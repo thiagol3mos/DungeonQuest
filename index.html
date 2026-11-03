@@ -738,7 +738,7 @@ let state = null;
 let busy = false;
 let toastMsg = "";
 let rollLog = [];
-let mapVersion = 1;
+let mapVersion = 1, mapHero = null;
 
 function freshState(){ return {v:1, screen:"title", hero:null, draft:null, cemetery:[], dungeon:null, ui:{}, settings:defaultSettings()}; }
 function defaultSettings(){ return {skin:"zelda", bagCap:10, map:"auto"}; }
@@ -1203,7 +1203,7 @@ function shopStock(){
   if(!state.shop || state.shop.key !== key || state.shop.v !== 2){
     const rand = [];
     for(let k=0; rand.length<5 && k<60; k++){ const it = rollShopItem(); if(!rand.some(x=>x.n.split(" (")[0] === it.n.split(" (")[0])) rand.push(it); }
-    state.shop = {key, v:2, items: SHOP_FIXED.map(x=>({...x})).concat(rand).map(x=>({...x, sold:false}))};
+    state.shop = {key, v:2, items: SHOP_FIXED.map(x=>({...x})).concat(rand).map(x=>crownize({...x, sold:false}))};
   }
   return state.shop.items;
 }
@@ -1260,6 +1260,14 @@ function fitRect(lv, dir, tx, ty, W, Dp){
   }
   return null;
 }
+/* corredor vertical largo: tenta 2 tiles de largura sem encolher; se não couber, cai no normal */
+function fitRect2(lv, dir, tx, ty, Dp){
+  for(const dp of [Dp, Dp-1]) for(const a of (Math.random()<.5 ? [0,1] : [1,0])){
+    const r = rectFor(dir, tx, ty, 2, dp, a);
+    if(isFree(lv, r.x, r.y, r.w, r.h)) return {...r, shrunk:false};
+  }
+  return null;
+}
 function sideTiles(seg, side){
   const out = [];
   if(side==="N") for(let i=0;i<seg.w;i++) out.push([seg.x+i, seg.y]);
@@ -1268,6 +1276,17 @@ function sideTiles(seg, side){
   if(side==="E") for(let i=0;i<seg.h;i++) out.push([seg.x+seg.w-1, seg.y+i]);
   return out;
 }
+/* quanto espaço livre existe à frente de um tile, na direção da porta */
+function freeAhead(lv, x, y, side){
+  const [dx,dy] = DIRV[side], px = dy ? 1 : 0, py = dx ? 1 : 0; let sc = 0;
+  for(let d=1; d<=6; d++){
+    const cx = x + dx*d, cy = y + dy*d;
+    if(lv.occ[cx+","+cy]) break;
+    sc += 2; for(const k of [-1,1,-2,2]) if(!lv.occ[(cx+px*k)+","+(cy+py*k)]) sc++;
+  }
+  return sc;
+}
+function sideScore(lv, seg, side){ return Math.max(0, ...sideTiles(seg, side).map(([x,y])=>freeAhead(lv, x, y, side))); }
 function addDoor(lv, seg, side, pref){
   const tiles = sideTiles(seg, side);
   const used = new Set(Object.values(lv.doors).map(d=>d.x+","+d.y+","+d.dir));
@@ -1279,7 +1298,11 @@ function addDoor(lv, seg, side, pref){
   let c;
   if(pref==="mid") c = cand.sort((a,b)=>Math.abs(a.i-(tiles.length-1)/2)-Math.abs(b.i-(tiles.length-1)/2))[0];
   else if(typeof pref === "number") c = cand.sort((a,b)=>Math.abs(a.i-pref)-Math.abs(b.i-pref))[0];
-  else c = pick(cand);
+  else {
+    // prefere o ponto da parede com mais espaço livre do lado de fora (com um pouco de sorte no meio)
+    const sc = cand.map(o=>({...o, s: freeAhead(lv, o.t[0], o.t[1], side) + Math.random()*3}));
+    c = sc.sort((a,b)=>b.s-a.s)[0];
+  }
   const door = {id:"d"+(lv.next++), seg:seg.id, x:c.t[0], y:c.t[1], dir:side, st:"closed", to:null};
   lv.doors[door.id] = door; seg.doors.push(door.id);
   return door;
@@ -1297,11 +1320,12 @@ function addNewSegDoors(lv, seg, code){
   const f = seg.fwd;
   if(seg.k==="corr"){
     if(n>=1) addDoor(lv, seg, f, "mid");
-    if(n===2) addDoor(lv, seg, Math.random()<.5?LEFT[f]:RIGHT[f], "mid");
+    if(n===2){ const l = sideScore(lv, seg, LEFT[f]) + Math.random()*4, r = sideScore(lv, seg, RIGHT[f]) + Math.random()*4; addDoor(lv, seg, l >= r ? LEFT[f] : RIGHT[f], "mid"); }
     if(n===3){ addDoor(lv, seg, LEFT[f], "mid"); addDoor(lv, seg, RIGHT[f], "mid"); }
     return;
   }
-  const sides = [f, LEFT[f], RIGHT[f]].sort(()=>Math.random()-.5);
+  // lados com mais espaço livre primeiro, para a masmorra não se chocar com salas existentes
+  const sides = [f, LEFT[f], RIGHT[f]].map(sd=>({sd, s: sideScore(lv, seg, sd) + Math.random()*6})).sort((a,b)=>b.s-a.s).map(o=>o.sd);
   for(let i=0;i<n;i++) addDoor(lv, seg, sides[i%3]);
 }
 
@@ -1314,10 +1338,10 @@ function buildLevel1(){
     start = makeSeg(lv, "ENT", {x:0,y:-1,w:1,h:2}, "N", {k:"stairs", name:"Escadaria de entrada", exit:true});
     addDoor(lv, start, "N", 0);
   } else if(dt.start==="corr3"){
-    start = makeSeg(lv, "ENT", {x:0,y:-4,w:1,h:5}, "N", {k:"corr", name:"Longo corredor de entrada", exit:true});
+    start = makeSeg(lv, "ENT", {x:0,y:-4,w:2,h:5}, "N", {k:"corr", name:"Longo corredor de entrada", exit:true});
     addDoor(lv, start, "N", "mid"); addDoor(lv, start, "W", 2); addDoor(lv, start, "E", 2);
   } else if(dt.start==="corr4"){
-    start = makeSeg(lv, "ENT", {x:0,y:-5,w:1,h:6}, "N", {k:"corr", name:"Corredor de entrada", exit:true});
+    start = makeSeg(lv, "ENT", {x:0,y:-5,w:2,h:6}, "N", {k:"corr", name:"Corredor de entrada", exit:true});
     addDoor(lv, start, "W", 1); addDoor(lv, start, "W", 4); addDoor(lv, start, "E", 1); addDoor(lv, start, "E", 4);
   } else {
     start = makeSeg(lv, "ENT", {x:-2,y:-5,w:6,h:6}, "N", {k:"room", name:"Salão de entrada", exit:true});
@@ -1396,8 +1420,11 @@ function itemFrom(text, magic){
 function fixWearable(it){
   if(/^Chapéu do Bobo/.test(it.n)){ it.slot = "Elmo"; it.pv = 2; }
   if(/^Sandálias do Imperador/.test(it.n)){ it.slot = "Botas"; it.pv = 2; }
+  crownize(it);
   return it;
 }
+const CROWN_RX = /^Coroa do Príncipe Degolado/;
+function crownize(it){ if(it && CROWN_RX.test(it.n) && !it.slot){ it.slot = "Elmo"; it.pv = 2; it.magic = true; it.crown = true; } return it; }
 const wearing = rx => !!(state.hero && ARMOR_SLOTS.some(s=>state.hero.armor[s] && rx.test(state.hero.armor[s].n)));
 function rollTreasure(){
   const dt = DT(), e = dt.tes[d6()-1];
@@ -1409,8 +1436,9 @@ function rollTreasure(){
 }
 let incoming = [];
 function addItem(it){
+  crownize(it);
   incoming.push(it);
-  if(it.slot && state.hero){ const set = it.n.split(" (")[0].replace(/^\S+\s/, ""); const x = H().sets; x[set] = x[set] || []; if(!x[set].includes(it.slot)) x[set].push(it.slot); }
+  if(it.slot && !it.crown && state.hero){ const set = it.n.split(" (")[0].replace(/^\S+\s/, ""); const x = H().sets; x[set] = x[set] || []; if(!x[set].includes(it.slot)) x[set].push(it.slot); }
   return true;
 }
 function flushIncoming(){
@@ -1465,7 +1493,8 @@ function mustRetire(h){ h = h || state.hero; return !!h && handsFree(h) === 0 &&
 function normalizeHands(){
   const VELA_N = "Vela dos Protetores (acenda a vela e os bônus do próximo baú serão dobrados!)";
   if(state.hero) state.hero.bag.forEach(it=>{ if(/^Vela dos Protetores/.test(it.n)) it.n = VELA_N; });
-  if(state.shop && state.shop.items) state.shop.items.forEach(it=>{ if(/^Vela dos Protetores/.test(it.n)) it.n = VELA_N; });
+  if(state.shop && state.shop.items) state.shop.items.forEach(it=>{ if(/^Vela dos Protetores/.test(it.n)) it.n = VELA_N; crownize(it); });
+  if(state.hero) state.hero.bag.forEach(crownize);
   const h = state.hero; if(!h) return;
   if((raceT("noArmor", h) || raceT("ogro", h)) && ARMOR_SLOTS.some(sl=>h.armor[sl] && !h.armor[sl].stone)){
     ARMOR_SLOTS.forEach(sl=>{ const p = h.armor[sl]; if(p && !p.stone){ h.bag.push(p); delete h.armor[sl]; } });
@@ -1600,7 +1629,7 @@ async function trap(origin){
     const [b] = await roll("Lâmina", 1);
     rollNote(b===1 ? "Golpe mortal" : b===2 ? "Perde um braço" : "Passa raspando");
     if(b===1){
-      if(hasItem(/^Coroa do Príncipe Degolado/) >= 0){ log("Uma lâmina desce do teto. A Coroa do Príncipe Degolado te salvou da morte."); return true; }
+      if(wearing(CROWN_RX)){ rollNote("Salvo pela Coroa!"); log("Uma lâmina desce do teto. Salvo de perder a cabeça pela Coroa do Príncipe Degolado!"); return true; }
       killHero("Uma lâmina desceu do teto"); return false;
     }
     if(b===2){ h.arms = (h.arms||2) - 1; log(`Uma lâmina desce do teto e arranca um dos seus braços. Restam ${h.arms}.`); return true; }
@@ -1719,7 +1748,8 @@ async function reveal(door, quiet){
   const [sv] = await roll("Segmento", 1);
   const code = table[sv-1], sh = SHAPES[code];
   rollNote(sh.n);
-  const rect = fitRect(lv, door.dir, tx, ty, sh.w, sh.d);
+  const wide = sh.k === "corr" && (door.dir === "N" || door.dir === "S");
+  const rect = (wide && fitRect2(lv, door.dir, tx, ty, sh.d)) || fitRect(lv, door.dir, tx, ty, sh.w, sh.d);
   if(!rect){ door.st = "rubble"; log("Atrás da porta só há escombros. Não dá para passar."); return; }
   const seg = makeSeg(lv, code, rect, door.dir, {from:door.id, quiet});
   door.to = seg.id;
@@ -1773,7 +1803,7 @@ async function teleTo(level, id){
 function moveTo(id, fresh){
   const d = D();
   d.pos.seg = id;
-  state.ui.selDoor = null; state.ui.bagFull = false; state.ui.pick = null;
+  state.ui.selDoor = null; state.ui.selObj = null; state.ui.bagFull = false; state.ui.pick = null;
   centerOn = true;
 }
 function walkPath(lv, a, b){
@@ -1823,7 +1853,7 @@ async function doChest(){
   const seg = curSeg(), h = state.hero;
   startAction();
   const v = await roll("Baú", 2);
-  seg.chests = 0;
+  seg.chests = 0; seg.chestsOpen = (seg.chestsOpen||0) + 1;
   const vela = (h.velas||0) > 0; if(vela) h.velas--;
   const lep = ARMOR_SLOTS.some(s=>h.armor[s] && /Leprechaun/.test(h.armor[s].n));
   const cMul = (lep?2:1) * (vela?2:1), tMul = vela ? 2 : 1;
@@ -2103,6 +2133,7 @@ function buildStatic(lv){
         for(let t=0;t<=1;t+=.06) ctx.fillRect(Math.round(cx+Math.cos(an)*14*(1-t)+Math.cos(an2)*14*t), Math.round(cy+Math.sin(an)*14*(1-t)+Math.sin(an2)*14*t), 1, 1); }
     }
     if(s.chests>0){ const cx = X+3, cy = Y+Hd-8; ctx.fillRect(cx, cy, 6, 5); ctx.fillStyle = PAPER; ctx.fillRect(cx+1, cy+2, 4, 2); ctx.fillStyle = INK; ctx.fillRect(cx+2, cy+1, 2, 1); }
+    else if(s.chestsOpen){ const cx = X+3, cy = Y+Hd-8; ctx.fillRect(cx, cy-2, 6, 2); ctx.fillRect(cx, cy+2, 6, 3); ctx.fillStyle = PAPER; ctx.fillRect(cx+1, cy+3, 4, 1); ctx.fillStyle = INK; }
     if(s.loot || (s.stash && s.stash.length)){ const cx = X+Wd-7, cy = Y+Hd-6; ctx.fillRect(cx+1,cy,2,1); ctx.fillRect(cx,cy+1,4,2); ctx.fillRect(cx+1,cy+3,2,1); ctx.fillRect(cx+3,cy+2,3,2); }
   });
   // cadáveres
@@ -2174,6 +2205,8 @@ function drawMap(cv){
   });
   // porta selecionada pisca
   const sel = state.ui.selDoor && lv.doors[state.ui.selDoor];
+  const so = state.ui.selObj && segObjRects(curSeg())[state.ui.selObj];
+  if(so && frame%4<2){ const [x,y,w,h] = so; ctx.fillStyle = "#f8e048"; ctx.fillRect(x-3,y-3,w+6,2); ctx.fillRect(x-3,y+h+1,w+6,2); ctx.fillRect(x-3,y-3,2,h+6); ctx.fillRect(x+w+1,y-3,2,h+6); }
   if(sel && frame%4<2){ const [x,y,w,h] = doorRect(sel); ctx.fillStyle = INK; ctx.fillRect(x-3,y-3,w+6,1); ctx.fillRect(x-3,y+h+2,w+6,1); ctx.fillRect(x-3,y-3,1,h+6); ctx.fillRect(x+w+2,y-3,1,h+6); }
   // herói com tocha
   if(seg && state.hero && !(state.ui.tele && Math.floor(t/350)%2)){
@@ -2548,7 +2581,7 @@ const GOLD = ["#6a4a10","#a8781c","#e0b038","#f8e078"];
 const MOSS = ["#2a4a26","#3e6a34","#5a8c42"];
 const CAP = 6;
 function palZ(){ return PALZ[(state.dungeon && state.dungeon.type) || 6]; }
-function faceH(s){ if(s.k==="stairs") return 18; if(s.h===1) return 12; if(s.w===1) return 24; return 40; }
+function faceH(s){ if(s.k==="stairs") return 18; if(s.h===1) return 12; if(s.w===1 || (s.k==="corr" && s.w===2)) return 24; return 40; }
 const md = (a,b) => ((a % b) + b) % b;
 function zh(x,y){ const n = Math.sin(x*127.1+y*311.7)*43758.5453; return n-Math.floor(n); }
 function drawSpriteC(ctx, rows, x, y, cmap){
@@ -2679,6 +2712,20 @@ function buildStaticZ(lv){
       [bx+1, bx+20].forEach(x=>{ ctx.fillStyle = GOLD[1]; ctx.fillRect(x, by+1, 3, 16); ctx.fillStyle = GOLD[3]; ctx.fillRect(x, by+1, 1, 16); });
       ctx.fillStyle = GOLD[1]; ctx.fillRect(bx+1, by+6, 22, 2); ctx.fillStyle = GOLD[3]; ctx.fillRect(bx+1, by+6, 22, 1);
       ctx.fillStyle = GOLD[2]; ctx.fillRect(bx+9, by+7, 6, 6); ctx.fillStyle = GOLD[3]; ctx.fillRect(bx+9, by+7, 6, 1); ctx.fillStyle = "#1a0e06"; ctx.fillRect(bx+11, by+9, 2, 3);
+    } else if(s.chestsOpen){
+      // baú aberto: tampa jogada para trás e o interior vazio à mostra
+      const bx = ix0+8, by = fy1-24;
+      ctx.fillStyle = "rgba(0,0,0,.4)"; ctx.fillRect(bx+1, by+17, 24, 3);
+      ctx.fillStyle = "#1a0e06"; ctx.fillRect(bx, by-3, 24, 21);
+      ctx.fillStyle = WOOD[3]; ctx.fillRect(bx+1, by-2, 22, 5); ctx.fillStyle = WOOD[2]; for(let x=bx+1; x<bx+23; x+=5) ctx.fillRect(x, by-2, 1, 5);
+      ctx.fillStyle = WOOD[4]; ctx.fillRect(bx+1, by+2, 22, 1);
+      [bx+1, bx+20].forEach(x=>{ ctx.fillStyle = GOLD[1]; ctx.fillRect(x, by-2, 3, 5); ctx.fillStyle = GOLD[3]; ctx.fillRect(x, by-2, 1, 5); });
+      ctx.fillStyle = "#0c0604"; ctx.fillRect(bx+1, by+4, 22, 4); ctx.fillStyle = "#2a1608"; ctx.fillRect(bx+2, by+6, 20, 2);
+      ctx.fillStyle = WOOD[3]; ctx.fillRect(bx+1, by+3, 22, 1);
+      ctx.fillStyle = WOOD[2]; ctx.fillRect(bx+1, by+8, 22, 9); ctx.fillStyle = WOOD[1]; for(let x=bx+1; x<bx+23; x+=5) ctx.fillRect(x, by+8, 1, 9);
+      [bx+1, bx+20].forEach(x=>{ ctx.fillStyle = GOLD[1]; ctx.fillRect(x, by+8, 3, 9); ctx.fillStyle = GOLD[3]; ctx.fillRect(x, by+8, 1, 9); });
+      ctx.fillStyle = GOLD[1]; ctx.fillRect(bx+1, by+8, 22, 2); ctx.fillStyle = GOLD[3]; ctx.fillRect(bx+1, by+8, 22, 1);
+      ctx.fillStyle = GOLD[2]; ctx.fillRect(bx+10, by+9, 4, 4); ctx.fillStyle = "#1a0e06"; ctx.fillRect(bx+11, by+10, 2, 2);
     }
     if(s.loot || (s.stash && s.stash.length)){
       const cx = ix1-22, cy = fy1-14;
@@ -2803,6 +2850,183 @@ function drawDoorZ(ctx, dd, lv, P){
 }
 const HERO_Z = [".....oooooo.....","....ohhHHhho....","...ohhHHHHhho...","...ohhhhhhhho...","...ohsssssSho...","...osesssesSo...","...ossssssSSo...","....osSSSSSo....","...oottttuuoo...","..ottuuttuuTto..",".osottuttuuTtoso",".ssootttttuTToSo","..ooobbbgbbbooo.","...otTttttTTto..","...otTttttTTto..","...oppppppppo...","...opppoopppo...","...opppo.oppo...","...okkko.okko...","..oKkkko.oKkko..","..oooooo.ooooo.."];
 const HERO_ZC = {o:"#1a1414",h:"#5a3218",H:"#8a5628",s:"#f0c090",S:"#c8905c",e:"#1a1414",t:"#3a6ab8",T:"#24447a",u:"#6a9ad8",b:"#6a3a18",g:"#e0b440",p:"#4a3a5a",k:"#3a2210",K:"#6a4220"};
+/* ===== Aventureiro modular: corpo base + camadas de equipamento, com poses ===== */
+const DOLL_W = 24, DOLL_H = 28, DOLL_OY = 4;
+const DOLL_SETS = [
+  [/Centurião/, ["#f0c070","#c48a3a","#7e521e"], "#c8302a"],
+  [/Conde/, ["#c8a0e8","#8a58b8","#4e2c78"]],
+  [/Força/, ["#ec8a78","#b8443a","#6e2220"]],
+  [/Realeza|Deuses|Imperador/, ["#fff0a0","#e8bc38","#9a7418"], "#d83a5a"],
+  [/Leprechaun/, ["#a8ec80","#52b040","#2a6a24"], "#e8bc38"],
+  [/Ossos/, ["#fbf4dc","#d8caa2","#8e8262"]],
+  [/Defunto/, ["#b4c49a","#74865e","#404c34"]],
+  [/Rainha Aranha/, ["#8e7aa2","#4a3a60","#221a30"], "#c82a2a"],
+  [/Guarda Especial/, ["#b4d0f0","#6488c8","#344c80"]],
+  [/Élfic/, ["#d4f4c4","#7cc080","#3a7a4a"]],
+  [/Escamas/, ["#9adcc0","#3e9a80","#1e5a48"]],
+  [/Demônio/, ["#f08060","#a82a1e","#4a1010"], "#ffb020"],
+  [/Anjos/, ["#ffffff","#d8e4f4","#8ea4c8"], "#ffe080"],
+  [/Cultista/, ["#a08cb0","#5e3e70","#2e1c3a"], "#d83a3a"],
+  [/Sacerdote/, ["#fff8e8","#e0d0b0","#a08c64"], "#e8bc38"],
+  [/Goblin/, ["#c0a070","#8a6a3a","#4e3a1e"]],
+  [/Pedra/, ["#b8b0a4","#847c70","#4e4840"]],
+];
+const DOLL_IRON = ["#d4dae4","#8e98ac","#525c72"];
+function dollPal(n){ for(const [rx,p,acc] of DOLL_SETS) if(rx.test(n||"")) return {p, acc: acc || p[0]}; return {p:DOLL_IRON, acc:"#e8e8e8"}; }
+function weaponKind(n){
+  n = n || "";
+  if(/Montante/.test(n)) return "big";
+  if(/Alabarda|Glaive/.test(n)) return "halberd";
+  if(/Gadanha|Foice/.test(n)) return "scythe";
+  if(/Lança/.test(n)) return "spear";
+  if(/Machado|Picareta/.test(n)) return "axe";
+  if(/Martelo|Maça|Panela|Pá\b/.test(n)) return "hammer";
+  if(/Chicote/.test(n)) return "whip";
+  if(/Fêmur|Remo|Castiçal|Espeto|Garra/.test(n)) return "club";
+  if(/Adaga|Kukri|Facão|Serrote/.test(n)) return "dagger";
+  return "sword";
+}
+/* aparência de cada raça: cores e partes do corpo */
+const DOLL_LOOKS = [
+  [/Homem-Gosma/, {skin:["#8ee878","#3e9e4a","#c8ffb8"], hair:null, tunic:null, head:"slime", lower:"blob"}],
+  [/Aboboróide/, {skin:["#8cc860","#4e8a34"], hair:null, tunic:["#6a4a2a","#4a3018"], head:"pumpkin"}],
+  [/Centauro/, {skin:["#e8b480","#b8804e"], hair:["#3a2414","#24160c"], tunic:null, lower:"horse"}],
+  [/Steambot/, {skin:["#e8b860","#a8782e","#fff0b0"], hair:null, tunic:["#b8743a","#7a4a20"], pants:["#6a7080","#454a58"], shoe:["#454a58","#2a2e38"], head:"robot"}],
+];
+function dollLook(h){ const r = R(h.race), n = r ? r.n : ""; for(const [rx, l] of DOLL_LOOKS) if(rx.test(n)) return l; return {}; }
+/* pose: idle | walkA | walkB | wind | strike ; back: vista de costas (arena) */
+function dollPixels(hero, pose, back){
+  const S = {}; let wx = 0, wy = 0;
+  const put = (x,y,c) => { x += wx; y += wy; if(x<0||y+DOLL_OY<0||x>=DOLL_W||y+DOLL_OY>=DOLL_H) return; S[x+","+(y+DOLL_OY)] = c; };
+  const rect = (x,y,w,h,c) => { for(let j=0;j<h;j++) for(let i=0;i<w;i++) put(x+i,y+j,c); };
+  const A = hero.armor || {};
+  const L = dollLook(hero);
+  const SK = L.skin || ["#f4c896","#cc9462"], HAIR = L.hair === null ? null : (L.hair || ["#8a5628","#5a3218"]);
+  const TUN = L.tunic === null ? [SK[0], SK[1]] : (L.tunic || ["#4a7ac8","#2c4c8a"]), PANTS = L.pants || ["#5a4a6a","#3a2e48"], SHOE = L.shoe || ["#6a4220","#3a2210"];
+  const la = pose==="walkA" ? -1 : 0, ra = pose==="walkB" ? -1 : 0;   // perna levantada
+  // pernas e pés (ou corpo de gosma / de cavalo)
+  if(L.lower === "blob"){
+    const sq = pose==="walkA" ? 1 : pose==="walkB" ? -1 : 0;
+    rect(7-Math.max(0,sq),15,10+Math.abs(sq),5,SK[0]); rect(6,17,12,3,SK[0]); rect(5,19,14,2,SK[1]); rect(7,15,1,3,SK[2]); rect(8,16,1,1,SK[2]); put(16,17,SK[1]); put(17,18,SK[1]);
+  } else if(L.lower === "horse"){
+    const HB = ["#b87c46","#865428","#563418"], st = pose==="walkA" ? -1 : 0, st2 = pose==="walkB" ? -1 : 0;
+    rect(8,13,14,5,HB[0]); rect(8,16,14,2,HB[1]); rect(9,12,12,1,HB[0]); rect(19,13,3,1,HB[1]); rect(10,13,6,1,"#d4985c");
+    rect(22,12,1,2,"#3a2414"); rect(23,13,1,4,"#3a2414"); rect(22,17,1,2,"#3a2414");
+    [[8,st],[10,st2],[17,st2],[20,st]].forEach(([x,u])=>{ rect(x,18+u,2,3,x>15?HB[1]:HB[0]); rect(x,21+u,2,1,"#2a1a10"); });
+    L._horse = HB;
+  } else {
+  rect(8,15,8,2,PANTS[0]); rect(15,15,1,2,PANTS[1]);
+  rect(8,17+la,3,2,PANTS[0]); put(10,17+la,PANTS[1]); put(10,18+la,PANTS[1]);
+  rect(13,17+ra,3,2,PANTS[0]); rect(15,17+ra,1,2,PANTS[1]);
+  rect(8,19+la,3,2,SHOE[0]); rect(8,20+la,3,1,SHOE[1]); rect(13,19+ra,3,2,SHOE[0]); rect(13,20+ra,3,1,SHOE[1]);
+  }
+  const bodyDy = pose==="breath" ? 1 : 0; wy = bodyDy;
+  // tronco, braços, cabeça
+  rect(8,9,8,5,TUN[0]); rect(14,9,2,5,TUN[1]); if(!back){ put(11,9,TUN[1]); put(12,9,TUN[1]); }
+  rect(8,14,8,1,"#6a3a18"); if(!back) rect(11,14,2,1,"#e0b440");
+  const armL = pose==="wind" ? -1 : 0;
+  rect(6,9+armL,2,4,TUN[0]); put(7,12+armL,TUN[1]); rect(16,9,2,4,TUN[1]); rect(6,13+armL,2,2,SK[0]); rect(16,13,2,2,SK[1]);
+  rect(11,8,2,1,SK[1]);
+  rect(8,3,8,4,SK[0]); rect(9,7,6,1,SK[1]); rect(15,3,1,4,SK[1]);
+  if(HAIR){
+    rect(8,0,8,3,HAIR[0]); rect(9,-1,6,1,HAIR[0]); rect(8,3,1,2,HAIR[0]); rect(15,3,1,2,HAIR[1]); rect(12,0,3,1,HAIR[1]);
+    if(back){ rect(8,3,8,4,HAIR[0]); rect(9,7,6,1,HAIR[1]); rect(15,3,1,4,HAIR[1]); rect(10,1,1,5,HAIR[1]); }
+  }
+  if(L.head === "slime"){
+    rect(8,0,8,8,SK[0]); rect(9,-1,6,1,SK[0]); rect(15,0,1,8,SK[1]); rect(9,0,2,1,SK[2]); put(9,1,SK[2]);
+    put(8,8,SK[0]); put(15,8,SK[1]); put(8,9,SK[1]);
+    if(!back){ rect(10,3,1,2,"#1a3a1a"); rect(13,3,1,2,"#1a3a1a"); put(10,3,"#ffffff"); put(13,3,"#ffffff"); rect(11,6,2,1,"#2a6a34"); }
+  } else if(L.head === "pumpkin"){
+    const PK = ["#ffa040","#e06a1a","#9a4210"];
+    rect(7,0,10,8,PK[1]); rect(8,-1,8,1,PK[1]); rect(8,0,1,8,PK[0]); rect(11,-1,1,9,PK[2]); rect(13,-1,1,9,PK[2]); rect(16,0,1,8,PK[2]); rect(8,8,8,1,PK[2]);
+    rect(11,-3,2,2,"#4e8a34"); put(13,-3,"#8cc860");
+    if(!back){ put(9,3,"#2a1408"); rect(9,4,2,1,"#2a1408"); put(14,3,"#2a1408"); rect(13,4,2,1,"#2a1408"); put(9,4,"#ffd040"); put(14,4,"#ffd040"); rect(9,6,6,1,"#2a1408"); put(10,7,"#2a1408"); put(13,7,"#2a1408"); put(11,6,"#ffd040"); }
+  } else if(L.head === "robot"){
+    const BR = SK;
+    rect(7,0,10,8,BR[1]); rect(7,0,10,1,BR[0]); rect(7,0,1,8,BR[0]); rect(16,1,1,7,"#7a5420"); rect(7,7,10,1,"#7a5420");
+    put(8,2,BR[2]); put(15,2,"#7a5420"); put(8,6,"#7a5420"); put(15,6,"#7a5420");
+    rect(13,-3,2,3,"#454a58"); put(13,-3,"#6a7080");
+    if(!back){ rect(9,3,4,3,"#24303a"); rect(10,4,2,1,"#60e0ff"); put(10,3,"#a0f4ff"); rect(9,6,6,1,"#454a58"); put(10,6,"#c8d0dc"); put(12,6,"#c8d0dc"); put(14,6,"#c8d0dc"); }
+    else { rect(9,2,6,4,BR[1]); put(10,3,"#7a5420"); put(13,4,"#7a5420"); }
+    if(!back){ rect(10,10,4,3,"#24303a"); put(11,11,"#ffe070"); put(12,11,"#e83a2a"); }
+  } else if(!back){ put(10,5,"#1a1414"); put(13,5,"#1a1414"); put(10,4,"#1a1414"); put(13,4,"#1a1414"); }
+  // armadura
+  const pc = A.Peitoral && dollPal(A.Peitoral.n);
+  if(pc){ const [l,m,d] = pc.p; rect(8,9,8,5,m); rect(9,9,2,4,l); rect(14,9,2,5,d); if(!back){ rect(11,10,2,3,d); put(11,10,l); if(pc.acc!==l){ put(11,11,pc.acc); put(12,11,pc.acc);} } else { rect(11,9,2,5,d); } rect(8,14,8,1,d); if(!back) rect(11,14,2,1,"#e0b440"); }
+  const bt = A.Botas && dollPal(A.Botas.n);
+  if(bt && L.lower === "horse"){ const [l,m,d] = bt.p; const step = pose==="walkA" ? -1 : 0, step2 = pose==="walkB" ? -1 : 0; [[8,step],[10,step2],[17,step2],[20,step]].forEach(([x,u])=>{ rect(x,19+u,2,2,m); put(x,19+u,l); rect(x,21+u,2,1,d); }); }
+  else if(bt && L.lower === "blob"){ const [l,m,d] = bt.p; rect(6,19,4,2,m); rect(14,19,4,2,m); put(6,19,l); put(14,19,l); }
+  else if(bt){ const [l,m,d] = bt.p; rect(8,17+la,3,4,m); rect(13,17+ra,3,4,m); rect(8,17+la,3,1,l); rect(13,17+ra,3,1,l); rect(8,20+la,3,1,d); rect(13,20+ra,3,1,d); put(10,18+la,d); put(15,18+ra,d); put(10,19+la,d); put(15,19+ra,d); }
+  const br = A.Braceletes && dollPal(A.Braceletes.n);
+  if(br){ const [l,m,d] = br.p; rect(6,11+armL,2,2,m); rect(16,11,2,2,m); put(6,11+armL,l); put(16,11,l); put(7,12+armL,d); put(17,12,d); }
+  const om = A.Ombreiras && dollPal(A.Ombreiras.n);
+  if(om){ const [l,m,d] = om.p; rect(5,9,4,2,m); rect(15,9,4,2,m); rect(6,8,2,1,m); rect(16,8,2,1,m); put(6,8,l); put(16,8,l); put(5,9,l); put(15,9,l); rect(5,10,4,1,d); rect(15,10,4,1,d); }
+  if(A.Anel && !back){ put(6,14+armL,"#ffe070"); put(5,13+armL,"#fff6c0"); }
+  const el = A.Elmo;
+  if(el){
+    if(/^Coroa/.test(el.n)){ const g=["#ffe680","#e8b830","#9a7418"]; rect(8,1,8,2,g[1]); rect(8,1,8,1,g[0]); put(8,0,g[1]); put(10,-1,g[1]); put(10,0,g[1]); put(13,-1,g[1]); put(13,0,g[1]); put(15,0,g[1]); if(!back){ put(11,1,"#d82a3a"); put(12,1,"#d82a3a"); } rect(8,2,8,1,g[2]); }
+    else if(/^Chapéu do Bobo/.test(el.n)){ rect(8,0,4,3,"#d83a3a"); rect(12,0,4,3,"#e8c030"); rect(6,-1,3,2,"#d83a3a"); rect(15,-1,3,2,"#e8c030"); put(5,0,"#ffe070"); put(18,0,"#ffe070"); rect(8,2,8,1,"#f2ead8"); }
+    else { const {p:[l,m,d],acc} = dollPal(el.n); rect(7,0,10,4,m); rect(8,-1,8,1,m); rect(8,-1,3,2,l); rect(7,4,2,3,m); rect(15,4,2,3,d); rect(15,0,2,4,d); rect(7,3,10,1,d);
+      if(back){ rect(7,4,10,3,m); rect(9,4,1,3,l); rect(15,4,2,3,d); } else { rect(11,3,2,3,m); put(11,3,d); put(12,3,d); }
+      if(/Centurião|Realeza|Deuses|Demônio|Anjos/.test(el.n)){ rect(10,-3,4,2,acc); put(9,-2,acc); } }
+  }
+  // mão esquerda: arma principal (sobe na preparação, avança no golpe)
+  const w = hero.weapon || {}, off = (hero.off || [])[0];
+  const lamp = (hero.bag||[]).some(it=>/^Lamparina/.test(it.n)), tongue = raceT("tongue", hero);
+  const W1 = ["#e8eef8","#a8b4c8","#5a6478"], WD = ["#a8743a","#6a4220"];
+  const k = w.unarmed ? "fist" : weaponKind(w.n);
+  if(pose==="wind"){ wx = -1; wy = 2; } if(pose==="strike"){ wx = 1; wy = -3; }
+  if(k==="sword"){ rect(4,1,2,12,W1[1]); rect(4,1,1,12,W1[0]); put(5,0,W1[1]); rect(3,13,4,1,"#e0b440"); rect(4,14,2,2,WD[1]); }
+  if(k==="big"){ rect(3,-2,3,15,W1[1]); rect(3,-2,1,15,W1[0]); put(4,-3,W1[1]); rect(1,13,7,1,"#e0b440"); rect(4,14,1,4,WD[1]); }
+  if(k==="dagger"){ rect(4,8,2,5,W1[1]); rect(4,8,1,5,W1[0]); put(5,7,W1[1]); rect(3,13,4,1,"#9a7418"); rect(4,14,2,1,WD[1]); }
+  if(k==="axe"){ rect(4,2,2,14,WD[0]); rect(5,2,1,14,WD[1]); rect(1,2,3,5,W1[1]); rect(1,2,1,5,W1[0]); put(3,7,W1[2]); }
+  if(k==="hammer"){ rect(4,4,2,12,WD[0]); rect(5,4,1,12,WD[1]); rect(2,1,6,4,W1[1]); rect(2,1,6,1,W1[0]); rect(2,4,6,1,W1[2]); }
+  if(k==="spear"){ rect(4,0,1,17,WD[0]); rect(5,0,1,17,WD[1]); rect(4,-3,2,3,W1[1]); put(4,-3,W1[0]); put(4,-2,W1[0]); }
+  if(k==="halberd"){ rect(4,-1,1,19,WD[0]); rect(5,-1,1,19,WD[1]); rect(4,-3,2,2,W1[1]); rect(1,0,3,5,W1[1]); rect(1,0,1,5,W1[0]); put(6,1,W1[1]); put(6,2,W1[2]); }
+  if(k==="scythe"){ rect(4,-1,1,19,WD[0]); rect(5,-1,1,19,WD[1]); rect(6,-1,5,1,W1[1]); rect(7,0,3,1,W1[2]); put(6,-2,W1[0]); }
+  if(k==="club"){ rect(4,5,2,11,"#e8dcc0"); rect(5,5,1,11,"#b0a080"); rect(3,3,4,3,"#f2ead2"); }
+  if(k==="whip"){ rect(4,12,2,4,WD[1]); [[3,11],[2,10],[2,9],[3,8],[4,7],[4,6],[3,5],[2,4]].forEach(([x,y])=>put(x,y,"#8a5a2a")); }
+  wx = 0; wy = bodyDy;
+  // mão direita: escudo, segunda arma ou tocha
+  let torch = null;
+  if(off && off.shield){ const g = /Dourado/.test(off.n) ? ["#ffe680","#e8b830","#9a7418"] : /Ferro/.test(off.n) ? DOLL_IRON : ["#c08a50","#8a5a2a","#5a3a18"];
+    rect(16,9,5,7,g[1]); rect(16,9,5,1,g[0]); rect(16,9,1,7,g[0]); rect(20,10,1,6,g[2]); rect(17,15,3,1,g[2]); put(18,16,g[2]); if(!back) put(18,12,"#f2ead8"); }
+  else if(off){ rect(18,2,2,12,W1[1]); rect(18,2,1,12,W1[0]); put(19,1,W1[1]); rect(17,13,4,1,"#e0b440"); }
+  if(lamp){ rect(15,15,2,3,"#e8b830"); put(15,15,"#ffe680"); put(16,16,"#fff4c0"); }
+  else if(!off && !w.two && !tongue){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); rect(17,5,4,1,"#7a808c"); torch = [19, 3 + DOLL_OY + bodyDy]; }
+  else if(tongue && !back){ rect(13,6,4,1,WD[0]); torch = [17, 4 + DOLL_OY + bodyDy]; }
+  else if(!off && !w.two){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); torch = [19, 3 + DOLL_OY + bodyDy]; }
+  return {S, torch};
+}
+const dollCache = new Map();
+function dollKey(h, pose, back){ return JSON.stringify([pose, !!back, h.race, h.race2, h.weapon && h.weapon.n, h.weapon && h.weapon.unarmed, (h.off||[]).map(o=>o.n), ARMOR_SLOTS.map(s=>h.armor[s] ? h.armor[s].n : ""), hasLamp(h)]); }
+function dollCanvas(h, pose, back){
+  const key = dollKey(h, pose, back);
+  let hit = dollCache.get(key); if(hit) return hit;
+  const {S, torch} = dollPixels(h, pose, back);
+  const cv = document.createElement("canvas"); cv.width = DOLL_W; cv.height = DOLL_H; const g = cv.getContext("2d");
+  const keys = Object.keys(S), O = {};
+  keys.forEach(k=>{ const [x,y] = k.split(",").map(Number); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{ const q=(x+a)+","+(y+b); if(!S[q]) O[q]=1; }); });
+  g.fillStyle = "#1a1414"; Object.keys(O).forEach(k=>{ const [x,y]=k.split(",").map(Number); g.fillRect(x,y,1,1); });
+  keys.forEach(k=>{ const [x,y]=k.split(",").map(Number); g.fillStyle = S[k]; g.fillRect(x,y,1,1); });
+  let out = cv, tp = torch;
+  if(back){ const m = document.createElement("canvas"); m.width = DOLL_W; m.height = DOLL_H; const mg = m.getContext("2d"); mg.translate(DOLL_W,0); mg.scale(-1,1); mg.drawImage(cv,0,0); out = m; if(tp) tp = [DOLL_W-1-tp[0], tp[1]]; }
+  hit = {cv: out, torch: tp};
+  if(dollCache.size > 80) dollCache.clear();
+  dollCache.set(key, hit); return hit;
+}
+/* desenha o aventureiro com os pés em (fx, fy); devolve a posição da chama da tocha (ou null) */
+function drawHero(ctx, fx, fy, t, pose, back, alpha){
+  const h = state.hero; if(!h) return null;
+  const d = dollCanvas(h, pose || "idle", back);
+  const x = Math.round(fx - 12), y = Math.round(fy - (20 + DOLL_OY + 1));
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(x+7, y+DOLL_OY+20, 11, 3);
+  if(alpha !== undefined){ ctx.save(); ctx.globalAlpha = alpha; }
+  ctx.drawImage(d.cv, x, y);
+  if(alpha !== undefined) ctx.restore();
+  return d.torch ? [x + d.torch[0], y + d.torch[1]] : null;
+}
+
 function flameZ(ctx, x, y, t, s, big){
   const sz = big || 1;
   const h = Math.round((11 + Math.sin(t*1.7+s)*2 + zh(Math.floor(t*4), s)*2) * sz);
@@ -2894,10 +3118,14 @@ function drawOverlayZ(ctx, lv, seg, t){
   if(seg && state.hero && !(state.ui.tele && Math.floor(t/350)%2)){
     const fh = faceH(seg), cx = (seg.x + seg.w/2)*T, floorTop = seg.y*T + CAP + fh, floorBot = (seg.y+seg.h)*T - CAP;
     const hx = Math.round(cx - 8 - (seg.mon && seg.w>=3 ? 20 : 0)), hy = Math.round(Math.min(floorBot - 23, floorTop + (floorBot-floorTop)*.62 - 10));
-    ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(hx+3, hy+21, 11, 3);
-    drawSpriteC(ctx, HERO_Z, hx, hy, HERO_ZC);
-    ctx.fillStyle = WOOD[2]; ctx.fillRect(hx+15, hy+4, 2, 9); ctx.fillStyle = WOOD[3]; ctx.fillRect(hx+15, hy+4, 1, 9); ctx.fillStyle = IRON[2]; ctx.fillRect(hx+14, hy+3, 4, 2);
-    flameZ(ctx, hx+16, hy+2, t, 5);
+    const tx = hx + 8, ty = hy + 22, now = performance.now();
+    if(!mapHero || mapHero.lvl !== lv.n){ mapHero = {lvl:lv.n, x:tx, y:ty, fx:tx, fy:ty, tx, ty, t0:0}; }
+    if(mapHero.tx !== tx || mapHero.ty !== ty){ mapHero.fx = mapHero.x; mapHero.fy = mapHero.y; mapHero.tx = tx; mapHero.ty = ty; mapHero.t0 = now; }
+    const k = Math.min(1, (now - mapHero.t0) / 420), walking = k < 1;
+    mapHero.x = mapHero.fx + (tx - mapHero.fx) * k; mapHero.y = mapHero.fy + (ty - mapHero.fy) * k;
+    const pose = walking ? (Math.floor(now/110)%2 ? "walkA" : "walkB") : (frame % 12 >= 6 ? "breath" : "idle");
+    const fl = drawHero(ctx, mapHero.x, mapHero.y - (walking && Math.floor(now/110)%2 ? 1 : 0), t, pose);
+    if(fl) flameZ(ctx, fl[0], fl[1], t, 5);
   }
   // luz e sombra
   Object.values(lv.segs).forEach(s=>{
@@ -2956,14 +3184,34 @@ function drawOverlayZ(ctx, lv, seg, t){
   }
   bossDraws.forEach(([k,x,y])=>drawBossEyes(ctx, k, x, y, t));
   const sel = state.ui.selDoor && lv.doors[state.ui.selDoor];
+  const so = state.ui.selObj && segObjRects(curSeg())[state.ui.selObj];
+  if(so && frame%4<2){ const [x,y,w,h] = so; ctx.fillStyle = "#f8e048"; ctx.fillRect(x-3,y-3,w+6,2); ctx.fillRect(x-3,y+h+1,w+6,2); ctx.fillRect(x-3,y-3,2,h+6); ctx.fillRect(x+w+1,y-3,2,h+6); }
   if(sel && frame%4<2){ const [x,y,w,h] = doorRect(sel); ctx.fillStyle = "#f8e048"; ctx.fillRect(x-6,y-5,w+12,2); ctx.fillRect(x-6,y+h+3,w+12,2); ctx.fillRect(x-6,y-5,2,h+10); ctx.fillRect(x+w+4,y-5,2,h+10); }
 }
 
-/* botão flutuante sobre a porta selecionada */
+/* monstros, baú e escada da sala: áreas tocáveis no mapa (Zelda: pixels; caderno: aproximado) */
+function segObjRects(s){
+  const out = {};
+  if(!s) return out;
+  if(isZ()){
+    const fh = faceH(s), floorTop = s.y*T + CAP + fh, floorBot = (s.y+s.h)*T - CAP;
+    if(s.mon){ const cx = (s.x + s.w/2)*T, base = Math.round(floorTop + (floorBot-floorTop)*.55), n = s.w>=3 ? 3 : 1; out.mon = [cx - n*13 - 4, base - 28, n*26 + 8, 36]; }
+    if(s.chests>0) out.chest = [s.x*T + CAP + 8, (s.y+s.h)*T - CAP - 24, 24, 18];
+  } else {
+    if(s.mon) out.mon = [s.x*T, s.y*T, s.w*T, s.h*T];
+    if(s.chests>0) out.chest = [s.x*T, (s.y+s.h)*T - 10, 10, 10];
+  }
+  if(s.down || s.up) out.stairs = [s.x*T, s.y*T, s.w*T, s.h*T];
+  return out;
+}
+/* botão flutuante sobre a porta ou o objeto selecionado */
 function placeDoorPop(cv, lv){
   const pop = document.getElementById("doorpop"); if(!pop) return;
-  const dd = lv.doors[pop.dataset.door]; if(!dd){ pop.hidden = true; return; }
-  const [x,y,w,h] = doorRect(dd);
+  let rr = null;
+  if(pop.dataset.obj){ rr = segObjRects(curSeg())[pop.dataset.obj] || null; }
+  else { const dd = lv.doors[pop.dataset.door]; if(dd) rr = doorRect(dd); }
+  if(!rr){ pop.hidden = true; return; }
+  const [x,y,w,h] = rr;
   const W = cv.clientWidth, H = cv.clientHeight;
   let sx = (x + w/2 - cam.x)*cam.z + W/2, sy = (y - cam.y)*cam.z + H/2;
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
@@ -3032,8 +3280,13 @@ function mapTap(wx, wy){
     const dist = Math.hypot(wx-(x+w/2), wy-(y+h/2));
     if(dist < bd){ bd = dist; best = dd; }
   });
-  if(best && (best.st==="closed"||best.st==="locked")){ state.ui.selDoor = best.id; render(); return; }
+  if(best && (best.st==="closed"||best.st==="locked")){ state.ui.selDoor = best.id; state.ui.selObj = null; render(); return; }
+  // monstros, baú ou escada da sala atual?
+  const rs = segObjRects(cur), inR = r => r && wx >= r[0]-6 && wx <= r[0]+r[2]+6 && wy >= r[1]-6 && wy <= r[1]+r[3]+6;
+  const hitObj = ["mon","chest","stairs"].find(k=>inR(rs[k]));
+  if(hitObj){ state.ui.selObj = state.ui.selObj === hitObj ? null : hitObj; state.ui.selDoor = null; render(); return; }
   const id = lv.occ[Math.floor(wx/T)+","+Math.floor(wy/T)];
+  if(id===d.pos.seg && (state.ui.selObj || state.ui.selDoor)){ state.ui.selObj = null; state.ui.selDoor = null; render(); return; }
   if(!id || id===d.pos.seg) return;
   if(blocked(cur)){ state.ui.msg = "Você não pode sair daqui com monstros te encarando."; render(); return; }
   if(!reachable(lv, d.pos.seg, id)){ state.ui.msg = "Não há caminho aberto até lá."; render(); return; }
@@ -3436,6 +3689,19 @@ function viewExplore(){
       }
     }
   }
+  const selObj = !tele && state.ui.selObj;
+  if(selObj === "mon" && seg.mon){
+    const g = seg.mon;
+    popHTML = isBlocked
+      ? `<button class="pbtn" data-act="fight">Lutar!</button>${g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") ? `<button class="pbtn alt" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>` : ""}`
+      : `<button class="pbtn" data-act="fight" data-surprise="1">Atacar de surpresa</button>`;
+    popHTML = `<span class="pwarn">${g.qty} ${esc(g.name)}</span>` + popHTML;
+  } else if(selObj === "chest" && seg.chests>0 && !isBlocked){
+    popHTML = `<button class="pbtn" data-act="chest">Abrir baú</button>`;
+  } else if(selObj === "stairs" && !isBlocked && (seg.down || seg.up)){
+    popHTML = (seg.down ? `<button class="pbtn" data-act="descend">${d.pos.level+1>=3 ? "Descer para a Sala Final" : `Descer para o nível ${d.pos.level+1}`}</button>` : "")
+      + (seg.up ? `<button class="pbtn alt" data-act="climb">Subir para o nível ${seg.up.level}</button>` : "");
+  } else if(selObj){ state.ui.selObj = null; }
   if(!isBlocked){
     if(seg.loot) acts.push(`<button class="btn" data-act="loot">Pegar: ${lootText(seg.loot)}</button>`);
     if(seg.stash && seg.stash.length && !state.ui.bagFull) acts.push(`<button class="btn" data-act="takeStash">Itens deixados aqui (${seg.stash.length})</button>`);
@@ -3485,12 +3751,12 @@ function viewExplore(){
   const canLeave = !isBlocked && pathClear();
   return `
   <div class="bar"><button class="back" data-act="go" data-to="sheet" aria-label="Ficha">◀</button><h2 class="sm">${esc(d.name)}<br><span class="label">Nível ${N(d.pos.level)}</span></h2></div>
-  <p class="muted small" style="margin:0">Toque numa porta ou sala. Arraste para mover e pince para dar zoom.</p>
+  <p class="muted small" style="margin:0">Toque numa porta, sala, monstro, baú ou escada. Arraste para mover e pince para dar zoom.</p>
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span><span>Moedas<b>${h.coins}</b></span><span>Mochila<b>${bagLabel(h)}</b></span></div>
     ${h.velas ? `<div class="mapbuff"><canvas width="5" height="8" data-candle></canvas>Vela · ${velaTxt(h.velas)}</div>` : ""}
     <canvas id="map" data-anim="map" aria-label="Mapa da masmorra visto de cima"></canvas>
- ${popHTML && !tele ? `<div class="doorpop" id="doorpop" data-door="${selDoor.id}">${popHTML}</div>` : ""}
+ ${popHTML && !tele ? `<div class="doorpop" id="doorpop" ${state.ui.selObj ? `data-obj="${state.ui.selObj}"` : `data-door="${selDoor.id}"`}>${popHTML}</div>` : ""}
     <div class="mapctl"><button data-act="zoom" data-z="1.3" aria-label="Aproximar">+</button><button data-act="zoom" data-z="0.77" aria-label="Afastar">−</button><button data-act="center" aria-label="Centralizar no aventureiro">◎</button><button data-act="go" data-to="sheet" aria-label="Ficha do personagem"><canvas width="13" height="13" data-clip></canvas></button></div>
   </div>
   <div class="etray" id="etray"></div>
@@ -3620,6 +3886,7 @@ function viewAdvClass(){
    COMBATE (página 10 do livro)
    ========================================================= */
 const ABILITIES = ["Explosivo","Fogo","Horda","Magia","Morte Súbita","Necromancia","Regeneração","Paralisar"];
+let heroAtk = null, heroDieAt = 0;
 let fxPops = [], heroHitUntil = 0, monHit = {}, monAtk = {}, monDie = {};
 const C = () => state.combat;
 const alive = () => C().units.filter(u=>u.pv>0);
@@ -3635,7 +3902,7 @@ function startCombat(surprise){
   if(seg.mon.sneak){ seg.mon.sneak = false; }
   state.combat = {level:D().pos.level, seg:seg.id, units, sel:0, phase:first, round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
   if(units.some(u=>has(u,"Morto-Vivo"))) H().undead++;
-  fxPops = []; monHit = {}; monAtk = {}; monDie = {};
+  fxPops = []; monHit = {}; monAtk = {}; monDie = {}; heroAtk = null; heroDieAt = 0;
   cLog(first === "hero" ? "O combate começa. Você ataca primeiro." : "O combate começa. Os monstros atacam primeiro.");
   go("combat");
   if(first === "mon") runMonsterTurn();
@@ -3700,6 +3967,8 @@ async function heroAttack(kind, wn){
   const vorpal = /Vorpal/.test(W.n) && die === 6 && kind !== "horn";
   cLog(`Você ${kind==="horn" ? "dá uma chifrada" : "ataca com " + W.n.split(" (")[0]}: ${die}${mod?(mod>0?"+":"")+mod:""}${heroDamageBonus(u, W)?" +"+heroDamageBonus(u, W):""} = ${Math.max(0,base)}.`);
   if(firstHit && hasClass("Assassino") && base > 0){ base *= 3; cLog(`Assassino: o primeiro golpe causa o triplo (${base}).`); }
+  heroAtk = {t0: performance.now(), i: c.sel, kind: kind === "horn" ? "fist" : W.unarmed ? "fist" : weaponKind(W.n)};
+  await new Promise(r=>setTimeout(r, 300));
   await hitMonster(c.sel, base, {die, vorpal, w:W, firstHit});
   if(/Vampírica/.test(W.n) && kind !== "horn"){ h.pv = Math.min(h.pvMax, h.pv+1); cLog("A arma vampírica te devolve 1 PV."); }
   if(die === 1 && raceT("goblin")){
@@ -3840,7 +4109,7 @@ async function runMonsterTurn(){
   applyHeroDamage({}, total, poison);
 }
 function armorCur(p){ return p.cur === undefined ? p.pv : p.cur; }
-function applyHeroDamage(alloc, total, poison){
+async function applyHeroDamage(alloc, total, poison){
   const c = C(), h = state.hero;
   let absorbed = 0;
   Object.entries(alloc).forEach(([slot, a])=>{
@@ -3854,7 +4123,7 @@ function applyHeroDamage(alloc, total, poison){
   if(absorbed) cLog(`A armadura absorveu ${absorbed} de dano.`);
   if(toPV) cLog(`Você perde ${toPV} PV (${h.pv}/${h.pvMax}).`);
   c.pending = null; c.alloc = {};
-  if(h.pv <= 0){ const killer = alive()[0]; finishDeath(killer ? `Morto por ${killer.name}` : "Morto em combate"); return; }
+  if(h.pv <= 0){ const killer = alive()[0]; if(!samambro()){ busy = true; lockButtons(); heroDieAt = performance.now(); await new Promise(r=>setTimeout(r, 900)); heroDieAt = 0; } finishDeath(killer ? `Morto por ${killer.name}` : "Morto em combate"); return; }
   startHeroTurn();
 }
 async function startHeroTurn(){
@@ -3943,16 +4212,27 @@ function drawArena(cv){
   });
   // aventureiro de costas para a tela, no primeiro plano
   const hx = Math.round(W/2 - 8), hy = H - 26;
-  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(hx+3, hy+21, 11, 3);
-  ctx.save(); if(heroHitUntil > now && frame%2) ctx.globalAlpha = .4;
-  drawSpriteC(ctx, HERO_Z, hx, hy, HERO_ZC);
-  ctx.restore();
-  ctx.fillStyle = WOOD[2]; ctx.fillRect(hx+15, hy+4, 2, 9); flameZ(ctx, hx+16, hy+2, t, 5);
+  let pose = frame % 12 >= 6 ? "breath" : "idle", dy = 0, dx = 0;
+  const ak = heroAtk ? (now - heroAtk.t0) : 1e9;
+  if(ak < 160) { pose = "wind"; dy = 1; }
+  else if(ak < 420){ pose = "strike"; dy = -Math.round(Math.sin((ak-160)/260*Math.PI)*6); }
+  const hurt = heroHitUntil > now;
+  if(hurt){ dy = 2; dx = frame%2 ? 1 : -1; }
+  let fl = null;
+  if(heroDieAt){
+    const k = Math.min(1, (now - heroDieAt) / 700), d = dollCanvas(state.hero, "idle", true);
+    ctx.save(); ctx.globalAlpha = 1 - k*.6; ctx.translate(W/2, H-4); ctx.rotate(k * Math.PI/2); ctx.drawImage(d.cv, -12, -(20 + DOLL_OY + 1)); ctx.restore();
+  } else {
+    fl = drawHero(ctx, W/2 + dx, H - 4 + dy, t, pose, true, hurt && frame%2 ? .45 : undefined);
+    if(fl) flameZ(ctx, fl[0], fl[1], t, 5);
+  }
+  if(heroAtk && ak < 520){ const pos = arenaPositions(c.units.length, W)[heroAtk.i]; if(pos) drawSlash(ctx, heroAtk.kind, pos[0], pos[1] - 10, (ak - 140) / 380); }
+  else if(heroAtk && ak >= 520) heroAtk = null;
   if(heroHitUntil > now){ ctx.fillStyle = "rgba(220,40,30,.25)"; ctx.fillRect(0,0,W,H); }
   const g = ctx.createRadialGradient(W/2, H-10, 20, W/2, H/2, W*.75);
   g.addColorStop(0, "rgba(4,6,12,0)"); g.addColorStop(1, "rgba(4,6,12,.5)");
   ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-  glowZ(ctx, hx+16, hy-4, 44, .2);
+  if(fl) glowZ(ctx, fl[0], fl[1]-4, 44, .2);
   // números de dano
   fxPops = fxPops.filter(p=>now - p.t0 < 1100);
   fxPops.forEach(p=>{
@@ -3961,6 +4241,20 @@ function drawArena(cv){
     drawText(ctx, p.txt.replace("-","").replace("+",""), 1, 1, "#0c0a12"); drawText(ctx, p.txt.replace("-","").replace("+",""), 0, 0, p.col);
     ctx.restore();
   });
+}
+function drawSlash(ctx, kind, x, y, k){
+  if(k < 0 || k > 1) return;
+  const a = 1 - k, px = (X,Y,c)=>{ ctx.fillStyle = c; ctx.fillRect(Math.round(X), Math.round(Y), 3, 3); };
+  ctx.save(); ctx.globalAlpha = Math.min(1, a*1.6);
+  const W1 = "#ffffff", W2 = "#bfe0ff", Y1 = "#ffe070";
+  if(kind==="sword" || kind==="big" || kind==="halberd" || kind==="scythe"){ const r = kind==="big"||kind==="scythe" ? 20 : 15; const n = Math.round(4 + k*10);
+    for(let i=0;i<n;i++){ const ang = -2.4 + i*0.22; px(x + Math.cos(ang)*r, y + Math.sin(ang)*r*.8 + 6, i > n-3 ? W1 : W2); } }
+  else if(kind==="dagger"){ [[-6,-6],[6,-4]].forEach(([ox,oy],j)=>{ for(let i=0;i<5;i++) px(x+ox+i*2*(j?-1:1)*-1 + (j?0:0), y+oy+i*2, W1); }); }
+  else if(kind==="spear"){ const len = Math.round(6 + k*14); for(let i=0;i<len;i+=2) px(x, y + 14 - i, i>len-4 ? W1 : W2); px(x-2, y+14-len, W1); px(x+2, y+14-len, W1); }
+  else if(kind==="axe" || kind==="hammer" || kind==="club"){ const r = Math.round(4 + k*13); for(let i=0;i<8;i++){ const ang = i/8*Math.PI*2; px(x + Math.cos(ang)*r, y + 8 + Math.sin(ang)*r*.4, i%2 ? Y1 : W1); } px(x, y+6, W1); }
+  else if(kind==="whip"){ for(let i=0;i<12;i++) px(x - 12 + i*2, y + Math.sin(i*.9 + k*6)*4, i>8 ? W1 : "#e8c890"); }
+  else { const r = Math.round(2 + k*7); for(let i=0;i<6;i++){ const ang = i/6*Math.PI*2; px(x + Math.cos(ang)*r, y + Math.sin(ang)*r, Y1); } px(x, y, W1); }
+  ctx.restore();
 }
 function arenaPositions(n, W){
   const pos = [];
@@ -4374,7 +4668,7 @@ const actions = {
     state.ui = {}; rollLog = []; centerOn = true; mapVersion++;
     go("explore");
   },
-  selDoor(b){ state.ui.selDoor = b.dataset.id; render(); },
+  selDoor(b){ state.ui.selDoor = b.dataset.id; state.ui.selObj = null; render(); },
   openDoor(b){ doOpenDoor(b.dataset.id); },
   unlock(b){ doUnlock(b.dataset.id, b.dataset.how); },
   loot(){ collectLoot(curSeg()); mapVersion++; persist(); render(); },
@@ -4669,7 +4963,7 @@ function paint(){
 let last = 0;
 function loop(ts){
   if(ts - last > 120){ last = ts; frame++; paint(); }
-  else { const m = $("#map"); if(m) drawMap(m); const ar = $("#arena"); if(ar && fxPops.length) drawArena(ar); }
+  else { const m = $("#map"); if(m) drawMap(m); const ar = $("#arena"); if(ar && (fxPops.length || heroAtk || heroDieAt || heroHitUntil > performance.now())) drawArena(ar); }
   requestAnimationFrame(loop);
 }
 
