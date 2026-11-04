@@ -140,6 +140,8 @@ textarea{font-size:16px;font-family:ui-monospace,monospace;min-height:110px;resi
 .item.sel{background:var(--ink);color:var(--paper)}
 .item-acts{display:flex;gap:8px;flex-wrap:wrap}
 .item-acts .use{flex:1}
+.preview{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px}
+.preview canvas{width:224px;height:184px;image-rendering:pixelated;border:3px solid var(--ink);background:#0c0a12}
 .bagtools{display:flex;gap:2px;align-items:center;flex:none}
 .bagtools .sortb{margin-left:3px}
 .bagtools .use{border-width:2px;padding:3px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;line-height:0}
@@ -3625,7 +3627,8 @@ function viewCreate(){
       ${r2 ? card(r2, "Raça herdada (vantagem)") : ""}
       ${needHalf ? `<button class="btn" data-act="rollRace2">Rolar a raça herdada (2d6)</button>` : ""}
       ${r ? `<div class="row"><button class="btn ghost" data-act="rollRace">Rolar de novo</button><button class="btn" data-act="step" data-to="cls" ${needHalf?"disabled":""}>Próximo</button></div>`
-          : `<button class="btn" data-act="rollRace">Rolar ${cat==="comum"?"2d6":cat==="zoada"?"2 dados":"1d6"}</button>`}`;
+          : `<button class="btn" data-act="rollRace">Rolar ${cat==="comum"?"2d6":cat==="zoada"?"2 dados":"1d6"}</button>`}
+      ${r ? `<div class="preview"><canvas id="preview" width="56" height="46" data-anim="preview" aria-label="Prévia do personagem: ${esc(r.n)}"></canvas><span class="label">Prévia</span></div>` : ""}`;
   }
   if(step==="cls"){
     const c = CLASSES[dr.cls];
@@ -4511,6 +4514,22 @@ function drawArena(cv){
     ctx.restore();
   });
 }
+/* prévia do aventureiro na criação: a raça sorteada, parado e respirando, com a tocha acesa */
+function drawPreview(cv){
+  const dr = state.draft; if(!dr || !dr.race) return;
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, t = frame/8;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#0c0a12"; ctx.fillRect(0,0,W,H);
+  const P = PALZ[1];
+  for(let y=30; y<H; y++) for(let x=0; x<W; x++){ const h = zh(x,y); ctx.fillStyle = h<.15 ? P.F[1] : h>.85 ? P.F[3] : P.F[2]; ctx.fillRect(x,y,1,1); }
+  for(let i=0;i<6;i++){ ctx.fillStyle = `rgba(0,0,0,${.5-i*.08})`; ctx.fillRect(0,30+i,W,1); }
+  const hero = {race:dr.race, race2:dr.race2, weapon:{unarmed:true}, armor:{}, off:[], bag:[], arms:2};
+  const d = dollCanvas(hero, frame % 12 >= 6 ? "breath" : "idle", false);
+  const x = Math.round(W/2 - 12), y = H - 3 - (20 + DOLL_OY + 1);
+  ctx.fillStyle = "rgba(0,0,0,.4)"; ctx.fillRect(x+7, y+DOLL_OY+20, 11, 3);
+  ctx.drawImage(d.cv, x, y);
+  if(d.torch){ flameZ(ctx, x + d.torch[0], y + d.torch[1], t, 5); glowZ(ctx, x + d.torch[0], y + d.torch[1] - 4, 34, .22); }
+}
 function drawSlash(ctx, kind, x, y, k){
   if(k < 0 || k > 1) return;
   const a = 1 - k, px = (X,Y,c)=>{ ctx.fillStyle = c; ctx.fillRect(Math.round(X), Math.round(Y), 3, 3); };
@@ -5218,6 +5237,7 @@ function paint(){
     if(a==="torches") drawTorches(cv);
     if(a==="map") drawMap(cv);
     if(a==="arena") drawArena(cv);
+    if(a==="preview") drawPreview(cv);
   });
   document.querySelectorAll("canvas[data-candle]").forEach(drawCandle);
   document.querySelectorAll("canvas[data-mon]").forEach(cv=>{
