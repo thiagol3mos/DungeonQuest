@@ -1241,7 +1241,7 @@ function curSeg(){ const p = state.dungeon.pos; return LV(p.level).segs[p.seg]; 
 function log(msg){ const d = D(); d.log.unshift(msg); if(d.log.length>40) d.log.length = 40; }
 
 function newLevel(n){ return {n, segs:{}, doors:{}, occ:{}, next:1, last:null, finalAsked:false}; }
-function occupy(lv, seg){ for(let y=seg.y;y<seg.y+seg.h;y++) for(let x=seg.x;x<seg.x+seg.w;x++) lv.occ[x+","+y] = seg.id; }
+function occupy(lv, seg){ [seg, seg.neck].forEach(r=>{ if(r) for(let y=r.y;y<r.y+r.h;y++) for(let x=r.x;x<r.x+r.w;x++) lv.occ[x+","+y] = seg.id; }); }
 function isFree(lv, x, y, w, h){ for(let yy=y;yy<y+h;yy++) for(let xx=x;xx<x+w;xx++) if(lv.occ[xx+","+yy]) return false; return true; }
 function rectFor(dir, tx, ty, W, Dp, a){
   if(dir==="N") return {x:tx-a, y:ty-Dp+1, w:W, h:Dp};
@@ -1249,14 +1249,65 @@ function rectFor(dir, tx, ty, W, Dp, a){
   if(dir==="E") return {x:tx, y:ty-a, w:Dp, h:W};
   return {x:tx-Dp+1, y:ty-a, w:Dp, h:W};
 }
-function fitRect(lv, dir, tx, ty, W, Dp){
-  const sizes = [[W,Dp],[W,Dp-1],[W-1,Dp],[W-1,Dp-1],[W,Dp-2],[W-1,Dp-2],[2,2],[1,2],[1,1]].filter(([w,d])=>w>=1&&d>=1);
-  for(const [w,dp] of sizes){
-    const offs = Array.from({length:w},(_,i)=>i).sort((a,b)=>Math.abs(a-(w-1)/2)-Math.abs(b-(w-1)/2) || Math.random()-.5);
-    for(const a of offs){
-      const r = rectFor(dir, tx, ty, w, dp, a);
-      if(isFree(lv, r.x, r.y, r.w, r.h)) return {...r, shrunk: w!==W || dp!==Dp};
-    }
+/* encaixe estilo Tetris: tenta a peça inteira nas duas orientações e em todas as posições ao longo da porta;
+   entre os encaixes possíveis, prefere o que deixa mais espaço livre em volta. Só encolhe se nada couber. */
+function ringFree(lv, r){
+  let n = 0;
+  for(let x=r.x-1; x<=r.x+r.w; x++){ if(!lv.occ[x+","+(r.y-1)]) n++; if(!lv.occ[x+","+(r.y+r.h)]) n++; }
+  for(let y=r.y; y<r.y+r.h; y++){ if(!lv.occ[(r.x-1)+","+y]) n++; if(!lv.occ[(r.x+r.w)+","+y]) n++; }
+  return n;
+}
+function fitRect(lv, dir, tx, ty, W, Dp, rot){
+  const orients = rot && W !== Dp ? [[W,Dp],[Dp,W]] : [[W,Dp]];
+  const tryAll = sizes => {
+    let best = null;
+    sizes.forEach(([w,dp], oi)=>{
+      for(let a=0; a<w; a++){
+        const r = rectFor(dir, tx, ty, w, dp, a);
+        if(!isFree(lv, r.x, r.y, r.w, r.h)) continue;
+        const centered = -Math.abs(a-(w-1)/2);
+        const score = ringFree(lv, r)*2 + centered + (oi===0 ? 1.5 : 0) + Math.random()*2;
+        if(!best || score > best.score) best = {...r, score};
+      }
+    });
+    return best;
+  };
+  // 1) peça inteira na orientação original; se não couber, girada
+  for(const o of orients){ const full = tryAll([o]); if(full){ delete full.score; return {...full, shrunk:false}; } }
+  // 2) encolhe aos poucos, sempre pela maior área possível (nas duas orientações)
+  const cand = [];
+  orients.forEach(([ow,od])=>{ for(let w=ow; w>=1; w--) for(let d=od; d>=1; d--) if(w*d < ow*od) cand.push([w,d]); });
+  const areas = [...new Set(cand.map(([w,d])=>w*d))].sort((x,y)=>y-x);
+  for(const ar of areas){
+    const r = tryAll(cand.filter(([w,d])=>w*d===ar && Math.min(w,d) >= Math.min(2, Math.min(W,Dp))));
+    if(r){ delete r.score; return {...r, shrunk:true}; }
+  }
+  // 3) último recurso: qualquer tamanho
+  for(const ar of areas){ const r = tryAll(cand.filter(([w,d])=>w*d===ar)); if(r){ delete r.score; return {...r, shrunk:true}; } }
+  return null;
+}
+/* sala com gargalo: quando a sala inteira não cabe colada na porta, ela começa estreita
+   (do tamanho da brecha entre as outras salas) e depois se abre no tamanho completo */
+function fitWithNeck(lv, dir, tx, ty, W, Dp){
+  const [dx,dy] = DIRV[dir], vert = dir==="N" || dir==="S";
+  for(let g=1; g<=3; g++){
+    let best = null;
+    const nx = tx + dx*g, ny = ty + dy*g;
+    [[W,Dp],[Dp,W]].forEach(([w,d], oi)=>{
+      for(let a=0; a<w; a++){
+        const r = rectFor(dir, nx, ny, w, d, a);
+        if(!isFree(lv, r.x, r.y, r.w, r.h)) continue;
+        // faixa da sala (no eixo da parede) em que o gargalo pode encostar
+        const b0 = vert ? r.x : r.y, b1 = b0 + (vert ? r.w : r.h) - 1, c = vert ? tx : ty;
+        for(let nw = Math.min(w-1, 4); nw >= 1; nw--) for(let s0 = Math.max(b0, c-nw+1); s0 <= Math.min(c, b1-nw+1); s0++){
+          const neck = vert ? {x:s0, y: dir==="N" ? ty-g+1 : ty, w:nw, h:g} : {x: dir==="W" ? tx-g+1 : tx, y:s0, w:g, h:nw};
+          if(!isFree(lv, neck.x, neck.y, neck.w, neck.h)) continue;
+          const score = ringFree(lv, r)*2 + nw*4 - g*6 + (oi===0 ? 1.5 : 0) + Math.random()*2;
+          if(!best || score > best.score) best = {score, rect:{...r, shrunk:false}, neck};
+        }
+      }
+    });
+    if(best) return best;
   }
   return null;
 }
@@ -1592,14 +1643,31 @@ function killHero(cause){
   state.hero = null; state.ui = {lastDeath:{name:h.name, cause}};
   state.screen = "cemetery";
 }
-function pathClear(){
-  const d = D();
-  for(let l=1; l<=d.pos.level; l++){
-    const lv = d.levels[l]; if(!lv) continue;
-    for(const s of Object.values(lv.segs)) if(blocked(s) && !(l===d.pos.level && s.id===d.pos.seg && false)) return false;
+/* existe caminho até a saída sem atravessar salas com monstros acordados? (sobe os níveis pelas escadas) */
+function exitRoute(){
+  const d = D(); let level = d.pos.level, cur = d.pos.seg; const by = [];
+  for(let guard=0; guard<6; guard++){
+    const lv = d.levels[level]; if(!lv) return {ok:false, by};
+    const target = Object.values(lv.segs).find(s => level===1 ? s.exit : s.up);
+    if(!target) return {ok:false, by};
+    const seen = new Set([cur]), q = [cur]; let found = cur === target.id;
+    while(q.length && !found){
+      const sid = q.shift(), seg = lv.segs[sid];
+      const ids = seg.doors.map(id=>lv.doors[id]).filter(dd=>dd.to && ["open","broken","secret"].includes(dd.st)).map(dd=>dd.to);
+      if(seg.from){ const dd = lv.doors[seg.from]; if(dd) ids.push(dd.seg); }
+      Object.values(lv.doors).forEach(dd=>{ if(dd.to===sid && ["open","broken","secret"].includes(dd.st)) ids.push(dd.seg); });
+      for(const n of ids){ if(seen.has(n)) continue; seen.add(n); const ns = lv.segs[n]; if(!ns) continue;
+        if(blocked(ns)){ if(!by.includes(ns.name)) by.push(ns.name); continue; }
+        if(n === target.id){ found = true; break; } q.push(n); }
+    }
+    if(!found) return {ok:false, by};
+    if(level === 1) return {ok:true, by:[]};
+    cur = target.up.seg; level = target.up.level;
+    const up = d.levels[level] && d.levels[level].segs[cur]; if(up && blocked(up)) return {ok:false, by:[up.name]};
   }
-  return true;
+  return {ok:false, by};
 }
+function pathClear(){ return exitRoute().ok; }
 function leaveDungeon(){
   const d = D(), h = state.hero;
   d.inside = false;
@@ -1749,9 +1817,11 @@ async function reveal(door, quiet){
   const code = table[sv-1], sh = SHAPES[code];
   rollNote(sh.n);
   const wide = sh.k === "corr" && (door.dir === "N" || door.dir === "S");
-  const rect = (wide && fitRect2(lv, door.dir, tx, ty, sh.d)) || fitRect(lv, door.dir, tx, ty, sh.w, sh.d);
+  let rect = (wide && fitRect2(lv, door.dir, tx, ty, sh.d)) || fitRect(lv, door.dir, tx, ty, sh.w, sh.d, sh.k === "room");
+  let np = null;
+  if(sh.k === "room" && (!rect || rect.shrunk)){ np = fitWithNeck(lv, door.dir, tx, ty, sh.w, sh.d); if(np) rect = np.rect; }
   if(!rect){ door.st = "rubble"; log("Atrás da porta só há escombros. Não dá para passar."); return; }
-  const seg = makeSeg(lv, code, rect, door.dir, {from:door.id, quiet});
+  const seg = makeSeg(lv, code, rect, door.dir, {from:door.id, quiet, neck: np ? np.neck : undefined});
   door.to = seg.id;
   addNewSegDoors(lv, seg, code);
   if(rect.shrunk) seg.name += " (estreita)";
@@ -2083,7 +2153,7 @@ function drawDoor(ctx, dd){
 function buildStatic(lv){
   const segs = Object.values(lv.segs);
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  segs.forEach(s=>{ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); });
+  segs.forEach(s=>[s, s.neck].forEach(r=>{ if(!r) return; x0=Math.min(x0,r.x); y0=Math.min(y0,r.y); x1=Math.max(x1,r.x+r.w); y1=Math.max(y1,r.y+r.h); }));
   x0-=4; y0-=4; x1+=6; y1+=4;
   const W = (x1-x0)*T, H = (y1-y0)*T;
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
@@ -2155,6 +2225,18 @@ function buildStatic(lv){
     if(!txt) return;
     const [sx, sy] = signPos(lv, s, txt);
     drawSign(ctx, sx, sy, txt);
+  });
+  // gargalo das salas irregulares: mesmo papel da sala, sem a linha que os separa
+  segs.filter(s=>s.neck).forEach(s=>{
+    const n = s.neck, NX = n.x*T, NY = n.y*T, NW = n.w*T, NH = n.h*T, d = s.fwd;
+    ctx.fillStyle = PAPER;
+    if(d==="N") ctx.fillRect(NX+1, NY-2, NW-2, NH+1);
+    if(d==="S") ctx.fillRect(NX+1, NY+1, NW-2, NH+1);
+    if(d==="E") ctx.fillRect(NX+1, NY+1, NW+1, NH-2);
+    if(d==="W") ctx.fillRect(NX-2, NY+1, NW+1, NH-2);
+    ctx.fillStyle = INK;
+    if(d==="N"||d==="S"){ ctx.fillRect(NX, NY, 1, NH); ctx.fillRect(NX+NW-1, NY, 1, NH); ctx.fillRect(NX, d==="N" ? NY+NH-1 : NY, NW, 1); }
+    else { ctx.fillRect(NX, NY, NW, 1); ctx.fillRect(NX, NY+NH-1, NW, 1); ctx.fillRect(d==="E" ? NX : NX+NW-1, NY, 1, NH); }
   });
   return {cv, ox:x0*T, oy:y0*T};
 }
@@ -2623,7 +2705,7 @@ function texFor(type){
 function buildStaticZ(lv){
   const segs = Object.values(lv.segs);
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  segs.forEach(s=>{ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); });
+  segs.forEach(s=>[s, s.neck].forEach(r=>{ if(!r) return; x0=Math.min(x0,r.x); y0=Math.min(y0,r.y); x1=Math.max(x1,r.x+r.w); y1=Math.max(y1,r.y+r.h); }));
   x0-=3; y0-=3; x1+=4; y1+=3;
   const W = (x1-x0)*T, H = (y1-y0)*T;
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
@@ -2732,6 +2814,7 @@ function buildStaticZ(lv){
       [[0,6],[6,6],[3,2],[9,2],[12,7],[4,9]].forEach(([a,b])=>drawSpriteC(ctx, [".kkk.","kyyok","kyyok","koook",".kkk."], cx+a, cy+b, {k:"#5a3a08", y:GOLD[3], o:GOLD[2]}));
     }
   });
+  segs.filter(s=>s.neck).forEach(s=>drawNeckZ(ctx, s, TX, P));
   // lápides dos cadáveres
   D().corpses.filter(c=>c.level===lv.n).forEach(c=>{
     const s = lv.segs[c.seg]; if(!s) return;
@@ -2749,6 +2832,29 @@ function buildStaticZ(lv){
     if(txt){ const [sx, sy] = signPos(lv, s, txt); ctx.save(); ctx.translate(sx, sy); ctx.scale(2,2); drawSign(ctx, 0, 0, txt); ctx.restore(); }
   });
   return {cv, ox:x0*T, oy:y0*T, extras};
+}
+function drawNeckZ(ctx, s, TX, P){
+  const n = s.neck, NX = n.x*T, NY = n.y*T, NW = n.w*T, NH = n.h*T, S = P.S, d = s.fwd;
+  const floorAt = (x,y,w,h) => { for(let yy=y; yy<y+h; yy+=T) for(let xx=x; xx<x+w; xx+=T){ const tw = Math.min(T, x+w-xx), th = Math.min(T, y+h-yy); ctx.drawImage(TX.floors[Math.min(3, Math.floor(zh(Math.floor(xx/T), Math.floor(yy/T))*4))], 0, 0, tw, th, xx, yy, tw, th); } };
+  floorAt(NX, NY, NW, NH);
+  // abre a parede da sala onde o gargalo encosta
+  if(d==="N") floorAt(NX+CAP, NY-CAP, NW-CAP*2, CAP*2);
+  if(d==="S"){ const fh = faceH(s); floorAt(NX+CAP, NY+NH-CAP, NW-CAP*2, CAP*2+fh); for(let i=0;i<6;i++){ ctx.fillStyle = `rgba(0,0,0,${.3-i*.05})`; ctx.fillRect(NX+CAP, NY+NH+CAP+fh+i, NW-CAP*2, 1); } }
+  if(d==="E") floorAt(NX+NW-CAP, NY+CAP, CAP*2, NH-CAP*2);
+  if(d==="W") floorAt(NX-CAP, NY+CAP, CAP*2, NH-CAP*2);
+  const capV = (x,y,h) => { ctx.drawImage(TX.capV, 0, md(x*7+y, 200), CAP, h, x, y, CAP, h); ctx.fillStyle = S[0]; ctx.fillRect(x, y, 1, h); ctx.fillRect(x+CAP-1, y, 1, h); };
+  const capH = (x,y,w) => { ctx.drawImage(TX.capH, md(x*3+y, 200), 0, w, CAP, x, y, w, CAP); ctx.fillStyle = S[0]; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y+CAP-1, w, 1); };
+  if(d==="N"||d==="S"){
+    const y0 = d==="N" ? NY-CAP : NY, h = NH + CAP;
+    capV(NX, y0, h); capV(NX+NW-CAP, y0, h);
+    if(d==="N") capH(NX, NY+NH-CAP, NW); else capH(NX, NY, NW);
+  } else {
+    const x0 = d==="W" ? NX-CAP : NX, w = NW + CAP;
+    capH(x0, NY, w); capH(x0, NY+NH-CAP, w);
+    ctx.drawImage(TX.face, md(n.x*37, 200), 28, w, 12, x0, NY+CAP, w, 12);
+    for(let i=0;i<4;i++){ ctx.fillStyle = `rgba(0,0,0,${.4-i*.1})`; ctx.fillRect(x0, NY+CAP+12+i, w, 1); }
+    if(d==="E") capV(NX, NY, NH); else capV(NX+NW-CAP, NY, NH);
+  }
 }
 /* escadaria desenhada como uma peça única: degraus que descem para o escuro */
 function drawStairsZ(ctx, s, S){
@@ -2851,7 +2957,7 @@ function drawDoorZ(ctx, dd, lv, P){
 const HERO_Z = [".....oooooo.....","....ohhHHhho....","...ohhHHHHhho...","...ohhhhhhhho...","...ohsssssSho...","...osesssesSo...","...ossssssSSo...","....osSSSSSo....","...oottttuuoo...","..ottuuttuuTto..",".osottuttuuTtoso",".ssootttttuTToSo","..ooobbbgbbbooo.","...otTttttTTto..","...otTttttTTto..","...oppppppppo...","...opppoopppo...","...opppo.oppo...","...okkko.okko...","..oKkkko.oKkko..","..oooooo.ooooo.."];
 const HERO_ZC = {o:"#1a1414",h:"#5a3218",H:"#8a5628",s:"#f0c090",S:"#c8905c",e:"#1a1414",t:"#3a6ab8",T:"#24447a",u:"#6a9ad8",b:"#6a3a18",g:"#e0b440",p:"#4a3a5a",k:"#3a2210",K:"#6a4220"};
 /* ===== Aventureiro modular: corpo base + camadas de equipamento, com poses ===== */
-const DOLL_W = 24, DOLL_H = 28, DOLL_OY = 4;
+const DOLL_W = 24, DOLL_H = 31, DOLL_OY = 7;
 const DOLL_SETS = [
   [/Centurião/, ["#f0c070","#c48a3a","#7e521e"], "#c8302a"],
   [/Conde/, ["#c8a0e8","#8a58b8","#4e2c78"]],
@@ -2887,13 +2993,148 @@ function weaponKind(n){
   return "sword";
 }
 /* aparência de cada raça: cores e partes do corpo */
+const FIRE = {skin:["#e83a20","#a82010"], mid:"#f08a20", inner:"#ffd040"};
 const DOLL_LOOKS = [
   [/Homem-Gosma/, {skin:["#8ee878","#3e9e4a","#c8ffb8"], hair:null, tunic:null, head:"slime", lower:"blob"}],
   [/Aboboróide/, {skin:["#8cc860","#4e8a34"], hair:null, tunic:["#6a4a2a","#4a3018"], head:"pumpkin"}],
+  [/Ponão/, {skin:["#e8b480","#b8804e"], hair:["#c86a2a","#8a4418"], tunic:null, lower:"horse", size:"small", horse:["#d8c0a0","#a88c6a","#6a5640"]}],
   [/Centauro/, {skin:["#e8b480","#b8804e"], hair:["#3a2414","#24160c"], tunic:null, lower:"horse"}],
   [/Steambot/, {skin:["#e8b860","#a8782e","#fff0b0"], hair:null, tunic:["#b8743a","#7a4a20"], pants:["#6a7080","#454a58"], shoe:["#454a58","#2a2e38"], head:"robot"}],
+  [/Vagalóide/, {skin:["#6a5a3a","#3e3420"], hair:null, head:"insect", ins:{a:"#4a3e2a", b:"#2a2418", e:"#e83a2a", glow:"#e8f060"}}],
+  [/Tri-kri-kri/, {skin:["#7cc048","#4a8a2a"], hair:null, tunic:null, head:"insect", ins:{a:"#7cc048", b:"#4a8a2a", e:"#c8a020"}, arms4:true}],
+  [/Fada/, {skin:["#fcd8c0","#e0a888"], hair:["#f0a8d8","#c070a8"], tunic:["#88d8a8","#4aa070"], wings:true}],
+  [/Gnomo/, {size:"small", hair:["#e8e8e8","#b8b8b8"], beard:["#f0f0f0","#c8c8c8"], tunic:["#c83a3a","#8a2020"]}],
+  [/^Elfo/, {skin:["#fbeee6","#d8c4bc"], hair:["#f4f4f8","#c8c8d4"], ears:"elf", tunic:["#4a9a5a","#2a6a3a"]}],
+  [/^Anão/, {size:"small", hair:["#7a4420","#4e2a12"], beard:["#8a4c22","#5a3016"]}],
+  [/Pequenino/, {size:"small", hair:["#e0602a","#a83e14"], tunic:["#6a9a3a","#466e22"]}],
+  [/Povo-Gato/, {skin:["#e8a050","#b87028"], head:"animal", an:{fur:"#e8a050", dark:"#b87028", muz:"#f8e8d0", ears:"tri", eye:"#70d040", nose:"#e07080", whisk:true}}],
+  [/Rinoceróide/, {skin:["#a0a0a8","#707078"], hair:null, head:"animal", an:{fur:"#a0a0a8", dark:"#707078", ears:"small", eye:"#1a1414", horn:true}}],
+  [/Meio-Dragão/, {skin:["#d8402a","#982014"], hair:null, head:"animal", an:{fur:"#d8402a", dark:"#982014", muz:"#e86a4a", snout:2, eye:"#ffd040", nose:"#5a1008", horns:"dragon"}}],
+  [/Samambro/, {skin:["#6ab848","#3a8028"], hair:["#3a8028","#2a5a1a"], tunic:["#8a6a3a","#5a4420"], leafArms:true}],
+  [/Corvino/, {skin:["#2a2a34","#16161e"], hair:null, head:"animal", an:{fur:"#2a2a34", dark:"#16161e", ears:"none", eye:"#e8e8f0", beak:"crow"}}],
+  [/Patovsky/, {skin:["#f4f4f0","#c8c8c0"], hair:null, head:"animal", an:{fur:"#f4f4f0", dark:"#c8c8c0", ears:"none", eye:"#1a1414", beak:"duck"}}],
+  [/Pandakhan/, {skin:["#f4f4f0","#c8c8c0"], hair:null, head:"animal", an:{fur:"#f4f4f0", dark:"#c8c8c0", ears:"panda", eye:"#1a1414", nose:"#1a1414", panda:true}}],
+  [/Sharkin/, {skin:["#6a90b8","#3e6088"], hair:null, head:"animal", an:{fur:"#6a90b8", dark:"#3e6088", ears:"none", eye:"#1a1414", shark:true}}],
+  [/^Goblin|Gnoblin/, {skin:["#7cba4a","#4e8a2a"], hair:null, ears:"goblin", tunic:["#8a6a3a","#5a4420"]}],
+  [/^Orc/, {size:"big", skin:["#6aa040","#3e7024"], hair:["#2a2a2a","#141414"], tusks:true, tunic:["#6a4a2a","#4a3018"]}],
+  [/Fungóide/, {skin:["#f0e6d0","#c8b898"], hair:null, head:"mushroom", tunic:["#a0805a","#705838"]}],
+  [/^Ogro/, {size:"big", skin:["#9aa860","#6a7838"], hair:null, tunic:["#7a5a3a","#523c22"]}],
+  [/Capivoraz/, {skin:["#9a6a3e","#6a4422"], hair:null, head:"animal", an:{fur:"#9a6a3e", dark:"#6a4422", muz:"#7a5230", ears:"round", eye:"#1a1414", snout:1, nose:"#3a2414", capy:true}}],
+  [/Lobisóide/, {skin:["#5a5a64","#3a3a44"], hair:null, head:"animal", an:{fur:"#5a5a64", dark:"#3a3a44", muz:"#9a9aa4", ears:"tri", eye:"#ffd040", snout:2, nose:"#1a1414"}}],
+  [/Arenoso/, {skin:["#e8c890","#c0a068"], hair:null, tunic:null, pants:["#d8b880","#b09060"], shoe:["#c0a068","#987848"], head:"sand"}],
+  [/Homem-Boto/, {skin:["#f4a8c0","#d07894"], hair:null, tunic:["#4a8ab8","#2a5a88"]}],
+  [/Lagartichano/, {skin:["#5aa848","#367828"], hair:null, head:"animal", an:{fur:"#5aa848", dark:"#367828", muz:"#8ac860", ears:"none", eye:"#ffd040", snout:2, nose:"#1e4a14", scales:true}}],
+  [/Zumbi Esperto/, {skin:["#8ab070","#5a8048"], hair:["#3a3a2a","#22221a"], spots:"#7a4a9a", tunic:["#6a6a7a","#4a4a5a"]}],
+  [/Semi-deus/, {skin:["#f8d8a8","#d8a878"], hair:["#f0d070","#c8a040"], halo:true, tunic:["#f4f0e0","#c8c0a8"]}],
+  [/Minotáurio/, {size:"big", skin:["#8a5a34","#5e3a1e"], hair:null, head:"animal", an:{fur:"#8a5a34", dark:"#5e3a1e", muz:"#c8a07a", ears:"small", eye:"#1a1414", snout:1, nose:"#3a2414", horns:"bull", ring:true}}],
+  [/Ser de Fogo|^Fira/, {skin:FIRE.skin, hair:null, tunic:null, head:"elem", el:FIRE, lower:"flame"}],
+  [/Ser de Água/, {skin:["#3a7ae0","#2050a8"], hair:null, tunic:null, head:"elem", el:{mid:"#6ab8f0", inner:"#c8ecff", drop:true}, lower:"flame"}],
+  [/Ser de Terra/, {skin:["#8a6034","#5a3e20"], hair:null, tunic:null, head:"elem", el:{mid:"#a88050", inner:"#c8a070", moss:"#6aa040"}, lower:"flame"}],
+  [/Ser de Ar/, {skin:["#b4d0f0","#7c9cc8"], hair:null, tunic:null, head:"elem", el:{mid:"#e2eefc", inner:"#ffffff", cloud:true}, lower:"flame"}],
+  [/Saponildes/, {skin:["#6ab040","#3e8024"], hair:null, head:"animal", an:{fur:"#6ab040", dark:"#3e8024", ears:"none", eye:"#1a1414", frog:true}}],
+  [/Povo-Cão/, {skin:["#b88048","#8a5628"], hair:null, head:"animal", an:{fur:"#b88048", dark:"#8a5628", muz:"#e8c8a0", ears:"flop", eye:"#1a1414", snout:1, nose:"#1a1414"}}],
+  [/Cachorrinho/, {size:"small", skin:["#e8d0a8","#b89870"], hair:null, head:"animal", an:{fur:"#e8d0a8", dark:"#b89870", muz:"#fff4e0", ears:"flop", eye:"#1a1414", snout:1, nose:"#1a1414"}}],
+  [/Vampirão/, {size:"big", skin:["#f0eef4","#c8c0d4"], hair:["#1a1420","#0c0a10"], tunic:["#3a1a2a","#24101a"], cape:"#8a1a2a", fangs:true}],
+  [/Alienígena/, {skin:["#a8acb4","#7a7e88"], hair:null, head:"alien", tunic:["#4a5a6a","#2e3a48"]}],
+  [/Meio-Cabra/, {skin:["#e8dcc0","#b8a888"], hair:null, head:"animal", an:{fur:"#e8dcc0", dark:"#b8a888", muz:"#f8f0e0", ears:"side", eye:"#c8a020", snout:1, nose:"#5a4a3a", horns:"goat", goatee:true}}],
+  [/Mimiminion/, {size:"small", skin:["#a888d8","#7a5ab0"], hair:null, head:"cyclops", tunic:["#5a8a5a","#3a603a"]}],
+  [/Sereia reversa/, {skin:["#4ab0a8","#2a7a74"], hair:null, head:"animal", an:{fur:"#4ab0a8", dark:"#2a7a74", ears:"none", eye:"#1a1414", fish:true}}],
+  [/Jenypher/, {skin:["#a8c890","#789a60"], hair:null, arms4:true, tunic:["#8a4a8a","#5a2a5a"]}],
+  [/Aesir/, {skin:["#8ab4e8","#5a84c0"], hair:["#f4e8b0","#c8b878"], beard:["#f4e8b0","#c8b878"], tunic:["#6a4a2a","#4a3018"], fur:"#a88a68"}],
+  [/Mahok/, {hair:null, tunic:["#e8822a","#b85a14"]}],
+  [/Tailox/, {skin:["#e87a2a","#b8521a"], hair:null, head:"animal", an:{fur:"#e87a2a", dark:"#b8521a", muz:"#fff4e8", ears:"tri", earTip:"#2a1a14", eye:"#2a1a14", snout:2, nose:"#1a1414"}}],
+  [/Juban/, {skin:["#e0b050","#b08028"], hair:null, head:"animal", an:{fur:"#e0b050", dark:"#b08028", muz:"#f8e0b0", ears:"round", eye:"#3a2414", snout:1, nose:"#5a3018", mane:"#a8541e"}}],
 ];
 function dollLook(h){ const r = R(h.race), n = r ? r.n : ""; for(const [rx, l] of DOLL_LOOKS) if(rx.test(n)) return l; return {}; }
+/* cabeças especiais: recebem o "pincel" do boneco (rect/put), a aparência e se está de costas */
+const DOLL_HEADS = {
+  animal(rect, put, L, back){
+    const a = L.an, f = a.fur, d = a.dark;
+    if(a.mane){ rect(6,-3,12,12,a.mane); rect(7,-4,10,1,a.mane); put(6,9,a.mane); put(17,9,a.mane); }
+    if(a.horns==="bull"){ rect(4,0,4,2,"#f2ead2"); rect(4,-2,2,2,"#f2ead2"); put(4,-3,"#c8c0a8"); rect(16,0,4,2,"#f2ead2"); rect(18,-2,2,2,"#f2ead2"); put(19,-3,"#c8c0a8"); }
+    rect(8,-1,8,9,f); rect(9,-2,6,1,f); rect(15,-1,1,9,d); rect(9,8,6,1,d);
+    if(a.ears==="tri"){ rect(8,-3,2,2,f); put(8,-4,f); rect(14,-3,2,2,f); put(15,-4,f); put(9,-2,a.earTip||"#f0a0a0"); put(14,-2,a.earTip||"#f0a0a0"); if(a.earTip){ put(8,-4,a.earTip); put(15,-4,a.earTip); } }
+    if(a.ears==="round"){ rect(7,-3,3,2,f); rect(14,-3,3,2,d); put(8,-2,d); }
+    if(a.ears==="small"){ rect(7,-2,2,2,f); rect(15,-2,2,2,d); }
+    if(a.ears==="flop"){ rect(6,0,2,5,d); rect(16,0,2,5,d); put(7,5,d); put(16,5,d); }
+    if(a.ears==="panda"){ rect(7,-3,3,3,"#1a1414"); rect(14,-3,3,3,"#1a1414"); }
+    if(a.ears==="side"){ rect(5,2,3,2,f); rect(16,2,3,2,d); }
+    if(a.horns==="dragon"){ put(9,-3,"#f2ead2"); put(8,-4,"#f2ead2"); put(7,-5,"#c8c0a8"); put(14,-3,"#f2ead2"); put(15,-4,"#f2ead2"); put(16,-5,"#c8c0a8"); }
+    if(a.horns==="goat"){ put(9,-3,"#8a8478"); put(9,-4,"#8a8478"); put(8,-5,"#6a6458"); put(14,-3,"#8a8478"); put(14,-4,"#8a8478"); put(15,-5,"#6a6458"); }
+    if(a.shark){ rect(11,-5,2,3,d); put(12,-6,d); }
+    if(a.frog){ rect(8,-3,3,3,f); rect(13,-3,3,3,f); }
+    if(back){ if(a.scales){ put(10,1,d); put(13,3,d); put(11,5,d); } return; }
+    if(a.panda){ rect(9,2,2,3,"#1a1414"); rect(13,2,2,3,"#1a1414"); put(10,3,"#ffffff"); put(13,3,"#ffffff"); }
+    else if(a.frog){ put(9,-2,"#ffffff"); put(9,-1,"#1a1414"); put(14,-2,"#ffffff"); put(14,-1,"#1a1414"); rect(9,5,6,1,d); put(9,4,d); put(14,4,d); }
+    else if(a.fish){ rect(7,2,2,2,"#ffffff"); put(7,3,"#1a1414"); rect(15,2,2,2,"#ffffff"); put(16,3,"#1a1414"); rect(5,3,2,3,d); rect(17,3,2,3,d); rect(11,6,2,1,"#f08aa0"); put(11,5,"#c86078"); put(12,5,"#c86078"); rect(9,0,1,7,d); }
+    else { put(10,3,a.eye); put(13,3,a.eye); if(a.eye!=="#1a1414"){ put(10,2,"#1a1414"); put(13,2,"#1a1414"); } }
+    if(a.muz){ const sn = a.snout===2 ? 2 : a.snout===1 ? 1 : 0; rect(10,5,4,3+sn,a.muz); rect(10,7+sn,4,1,d); }
+    if(a.capy){ rect(9,4,6,4,a.muz); rect(9,7,6,1,d); }
+    if(a.nose){ rect(11,5,2,1,a.nose); }
+    if(a.whisk){ put(7,5,"#f4f4f4"); put(16,5,"#f4f4f4"); put(7,6,"#f4f4f4"); put(16,6,"#f4f4f4"); }
+    if(a.horn){ rect(10,5,4,3,"#c0c0c8"); rect(11,2,2,4,"#fff8e8"); put(11,1,"#fff8e8"); put(12,0,"#fff8e8"); put(12,4,"#d8ccb0"); put(12,5,"#d8ccb0"); }
+    if(a.beak==="crow"){ rect(11,4,2,4,"#5a5a64"); put(11,4,"#8a8a94"); put(12,8,"#5a5a64"); }
+    if(a.beak==="duck"){ rect(9,5,6,2,"#f0901e"); rect(10,7,4,1,"#c86a10"); }
+    if(a.shark){ rect(9,6,6,1,"#ffffff"); put(10,6,"#1a1414"); put(12,6,"#1a1414"); put(14,6,"#1a1414"); rect(9,7,6,1,"#e8eef4"); }
+    if(a.scales){ put(9,1,d); put(13,1,d); put(14,4,d); }
+    if(a.ring){ put(11,8,"#e8c040"); put(12,8,"#e8c040"); }
+    if(a.goatee){ rect(11,9,2,2,"#f8f8f0"); }
+  },
+  insect(rect, put, L, back){
+    const c = L.ins;
+    rect(8,0,8,8,c.a); rect(9,-1,6,1,c.a); rect(15,0,1,8,c.b); rect(10,8,4,1,c.b);
+    put(10,-2,c.b); put(9,-3,c.b); put(8,-4,c.glow||c.b); put(13,-2,c.b); put(14,-3,c.b); put(15,-4,c.glow||c.b);
+    if(back) return;
+    rect(8,2,3,3,c.e); rect(13,2,3,3,c.e); put(9,2,"#ffffff"); put(14,2,"#ffffff"); put(10,7,c.b); put(13,7,c.b); rect(11,6,2,1,"#1a1414");
+  },
+  mushroom(rect, put, L, back){
+    const SK = L.skin;
+    rect(9,3,6,5,SK[0]); rect(14,3,1,5,SK[1]); rect(10,8,4,1,SK[1]);
+    rect(5,-1,14,4,"#d83a3a"); rect(6,-2,12,1,"#d83a3a"); rect(8,-3,8,1,"#e85a4a"); rect(5,2,14,1,"#9a2020");
+    [[7,0],[11,-2],[15,0],[9,1],[13,1],[17,1],[6,1]].forEach(([x,y])=>put(x,y,"#fff4e8")); put(12,-1,"#fff4e8");
+    if(!back){ put(10,5,"#1a1414"); put(13,5,"#1a1414"); put(11,7,"#a87858"); put(12,7,"#a87858"); }
+  },
+  sand(rect, put, L, back){
+    const SK = L.skin;
+    rect(8,0,8,8,SK[0]); rect(9,-1,6,1,SK[0]); rect(15,0,1,8,SK[1]);
+    [[9,1],[13,0],[14,6],[9,7],[12,3],[10,11],[13,13],[7,12],[16,10]].forEach(([x,y])=>put(x,y,SK[1]));
+    put(8,-1,SK[1]); put(16,1,SK[1]);
+    if(!back){ rect(10,4,1,2,"#5a4020"); rect(13,4,1,2,"#5a4020"); rect(11,6,2,1,"#a88050"); }
+  },
+  cloud(rect, put, L, back){
+    const SK = L.skin;
+    rect(8,0,8,8,"#ffffff"); rect(7,1,10,6,"#ffffff"); rect(9,-1,6,1,"#ffffff"); put(8,-1,"#f4f8ff"); put(15,-1,"#f4f8ff");
+    rect(16,2,1,4,SK[1]); rect(9,8,6,1,SK[1]); put(6,3,"#ffffff"); put(17,3,SK[0]);
+    [[6,10],[17,9],[7,13],[16,12],[10,9],[13,12]].forEach(([x,y])=>put(x,y,"#ffffff"));
+    if(!back){ rect(10,3,1,2,"#5a7ab0"); rect(13,3,1,2,"#5a7ab0"); rect(11,6,2,1,"#a8b8d4"); }
+  },
+  alien(rect, put, L, back){
+    const SK = L.skin;
+    rect(7,-3,10,10,SK[0]); rect(8,-4,8,1,SK[0]); rect(16,-3,1,10,SK[1]); rect(9,7,6,1,SK[1]); rect(10,8,4,1,SK[1]);
+    if(!back){ rect(8,1,3,3,"#0a0a12"); put(11,3,"#0a0a12"); rect(13,1,3,3,"#0a0a12"); put(12,3,"#0a0a12"); put(9,1,"#5a6a8a"); put(14,1,"#5a6a8a"); put(11,6,"#5a5e68"); put(12,6,"#5a5e68"); }
+  },
+  cyclops(rect, put, L, back){
+    const SK = L.skin;
+    rect(8,-1,8,9,SK[0]); rect(9,-2,6,1,SK[0]); rect(15,-1,1,9,SK[1]); rect(9,8,6,1,SK[1]);
+    put(12,-3,"#6a8a3a"); put(12,-4,"#6a8a3a"); put(11,-5,"#9ac860"); put(13,-5,"#9ac860");
+    if(!back){ rect(9,1,6,5,"#ffffff"); rect(10,2,4,3,"#3a9ad8"); rect(11,3,2,1,"#0a0a12"); put(10,2,"#ffffff"); rect(9,0,6,1,SK[1]); rect(10,7,4,1,"#5a3a8a"); }
+  },
+  elem(rect, put, L, back, pose){
+    const SK = L.skin, e = L.el, f = pose==="breath" ? 1 : 0;
+    rect(8,1,8,7,SK[0]); rect(9,2,6,5,e.mid); rect(10,3,4,4,e.inner);
+    const tips = e.cloud ? [[7,1],[8,0],[8,-1],[9,-1],[10,-2],[11,-2],[12,-1],[13,-2],[14,-2],[15,-1],[15,0],[16,1]] : e.drop ? [[9,0],[11,-1],[12,-2],[14,0]] : e.moss ? [] : [[8,0],[9,-1+f],[10,-2],[11,-1],[12,-3+f],[13,-1],[14,-2],[15,0+f],[7,1]];
+    tips.forEach(([x,y])=>put(x,y,SK[0]));
+    if(e.cloud){ rect(9,0,6,1,e.mid); put(10,-1,e.inner); put(13,-1,e.inner); put(11,-2,e.inner);
+      [[7,9],[7,12],[16,10],[16,13],[7,15],[16,15],[8,17],[15,17],[9,19],[14,19]].forEach(([x,y])=>{ put(x,y,SK[0]); put(x+(x<12?-1:1),y,e.mid); });
+      put(9,10,e.mid); put(14,12,e.mid); put(9,13,e.inner); }
+    else if(!e.drop && !e.moss){ put(12,-2+f,e.mid); put(10,-1,e.mid); put(14,-1,e.mid); }
+    if(e.moss){ rect(8,0,8,1,e.moss); rect(9,-1,5,1,e.moss); put(8,1,e.moss); put(15,1,e.moss); put(10,2,SK[1]); put(14,5,SK[1]); }
+    if(e.drop){ put(11,-2,e.inner); rect(10,0,4,1,e.mid); }
+    rect(10,10,4,4,e.mid); rect(11,11,2,2,e.inner);
+    const ec = e.cloud ? "#1e3458" : "#2a0a04";
+    if(!back){ rect(10,4,1,2,ec); rect(13,4,1,2,ec); put(9,3,ec); put(14,3,ec); rect(10,6,4,1,"#ffffff"); put(10,6,ec); put(13,6,ec); }
+  },
+};
 /* pose: idle | walkA | walkB | wind | strike ; back: vista de costas (arena) */
 function dollPixels(hero, pose, back){
   const S = {}; let wx = 0, wy = 0;
@@ -2909,25 +3150,41 @@ function dollPixels(hero, pose, back){
     const sq = pose==="walkA" ? 1 : pose==="walkB" ? -1 : 0;
     rect(7-Math.max(0,sq),15,10+Math.abs(sq),5,SK[0]); rect(6,17,12,3,SK[0]); rect(5,19,14,2,SK[1]); rect(7,15,1,3,SK[2]); rect(8,16,1,1,SK[2]); put(16,17,SK[1]); put(17,18,SK[1]);
   } else if(L.lower === "horse"){
-    const HB = ["#b87c46","#865428","#563418"], st = pose==="walkA" ? -1 : 0, st2 = pose==="walkB" ? -1 : 0;
+    const HB = L.horse || ["#b87c46","#865428","#563418"], st = pose==="walkA" ? -1 : 0, st2 = pose==="walkB" ? -1 : 0;
     rect(8,13,14,5,HB[0]); rect(8,16,14,2,HB[1]); rect(9,12,12,1,HB[0]); rect(19,13,3,1,HB[1]); rect(10,13,6,1,"#d4985c");
     rect(22,12,1,2,"#3a2414"); rect(23,13,1,4,"#3a2414"); rect(22,17,1,2,"#3a2414");
     [[8,st],[10,st2],[17,st2],[20,st]].forEach(([x,u])=>{ rect(x,18+u,2,3,x>15?HB[1]:HB[0]); rect(x,21+u,2,1,"#2a1a10"); });
     L._horse = HB;
+  } else if(L.lower === "flame"){
+    const e = L.el, fl = pose==="breath" || pose==="walkA" ? 1 : 0;
+    rect(8,15,8,2,SK[0]); rect(10,15,4,2,e.mid); rect(9,17,6,2,SK[0]); rect(11,17,2,2,e.mid); rect(10,19,4,1,SK[0]); put(11+fl,20,SK[0]); put(12-fl,21,e.mid); put(8,17,SK[1]); put(15,16,SK[1]);
   } else {
   rect(8,15,8,2,PANTS[0]); rect(15,15,1,2,PANTS[1]);
   rect(8,17+la,3,2,PANTS[0]); put(10,17+la,PANTS[1]); put(10,18+la,PANTS[1]);
   rect(13,17+ra,3,2,PANTS[0]); rect(15,17+ra,1,2,PANTS[1]);
   rect(8,19+la,3,2,SHOE[0]); rect(8,20+la,3,1,SHOE[1]); rect(13,19+ra,3,2,SHOE[0]); rect(13,20+ra,3,1,SHOE[1]);
   }
-  const bodyDy = pose==="breath" ? 1 : 0; wy = bodyDy;
+  const su = L.size==="small" ? 2 : L.size==="big" ? -2 : 0;
+  if(L.size==="big" && !L.lower){ rect(8,13,8,2,PANTS[0]); rect(15,13,1,2,PANTS[1]); }
+  const bodyDy = (pose==="breath" ? 1 : 0) + su; wy = bodyDy;
+  // asas de fada, atrás do corpo
+  if(L.wings){ const gl = pose==="breath" ? "#d8f4ff" : "#b8e8ff"; rect(2,6,5,4,gl); rect(3,5,3,1,gl); rect(3,10,3,2,gl); rect(17,6,5,4,gl); rect(18,5,3,1,gl); rect(18,10,3,2,gl); put(4,7,"#ffffff"); put(19,7,"#ffffff"); put(3,9,"#ffffff"); put(20,9,"#ffffff"); }
+  if(L.cape){ rect(7,9,10,7,L.cape); rect(7,8,10,1,"#5a0e1a"); }
   // tronco, braços, cabeça
   rect(8,9,8,5,TUN[0]); rect(14,9,2,5,TUN[1]); if(!back){ put(11,9,TUN[1]); put(12,9,TUN[1]); }
   rect(8,14,8,1,"#6a3a18"); if(!back) rect(11,14,2,1,"#e0b440");
   const armL = pose==="wind" ? -1 : 0;
   rect(6,9+armL,2,4,TUN[0]); put(7,12+armL,TUN[1]); rect(16,9,2,4,TUN[1]); rect(6,13+armL,2,2,SK[0]); rect(16,13,2,2,SK[1]);
+  if(L.arms4){ rect(5,12,2,3,TUN===SK ? SK[1] : SK[1]); rect(4,14,2,1,SK[0]); rect(17,12,2,3,SK[1]); rect(18,14,2,1,SK[1]); }
+  if(L.leafArms){ rect(5,9,1,5,"#3a8028"); put(4,10,"#6ab848"); put(4,12,"#6ab848"); put(5,14,"#8ad868"); rect(18,9,1,5,"#3a8028"); put(19,10,"#6ab848"); put(19,12,"#6ab848"); put(18,14,"#8ad868"); rect(6,9,2,4,"#5aa040"); rect(16,9,2,4,"#3a8028"); }
+  if(L.fur){ rect(7,8,10,2,L.fur); put(8,8,"#c8ac8a"); put(14,8,"#c8ac8a"); }
+  if(L.cape && !back){ put(7,9,"#5a0e1a"); put(16,9,"#5a0e1a"); }
   rect(11,8,2,1,SK[1]);
   rect(8,3,8,4,SK[0]); rect(9,7,6,1,SK[1]); rect(15,3,1,4,SK[1]);
+  if(L.ears==="elf"){ put(7,4,SK[0]); put(6,3,SK[0]); put(16,4,SK[1]); put(17,3,SK[1]); }
+  if(L.ears==="goblin"){ rect(6,3,2,2,SK[0]); put(5,2,SK[0]); put(4,1,SK[0]); rect(16,3,2,2,SK[1]); put(18,2,SK[1]); put(19,1,SK[1]); }
+  if(L.spots){ put(9,4,L.spots); put(14,6,L.spots); put(6,10,L.spots); put(17,11,L.spots); put(12,6,L.spots); }
+  if(!HAIR && !L.head){ rect(8,0,8,3,SK[0]); rect(9,-1,6,1,SK[0]); rect(15,0,1,3,SK[1]); if(!back && SK[2]) put(9,0,SK[2]); }
   if(HAIR){
     rect(8,0,8,3,HAIR[0]); rect(9,-1,6,1,HAIR[0]); rect(8,3,1,2,HAIR[0]); rect(15,3,1,2,HAIR[1]); rect(12,0,3,1,HAIR[1]);
     if(back){ rect(8,3,8,4,HAIR[0]); rect(9,7,6,1,HAIR[1]); rect(15,3,1,4,HAIR[1]); rect(10,1,1,5,HAIR[1]); }
@@ -2949,14 +3206,20 @@ function dollPixels(hero, pose, back){
     if(!back){ rect(9,3,4,3,"#24303a"); rect(10,4,2,1,"#60e0ff"); put(10,3,"#a0f4ff"); rect(9,6,6,1,"#454a58"); put(10,6,"#c8d0dc"); put(12,6,"#c8d0dc"); put(14,6,"#c8d0dc"); }
     else { rect(9,2,6,4,BR[1]); put(10,3,"#7a5420"); put(13,4,"#7a5420"); }
     if(!back){ rect(10,10,4,3,"#24303a"); put(11,11,"#ffe070"); put(12,11,"#e83a2a"); }
-  } else if(!back){ put(10,5,"#1a1414"); put(13,5,"#1a1414"); put(10,4,"#1a1414"); put(13,4,"#1a1414"); }
+  } else if(DOLL_HEADS[L.head]){ DOLL_HEADS[L.head](rect, put, L, back, pose); }
+  else if(!back){ put(10,5,"#1a1414"); put(13,5,"#1a1414"); put(10,4,"#1a1414"); put(13,4,"#1a1414"); }
+  if(L.beard){ rect(9,5,6,3,L.beard[0]); rect(10,8,4,2,L.beard[0]); put(14,6,L.beard[1]); put(13,9,L.beard[1]); if(!back){ put(10,4,"#1a1414"); put(13,4,"#1a1414"); rect(11,6,2,1,L.beard[1]); } else { rect(9,5,6,3,HAIR ? HAIR[0] : L.beard[0]); } }
+  if(L.tusks && !back){ put(10,6,"#f8f4e8"); put(13,6,"#f8f4e8"); put(10,5,"#f8f4e8"); put(13,5,"#f8f4e8"); }
+  if(L.fangs && !back){ rect(10,6,4,1,"#5a0e1a"); put(11,7,"#ffffff"); put(12,7,"#ffffff"); }
+  if(L.halo){ rect(9,-5,6,1,"#ffe070"); put(8,-4,"#ffe070"); put(15,-4,"#ffe070"); rect(9,-3,6,1,"#c8a030"); }
   // armadura
   const pc = A.Peitoral && dollPal(A.Peitoral.n);
   if(pc){ const [l,m,d] = pc.p; rect(8,9,8,5,m); rect(9,9,2,4,l); rect(14,9,2,5,d); if(!back){ rect(11,10,2,3,d); put(11,10,l); if(pc.acc!==l){ put(11,11,pc.acc); put(12,11,pc.acc);} } else { rect(11,9,2,5,d); } rect(8,14,8,1,d); if(!back) rect(11,14,2,1,"#e0b440"); }
-  const bt = A.Botas && dollPal(A.Botas.n);
+  const bt = A.Botas && dollPal(A.Botas.n); const wyKeep = wy; wy = 0;
   if(bt && L.lower === "horse"){ const [l,m,d] = bt.p; const step = pose==="walkA" ? -1 : 0, step2 = pose==="walkB" ? -1 : 0; [[8,step],[10,step2],[17,step2],[20,step]].forEach(([x,u])=>{ rect(x,19+u,2,2,m); put(x,19+u,l); rect(x,21+u,2,1,d); }); }
   else if(bt && L.lower === "blob"){ const [l,m,d] = bt.p; rect(6,19,4,2,m); rect(14,19,4,2,m); put(6,19,l); put(14,19,l); }
   else if(bt){ const [l,m,d] = bt.p; rect(8,17+la,3,4,m); rect(13,17+ra,3,4,m); rect(8,17+la,3,1,l); rect(13,17+ra,3,1,l); rect(8,20+la,3,1,d); rect(13,20+ra,3,1,d); put(10,18+la,d); put(15,18+ra,d); put(10,19+la,d); put(15,19+ra,d); }
+  wy = wyKeep;
   const br = A.Braceletes && dollPal(A.Braceletes.n);
   if(br){ const [l,m,d] = br.p; rect(6,11+armL,2,2,m); rect(16,11,2,2,m); put(6,11+armL,l); put(16,11,l); put(7,12+armL,d); put(17,12,d); }
   const om = A.Ombreiras && dollPal(A.Ombreiras.n);
@@ -2975,7 +3238,7 @@ function dollPixels(hero, pose, back){
   const lamp = (hero.bag||[]).some(it=>/^Lamparina/.test(it.n)), tongue = raceT("tongue", hero);
   const W1 = ["#e8eef8","#a8b4c8","#5a6478"], WD = ["#a8743a","#6a4220"];
   const k = w.unarmed ? "fist" : weaponKind(w.n);
-  if(pose==="wind"){ wx = -1; wy = 2; } if(pose==="strike"){ wx = 1; wy = -3; }
+  if(pose==="wind"){ wx = -1; wy = 2 + su; } if(pose==="strike"){ wx = 1; wy = -3 + su; }
   if(k==="sword"){ rect(4,1,2,12,W1[1]); rect(4,1,1,12,W1[0]); put(5,0,W1[1]); rect(3,13,4,1,"#e0b440"); rect(4,14,2,2,WD[1]); }
   if(k==="big"){ rect(3,-2,3,15,W1[1]); rect(3,-2,1,15,W1[0]); put(4,-3,W1[1]); rect(1,13,7,1,"#e0b440"); rect(4,14,1,4,WD[1]); }
   if(k==="dagger"){ rect(4,8,2,5,W1[1]); rect(4,8,1,5,W1[0]); put(5,7,W1[1]); rect(3,13,4,1,"#9a7418"); rect(4,14,2,1,WD[1]); }
@@ -3202,6 +3465,7 @@ function segObjRects(s){
     if(s.chests>0) out.chest = [s.x*T, (s.y+s.h)*T - 10, 10, 10];
   }
   if(s.down || s.up) out.stairs = [s.x*T, s.y*T, s.w*T, s.h*T];
+  if(s.exit){ const cx = Math.round((s.x + s.w/2)*T), by = (s.y+s.h)*T, w = isZ() ? Math.min(24, s.w*T - CAP*2 - 4) : 8; out.exit = [cx - Math.floor(w/2) - 6, by - (isZ() ? CAP + 4 : 4), w + 12, isZ() ? 40 : 14]; }
   return out;
 }
 /* botão flutuante sobre a porta ou o objeto selecionado */
@@ -3283,7 +3547,7 @@ function mapTap(wx, wy){
   if(best && (best.st==="closed"||best.st==="locked")){ state.ui.selDoor = best.id; state.ui.selObj = null; render(); return; }
   // monstros, baú ou escada da sala atual?
   const rs = segObjRects(cur), inR = r => r && wx >= r[0]-6 && wx <= r[0]+r[2]+6 && wy >= r[1]-6 && wy <= r[1]+r[3]+6;
-  const hitObj = ["mon","chest","stairs"].find(k=>inR(rs[k]));
+  const hitObj = ["mon","chest","exit","stairs"].find(k=>inR(rs[k]));
   if(hitObj){ state.ui.selObj = state.ui.selObj === hitObj ? null : hitObj; state.ui.selDoor = null; render(); return; }
   const id = lv.occ[Math.floor(wx/T)+","+Math.floor(wy/T)];
   if(id===d.pos.seg && (state.ui.selObj || state.ui.selDoor)){ state.ui.selObj = null; state.ui.selDoor = null; render(); return; }
@@ -3698,6 +3962,11 @@ function viewExplore(){
     popHTML = `<span class="pwarn">${g.qty} ${esc(g.name)}</span>` + popHTML;
   } else if(selObj === "chest" && seg.chests>0 && !isBlocked){
     popHTML = `<button class="pbtn" data-act="chest">Abrir baú</button>`;
+  } else if(selObj === "exit" && seg.exit){
+    const er = exitRoute();
+    popHTML = isBlocked ? `<span class="pwarn">Monstros bloqueiam a saída</span>`
+      : er.ok ? `<button class="pbtn" data-act="leave">Sair da masmorra</button>`
+      : `<span class="pwarn">Monstros em ${esc(er.by.map(n=>n.toLowerCase()).join(" ou "))} bloqueiam o caminho</span>`;
   } else if(selObj === "stairs" && !isBlocked && (seg.down || seg.up)){
     popHTML = (seg.down ? `<button class="pbtn" data-act="descend">${d.pos.level+1>=3 ? "Descer para a Sala Final" : `Descer para o nível ${d.pos.level+1}`}</button>` : "")
       + (seg.up ? `<button class="pbtn alt" data-act="climb">Subir para o nível ${seg.up.level}</button>` : "");
@@ -3751,7 +4020,7 @@ function viewExplore(){
   const canLeave = !isBlocked && pathClear();
   return `
   <div class="bar"><button class="back" data-act="go" data-to="sheet" aria-label="Ficha">◀</button><h2 class="sm">${esc(d.name)}<br><span class="label">Nível ${N(d.pos.level)}</span></h2></div>
-  <p class="muted small" style="margin:0">Toque numa porta, sala, monstro, baú ou escada. Arraste para mover e pince para dar zoom.</p>
+  <p class="muted small" style="margin:0">Toque numa porta, sala, monstro, baú, escada ou saída. Arraste para mover e pince para dar zoom.</p>
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span><span>Moedas<b>${h.coins}</b></span><span>Mochila<b>${bagLabel(h)}</b></span></div>
     ${h.velas ? `<div class="mapbuff"><canvas width="5" height="8" data-candle></canvas>Vela · ${velaTxt(h.velas)}</div>` : ""}
@@ -3776,7 +4045,7 @@ function viewExplore(){
     ${doorsHTML}
     ${acts.length ? `<div class="stack">${acts.join("")}</div>` : (!closed.length && !seg.mon ? `<p class="muted small">Nada para fazer aqui. Toque em outra sala no mapa para andar até ela.</p>` : "")}
   </div>
-  ${canLeave ? `<button class="btn ghost" data-act="leave">Sair para a cidade</button>` : ""}`}
+  ${canLeave ? `<button class="btn ghost" data-act="leave">Sair para a cidade</button>` : (!isBlocked && exitRoute().by.length ? `<p class="muted small">Para sair da masmorra você precisa passar por ${esc(exitRoute().by.map(n=>n.toLowerCase()).join(" ou "))}, onde há monstros.</p>` : "")}`}
   <div class="sheet"><h3>Diário</h3><div class="log">${d.log.slice(0,8).map(l=>`<p>${esc(l)}</p>`).join("")}</div></div>`;
 }
 
