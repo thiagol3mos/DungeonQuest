@@ -1,5 +1,5 @@
-// NoteQuest: cache para jogar offline. Troque a versão a cada atualização do jogo.
-const CACHE = 'notequest-v12';
+// Dungeon Quest: cache para jogar offline. Troque a versão a cada atualização do jogo.
+const CACHE = 'dungeonquest-v13';
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon.png'];
 

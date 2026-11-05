@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>NoteQuest</title>
+<title>Dungeon Quest</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="NoteQuest">
+<meta name="apple-mobile-web-app-title" content="Dungeon Quest">
 <meta name="theme-color" content="#18213d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/favicon.png">
@@ -734,8 +734,8 @@ for(const k in DUNGEONS){ const D = DUNGEONS[k]; D.corr = D.corr || ["S1","M1","
 /* =========================================================
    ESTADO E SAVE
    ========================================================= */
-const KEY = "notequest.save.v1";
-const SAVE_PREFIX = "NQ1:";
+const KEY = "notequest.save.v1" + (/[#&]slot=(\w+)/.test(location.hash) ? "." + location.hash.match(/slot=(\w+)/)[1] : "");
+const SAVE_PREFIX = "DQ1:";
 let state = null;
 let busy = false;
 let toastMsg = "";
@@ -777,7 +777,7 @@ function migrate(){
     if(dd && dd.st==="open" && dd.dir==="N" && dd.x !== st.x && !Object.values(lv1.doors).some(o=>o!==dd && o.seg===dd.seg && o.dir==="N" && o.x===st.x)) dd.x = st.x;
   });
 }
-function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} if(typeof COOP !== "undefined" && COOP.on()) COOP.sync(); }
 function go(screen){ state.screen = screen; toastMsg=""; rollLog = []; persist(); render(); window.scrollTo(0,0); }
 
 function encodeSave(){
@@ -786,7 +786,7 @@ function encodeSave(){
 }
 function decodeSave(code){
   const raw = code.replace(/\s+/g,"");
-  const at = raw.search(/nq1:/i);
+  const at = raw.search(/[nd]q1:/i);
   if(at < 0) throw new Error("prefixo");
   const c = raw.slice(at + SAVE_PREFIX.length).replace(/[^A-Za-z0-9+/=]/g,"");
   const s = JSON.parse(decodeURIComponent(escape(atob(c))));
@@ -1240,7 +1240,7 @@ function D(){ return state.dungeon; }
 function DT(){ return DUNGEONS[state.dungeon.type]; }
 function LV(n){ return state.dungeon.levels[n || state.dungeon.pos.level]; }
 function curSeg(){ const p = state.dungeon.pos; return LV(p.level).segs[p.seg]; }
-function log(msg){ const d = D(); d.log.unshift(msg); if(d.log.length>40) d.log.length = 40; }
+function log(msg){ const d = D(); if(state.coop && state.coop.code && state.hero) msg = `${state.hero.name}: ${msg}`; d.log.unshift(msg); if(d.log.length>40) d.log.length = 40; }
 
 function newLevel(n){ return {n, segs:{}, doors:{}, occ:{}, next:1, last:null, finalAsked:false}; }
 function occupy(lv, seg){ [seg, seg.neck].forEach(r=>{ if(r) for(let y=r.y;y<r.y+r.h;y++) for(let x=r.x;x<r.x+r.w;x++) lv.occ[x+","+y] = seg.id; }); }
@@ -1540,7 +1540,7 @@ function attacksPerTurn(h){ h = h || state.hero; const n = 1 + offWeapons(h).len
 function w2(h){ const o = offWeapons(h)[0]; return o ? o.w : null; }
 /* sem a Lamparina, a segunda arma volta para a mochila */
 /* mãos livres para armas: a tocha ocupa uma, a Lamparina libera; sem um braço, sobra uma só */
-function handsFree(h){ h = h || state.hero; if(!h) return 1; return Math.max(0, (h.arms || 2) - (hasLamp(h) || raceT("tongue", h) ? 0 : 1)); }
+function handsFree(h){ h = h || state.hero; if(!h) return 1; return Math.max(0, (h.arms || 2) - (hasLamp(h) || raceT("tongue", h) || (typeof COOP !== "undefined" && !COOP.holdsTorch(h)) ? 0 : 1)); }
 /* um braço, sem Lamparina e sem poção que devolva o braço: fim de carreira ao chegar na cidade */
 function mustRetire(h){ h = h || state.hero; return !!h && handsFree(h) === 0 && (h.arms||2) < 2 && !h.bag.some(it=>/^Poção da Salamandra|^Poção Mão na Roda/.test(it.n)); }
 function normalizeHands(){
@@ -1874,7 +1874,9 @@ async function teleTo(level, id){
 }
 function moveTo(id, fresh){
   const d = D();
+  const changed = d.pos.seg !== id;
   d.pos.seg = id;
+  if(changed && COOP.on()) setTimeout(()=>COOP.checkLight(true), 0);
   state.ui.selDoor = null; state.ui.selObj = null; state.ui.bagFull = false; state.ui.pick = null;
   centerOn = true;
 }
@@ -3258,13 +3260,13 @@ function dollPixels(hero, pose, back){
     rect(16,9,5,7,g[1]); rect(16,9,5,1,g[0]); rect(16,9,1,7,g[0]); rect(20,10,1,6,g[2]); rect(17,15,3,1,g[2]); put(18,16,g[2]); if(!back) put(18,12,"#f2ead8"); }
   else if(off){ rect(18,2,2,12,W1[1]); rect(18,2,1,12,W1[0]); put(19,1,W1[1]); rect(17,13,4,1,"#e0b440"); }
   if(lamp){ rect(15,15,2,3,"#e8b830"); put(15,15,"#ffe680"); put(16,16,"#fff4c0"); }
-  else if(!off && !w.two && !tongue){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); rect(17,5,4,1,"#7a808c"); torch = [19, 3 + DOLL_OY + bodyDy]; }
+  else if(!off && !w.two && !tongue && !hero.noTorch){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); rect(17,5,4,1,"#7a808c"); torch = [19, 3 + DOLL_OY + bodyDy]; }
   else if(tongue && !back){ rect(13,6,4,1,WD[0]); torch = [17, 4 + DOLL_OY + bodyDy]; }
-  else if(!off && !w.two){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); torch = [19, 3 + DOLL_OY + bodyDy]; }
+  else if(!off && !w.two && !hero.noTorch){ rect(18,6,2,9,WD[0]); rect(19,6,1,9,WD[1]); torch = [19, 3 + DOLL_OY + bodyDy]; }
   return {S, torch};
 }
 const dollCache = new Map();
-function dollKey(h, pose, back){ return JSON.stringify([pose, !!back, h.race, h.race2, h.weapon && h.weapon.n, h.weapon && h.weapon.unarmed, (h.off||[]).map(o=>o.n), ARMOR_SLOTS.map(s=>h.armor[s] ? h.armor[s].n : ""), hasLamp(h)]); }
+function dollKey(h, pose, back){ return JSON.stringify([pose, !!back, !!h.noTorch, h.race, h.race2, h.weapon && h.weapon.n, h.weapon && h.weapon.unarmed, (h.off||[]).map(o=>o.n), ARMOR_SLOTS.map(s=>h.armor[s] ? h.armor[s].n : ""), hasLamp(h)]); }
 function dollCanvas(h, pose, back){
   const key = dollKey(h, pose, back);
   let hit = dollCache.get(key); if(hit) return hit;
@@ -3281,8 +3283,9 @@ function dollCanvas(h, pose, back){
   dollCache.set(key, hit); return hit;
 }
 /* desenha o aventureiro com os pés em (fx, fy); devolve a posição da chama da tocha (ou null) */
-function drawHero(ctx, fx, fy, t, pose, back, alpha){
-  const h = state.hero; if(!h) return null;
+function drawHero(ctx, fx, fy, t, pose, back, alpha, other){
+  let h = other || state.hero; if(!h) return null;
+  if(!other && COOP.on() && !COOP.holdsTorch(h) && !hasLamp(h)) h = {...h, noTorch:true};
   const d = dollCanvas(h, pose || "idle", back);
   const x = Math.round(fx - 12), y = Math.round(fy - (20 + DOLL_OY + 1));
   ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(x+7, y+DOLL_OY+20, 11, 3);
@@ -3383,7 +3386,7 @@ function drawOverlayZ(ctx, lv, seg, t){
   if(seg && state.hero && !(state.ui.tele && Math.floor(t/350)%2)){
     const fh = faceH(seg), cx = (seg.x + seg.w/2)*T, floorTop = seg.y*T + CAP + fh, floorBot = (seg.y+seg.h)*T - CAP;
     const hx = Math.round(cx - 8 - (seg.mon && seg.w>=3 ? 20 : 0)), hy = Math.round(Math.min(floorBot - 23, floorTop + (floorBot-floorTop)*.62 - 10));
-    const tx = hx + 8, ty = hy + 22, now = performance.now();
+    const tx = hx + 8 - (COOP.on() && COOP.partnerHere() && COOP.sameRoom() ? 16 : 0), ty = hy + 22, now = performance.now();
     if(!mapHero || mapHero.lvl !== lv.n){ mapHero = {lvl:lv.n, x:tx, y:ty, fx:tx, fy:ty, tx, ty, t0:0}; }
     if(mapHero.tx !== tx || mapHero.ty !== ty){ mapHero.fx = mapHero.x; mapHero.fy = mapHero.y; mapHero.tx = tx; mapHero.ty = ty; mapHero.t0 = now; }
     const k = Math.min(1, (now - mapHero.t0) / 420), walking = k < 1;
@@ -3391,6 +3394,17 @@ function drawOverlayZ(ctx, lv, seg, t){
     const pose = walking ? (Math.floor(now/110)%2 ? "walkA" : "walkB") : (frame % 12 >= 6 ? "breath" : "idle");
     const fl = drawHero(ctx, mapHero.x, mapHero.y - (walking && Math.floor(now/110)%2 ? 1 : 0), t, pose);
     if(fl) flameZ(ctx, fl[0], fl[1], t, 5);
+  }
+  // parceiro da dupla
+  const pt = COOP.on() && COOP.partner();
+  if(pt && pt.inside && !pt.dead && pt.pos && pt.pos.level === lv.n && lv.segs[pt.pos.seg] && pt.lite){
+    const ps = lv.segs[pt.pos.seg], same = seg && ps.id === seg.id;
+    const pfh = faceH(ps), pcx = (ps.x + ps.w/2)*T, pTop = ps.y*T + CAP + pfh, pBot = (ps.y+ps.h)*T - CAP;
+    const px = Math.round(pcx + (same ? 18 : 0) - (ps.mon && ps.w>=3 ? 20 : 0)), py = Math.round(Math.min(pBot - 1, pTop + (pBot-pTop)*.62 + 12));
+    const ph = {...pt.lite, armor:pt.lite.armor||{}, off:pt.lite.off||[], bag: pt.lite.lamp ? [{n:LAMP}] : [], noTorch: COOP.holder() !== COOP.other() && !pt.own};
+    const pf = drawHero(ctx, px, py, t, frame % 12 >= 6 ? "breath" : "idle", false, COOP.online(pt) ? undefined : .45, ph);
+    if(pf) flameZ(ctx, pf[0], pf[1], t, 5);
+    ctx.save(); ctx.translate(px - 4, py - 34); ctx.fillStyle = "#f8e048"; ctx.fillRect(3, 0, 3, 1); ctx.fillRect(4, 1, 1, 1); ctx.restore();
   }
   // luz e sombra
   Object.values(lv.segs).forEach(s=>{
@@ -3556,6 +3570,7 @@ function mapTap(wx, wy){
   if(!id || id===d.pos.seg) return;
   if(blocked(cur)){ state.ui.msg = "Você não pode sair daqui com monstros te encarando."; render(); return; }
   if(!reachable(lv, d.pos.seg, id)){ state.ui.msg = "Não há caminho aberto até lá."; render(); return; }
+  if(COOP.on()){ COOP.lock().then(ok=>{ if(ok) doWalk(id); else { state.ui.msg = `${COOP.partner() ? COOP.partner().name : "O outro aventureiro"} está agindo. Espere um instante.`; render(); } }); return; }
   doWalk(id);
 }
 function reachable(lv, a, b){
@@ -3582,7 +3597,7 @@ function viewTitle(){
   return `
   <div class="topbar"><button class="gear" data-act="go" data-to="settings" aria-label="Ajustes"><canvas width="13" height="13" data-gear></canvas></button></div>
   <canvas class="scene" id="scene" width="160" height="104" data-anim="scene" aria-label="Entrada de masmorra com tochas acesas"></canvas>
-  <div class="logo"><h1>NOTEQUEST</h1><p class="muted">Exploração de masmorras solo</p></div>
+  <div class="logo"><h1>DUNGEON QUEST</h1><p class="muted">Exploração de masmorras</p></div>
   <div class="stack">
     ${h ? `<button class="btn" data-act="go" data-to="${d && d.inside ? "explore" : "sheet"}">Continuar com ${esc(h.name)}</button>` : ""}
     ${h && ui.confirmNew ? `
@@ -3596,7 +3611,7 @@ function viewTitle(){
       <button class="btn ghost" data-act="go" data-to="save">Backup</button>
     </div>
   </div>
-  <p class="credit">Baseado em NoteQuest, de Tiago Junges.<br>Versão de fã para uso pessoal.</p>`;
+  <p class="credit">Versão para uso pessoal.</p>`;
 }
 
 /* lista das tabelas de magia que o personagem rola na criação */
@@ -3815,7 +3830,8 @@ function viewSheet(){
     </div>
     <div class="sheet">
       <h3>Mãos <span class="n" style="font-size:12px">${handsUsed(h)}/${handsFree(h)}</span></h3>
-      <p class="muted small" style="margin:0 0 6px">${h.arms||2} braço${(h.arms||2)===1?"":"s"}${hasLamp() || raceT("tongue") ? "" : ", um com a tocha"}</p>
+      <p class="muted small" style="margin:0 0 6px">${h.arms||2} braço${(h.arms||2)===1?"":"s"}${hasLamp() || raceT("tongue") || !COOP.holdsTorch(h) ? "" : ", um com a tocha"}</p>
+      ${COOP.on() && !hasLamp() && !raceT("tongue") ? (COOP.holder() === COOP.me() ? `<button class="btn ghost" disabled>Você está segurando a tocha</button>` : `<button class="btn ghost" data-act="takeTorch">Segurar a tocha</button><p class="muted small">${esc(COOP.partner() ? COOP.partner().name : "Seu parceiro")} está com a tocha${COOP.sameRoom() ? "" : ", mas não está na mesma sala que você"}.${state.coop.own ? " Você acendeu uma tocha própria." : ""}</p>`) : ""}
       ${state.ui.armsMsg ? `<p class="toast" style="text-align:left">${esc(state.ui.armsMsg)}</p>` : ""}
       <button class="slot full eqbtn ${eq==="weapon"?"sel":""}" data-act="eqSel" data-s="weapon"><b>${esc(h.weapon.n.split(" (")[0])}</b><span class="small">Dano ${h.weapon.d}${h.weapon.two?" · Duas Mãos":""}</span>${descHTML(h.weapon, false)}</button>
       ${offs(h).map((w,k)=>`<button class="slot full eqbtn ${eq==="off"+k?"sel":""}" data-act="eqSel" data-s="off${k}" style="margin-top:8px"><b>${esc(w.n.split(" (")[0])}</b><span class="small">${w.shield ? `Escudo: −${+((w.n.match(/em (\d)\)/)||[])[1]||1)} de dano` : `Dano ${w.d}${w.two?" · Duas Mãos":""}`}</span>${descHTML(w, false)}</button>`).join("")}
@@ -3888,7 +3904,26 @@ function viewDungeon(){
     ${state.ui.confirmReroll ? `<div class="sheet dashed"><p>Procurar outra masmorra abandona ${d.name}${d.corpses.length?" e os cadáveres lá dentro":""}.</p>
        <div class="row"><button class="btn ghost" data-act="cancelReroll">Manter</button><button class="btn" data-act="rollDungeon">Procurar outra</button></div></div>`
       : `<button class="btn ghost" data-act="askReroll">Procurar outra masmorra</button>`}`
-  : `<button class="btn" data-act="rollDungeon">Rolar 3d6</button>`}`;
+  : `<button class="btn" data-act="rollDungeon">Rolar 3d6</button>`}
+  ${coopPanel()}`;
+}
+function coopPanel(){
+  const msg = state.ui.coopMsg ? `<p class="toast">${esc(state.ui.coopMsg)}</p>` : "";
+  if(COOP.on()){
+    const p = COOP.partner();
+    const st = !p ? "aguardando alguém entrar com o código" : p.dead ? `${esc(p.name)} morreu` : !COOP.online(p) ? `${esc(p.name)} está desconectado` : p.inside ? `${esc(p.name)} está na masmorra` : `${esc(p.name)} está na cidade`;
+    return `<div class="sheet"><h3>Jogo em dupla</h3>
+      <p>Código da sala: <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(state.coop.code)}</b></p>
+      <p class="small">${st}.</p>
+      ${msg}<button class="btn ghost" data-act="coopLeave">Sair da dupla</button></div>`;
+  }
+  if(!NET.ready()) return `<div class="sheet dashed"><h3>Jogo em dupla</h3><p class="muted small">O servidor do jogo em dupla ainda não foi configurado.</p></div>`;
+  return `<div class="sheet"><h3>Jogo em dupla</h3>
+    <p class="muted small">Explore esta masmorra junto com um amigo, cada um no seu aparelho.</p>
+    ${state.dungeon && !state.dungeon.inside ? `<button class="btn ghost" data-act="coopCreate">Criar sala com esta masmorra</button>` : ""}
+    <label class="label" for="coopCode">Entrar na sala de um amigo</label>
+    <div class="row"><input type="text" id="coopCode" maxlength="4" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase"><button class="btn" data-act="coopJoin">Entrar</button></div>
+    ${msg}</div>`;
 }
 
 /* masmorra: exploração */
@@ -4021,8 +4056,13 @@ function viewExplore(){
     }
   }
   const canLeave = !isBlocked && pathClear();
+  if(COOP.on()){
+    const p = COOP.partner();
+    if(state.coop.dark != null) banner = `<div class="banner"><b>Você está no escuro!</b><p>Volte para perto de ${esc(p ? p.name : "seu parceiro")}, que está com a tocha. ${state.coop.dark === 1 ? "Último movimento" : `${state.coop.dark} movimentos`} antes de precisar acender uma tocha própria.</p></div>` + banner;
+  }
   return `
   <div class="bar"><button class="back" data-act="go" data-to="sheet" aria-label="Ficha">◀</button><h2 class="sm">${esc(d.name)}<br><span class="label">Nível ${N(d.pos.level)}</span></h2></div>
+  ${COOP.on() ? (()=>{ const p = COOP.partner(); return `<p class="small" style="margin:0">Dupla ${esc(state.coop.code)} · ${p ? `${esc(p.name)}: ${!COOP.online(p) ? "desconectado" : p.dead ? "morto" : !p.inside ? "na cidade" : p.pos && p.pos.level !== d.pos.level ? `nível ${p.pos.level}` : COOP.sameRoom() ? "aqui com você" : "em outra sala"}` : "sem parceiro"}${COOP.holder() === COOP.me() && !hasLamp() ? " · você está com a tocha" : ""}</p>`; })() : ""}
   <p class="muted small" style="margin:0">Toque numa porta, sala, monstro, baú, escada ou saída. Arraste para mover e pince para dar zoom.</p>
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span><span>Moedas<b>${h.coins}</b></span><span>Mochila<b>${bagLabel(h)}</b></span></div>
@@ -4691,7 +4731,7 @@ function viewSave(){
   <div class="sheet">
     <h3>Importar</h3>
     <p class="small">Cole um código salvo. Isso substitui o jogo atual deste aparelho.</p>
-    <textarea id="importCode" placeholder="NQ1:..." autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></textarea>
+    <textarea id="importCode" placeholder="DQ1:..." autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></textarea>
     ${navigator.clipboard && navigator.clipboard.readText ? `<button class="btn ghost" data-act="pasteSave">Colar da área de transferência</button>` : ""}
     <button class="btn ghost" data-act="import">Restaurar este save</button>
   </div>
@@ -4708,7 +4748,7 @@ function render(){
   if(["sheet","dungeon","explore","city","advclass"].includes(state.screen) && !state.hero) state.screen = "title";
   if(state.screen==="explore" && !(state.dungeon && state.dungeon.inside)) state.screen = "sheet";
   if(state.screen==="combat" && !(state.combat && state.hero)) state.screen = state.hero && state.dungeon && state.dungeon.inside ? "explore" : "title";
-  $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)();
+  $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)() + (COOP.on() && COOP.paused() ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Jogo pausado</h3><p>Aguardando ${esc(COOP.partner().name)} se reconectar. Nada se perde enquanto isso.</p></div></div>` : "");
   const dr = state.draft;
   if(state.screen==="create" && dr){
     const tray = $("#tray");
@@ -4740,7 +4780,251 @@ function render(){
   paint();
 }
 
+/* =========================================================
+   JOGO EM DUPLA (coop online, 2 jogadores)
+   Masmorra compartilhada numa sala do Firebase Realtime Database (REST + EventSource).
+   Cada jogador age no próprio aparelho; uma trava evita que os dois mexam na masmorra ao mesmo tempo.
+   ========================================================= */
+const COOP_FB = "https://dungeonquest-thiagolemos-default-rtdb.firebaseio.com";   // endereço do Realtime Database
+const NET = {
+  sim(){ return !!(state.settings && state.settings.coopSim); },
+  base(){ return ((state.settings && state.settings.fbUrl) || COOP_FB || "").replace(/\/+$/,""); },
+  ready(){ return this.sim() || !!this.base(); },
+  url(path){ return `${this.base()}/salas/${path}.json`; },
+  // ---- banco simulado (testes): localStorage compartilhado entre abas do mesmo navegador
+  simDB(){ try{ return JSON.parse(localStorage.getItem("nq-sim-db") || "{}"); }catch(e){ return {}; } },
+  simAt(db, parts){ let o = db; for(const p of parts){ if(o == null) return null; o = o[p]; } return o === undefined ? null : o; },
+  simWrite(path, val, merge){
+    const db = this.simDB(), parts = path.split("/").filter(Boolean);
+    let o = db; for(let i=0;i<parts.length-1;i++){ o[parts[i]] = (o[parts[i]] && typeof o[parts[i]]==="object") ? o[parts[i]] : {}; o = o[parts[i]]; }
+    const k = parts[parts.length-1];
+    if(merge && val && typeof val === "object"){ o[k] = Object.assign((o[k] && typeof o[k]==="object") ? o[k] : {}, val); Object.keys(val).forEach(x=>{ if(val[x]===null) delete o[k][x]; }); }
+    else if(val === null) delete o[k]; else o[k] = JSON.parse(JSON.stringify(val));
+    localStorage.setItem("nq-sim-db", JSON.stringify(db));
+    const code = parts[0]; (NET._sims[code]||[]).forEach(cb=>setTimeout(()=>cb(this.simAt(this.simDB(), [code])), 0));
+  },
+  _sims: {},
+  async get(path){
+    if(this.sim()) return this.simAt(this.simDB(), path.split("/").filter(Boolean));
+    const r = await fetch(this.url(path)); if(!r.ok) throw new Error("rede"); return r.json();
+  },
+  async put(path, val){
+    if(this.sim()) return this.simWrite(path, val, false);
+    await fetch(this.url(path), {method:"PUT", body:JSON.stringify(val)});
+  },
+  async patch(path, obj){
+    if(this.sim()) return this.simWrite(path, obj, true);
+    await fetch(this.url(path), {method:"PATCH", body:JSON.stringify(obj)});
+  },
+  /* escuta a sala inteira; cb recebe sempre o espelho completo da sala */
+  listen(code, cb){
+    if(this.sim()){
+      (this._sims[code] = this._sims[code] || []).push(cb);
+      const onSt = e => { if(e.key === "nq-sim-db") cb(this.simAt(this.simDB(), [code])); };
+      window.addEventListener("storage", onSt);
+      setTimeout(()=>cb(this.simAt(this.simDB(), [code])), 0);
+      return () => { this._sims[code] = (this._sims[code]||[]).filter(f=>f!==cb); window.removeEventListener("storage", onSt); };
+    }
+    let mirror = null, es = null, closed = false;
+    const setAt = (path, data, merge) => {
+      const parts = path.split("/").filter(Boolean);
+      if(!parts.length){ mirror = merge ? Object.assign(mirror||{}, data) : data; return; }
+      mirror = mirror || {}; let o = mirror;
+      for(let i=0;i<parts.length-1;i++){ o[parts[i]] = (o[parts[i]] && typeof o[parts[i]]==="object") ? o[parts[i]] : {}; o = o[parts[i]]; }
+      const k = parts[parts.length-1];
+      if(merge && data && typeof data==="object"){ o[k] = Object.assign((o[k] && typeof o[k]==="object") ? o[k] : {}, data); Object.keys(data).forEach(x=>{ if(data[x]===null) delete o[k][x]; }); }
+      else if(data === null) delete o[k]; else o[k] = data;
+    };
+    const open = () => {
+      if(closed) return;
+      es = new EventSource(this.url(code));
+      es.addEventListener("put", e=>{ const m = JSON.parse(e.data); setAt(m.path, m.data, false); cb(mirror); });
+      es.addEventListener("patch", e=>{ const m = JSON.parse(e.data); setAt(m.path, m.data, true); cb(mirror); });
+      es.onerror = () => { if(es.readyState === 2 && !closed) setTimeout(open, 3000); };
+    };
+    open();
+    return () => { closed = true; if(es) es.close(); };
+  }
+};
+
+const COOP = {
+  room: null, close: null, lastPushed: "", pending: null, partnerBeat: null, partnerSeenAt: 0, lockSeenAt: 0, beatTimer: null, myLockN: null,
+  on(){ return !!(state.coop && state.coop.code); },
+  me(){ return state.coop && state.coop.me; },
+  other(){ return this.me() === "A" ? "B" : "A"; },
+  partner(){ return this.room && this.room.players ? this.room.players[this.other()] || null : null; },
+  online(p){ return !!p && (performance.now() - this.partnerSeenAt) < 16000; },
+  /* o parceiro está na masmorra, vivo e conectado? */
+  partnerHere(){ const p = this.partner(); return !!(p && p.inside && !p.dead && this.online(p)); },
+  sameRoom(){ const p = this.partner(), d = state.dungeon; return !!(p && p.pos && d && d.pos && p.pos.level === d.pos.level && p.pos.seg === d.pos.seg); },
+  lite(h){
+    h = h || state.hero; if(!h) return null;
+    return {name:h.name, race:h.race, race2:h.race2||null, arms:h.arms||2, pv:h.pv, pvMax:h.pvMax, torches:h.torches,
+      weapon:{n:h.weapon.n, unarmed:!!h.weapon.unarmed, two:!!h.weapon.two}, off:offs(h).map(o=>({n:o.n, shield:!!o.shield})),
+      armor:Object.fromEntries(ARMOR_SLOTS.filter(s=>h.armor[s]).map(s=>[s,{n:h.armor[s].n}])), lamp:hasLamp(h), tongue:!!raceT("tongue", h)};
+  },
+  netDungeon(d){ const {pos, inside, ...rest} = d; return rest; },
+  /* ---------- sala ---------- */
+  code(){ const L = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; return Array.from({length:4},()=>L[Math.floor(Math.random()*L.length)]).join(""); },
+  async create(){
+    const d = state.dungeon, h = state.hero; if(!d || !h) return "Role uma masmorra antes.";
+    let code = this.code();
+    for(let i=0;i<5;i++){ const ex = await NET.get(code); if(!ex) break; code = this.code(); }
+    await NET.put(code, {dungeon:this.netDungeon(d), ver:1, torch:"A", lock:null, players:{A:this.playerRec()}});
+    state.coop = {code, me:"A"}; state.soloDungeon = null; this.lastPushed = JSON.stringify(this.netDungeon(d));
+    persist(); this.connect(); return null;
+  },
+  async join(code){
+    code = (code||"").trim().toUpperCase();
+    if(!/^[A-Z0-9]{4}$/.test(code)) return "O código tem 4 letras ou números.";
+    const room = await NET.get(code);
+    if(!room || !room.dungeon) return "Sala não encontrada. Confira o código.";
+    const P = room.players || {}, fresh = x => x && Date.now() - (x.beat||0) < 20000;
+    let me;
+    if(P.A && P.A.name === state.hero.name) me = "A";
+    else if(!P.B || P.B.name === state.hero.name || !fresh(P.B)) me = "B";
+    else return "Esta sala já tem dois aventureiros.";
+    if(state.dungeon && !(state.coop && state.coop.code)) state.soloDungeon = state.dungeon;
+    state.dungeon = {...room.dungeon, pos:null, inside:false};
+    state.coop = {code, me};
+    await NET.put(`${code}/players/${me}`, this.playerRec());
+    this.lastPushed = JSON.stringify(room.dungeon); persist(); this.connect(); return null;
+  },
+  async leave(){
+    if(!this.on()) return;
+    const code = state.coop.code, me = this.me();
+    try{ await NET.put(`${code}/players/${me}`, null); }catch(e){}
+    if(this.close) this.close(); this.close = null; this.room = null;
+    if(me === "B"){ state.dungeon = state.soloDungeon || null; }
+    else if(state.dungeon){ state.dungeon = {...state.dungeon, inside:false}; }
+    state.soloDungeon = null; state.coop = null; persist();
+  },
+  playerRec(){
+    const d = state.dungeon, h = state.hero;
+    return {name:h ? h.name : "?", lite:this.lite(h), pos: d && d.inside ? d.pos : null, inside: !!(d && d.inside), dead: !h,
+      own: !!(state.coop && state.coop.own), dark: state.coop ? (state.coop.dark ?? null) : null, beat: Date.now()};
+  },
+  /* ---------- conexão e sincronização ---------- */
+  connect(){
+    if(!this.on() || !NET.ready()) return;
+    if(this.close) this.close();
+    this.close = NET.listen(state.coop.code, room => this.onRoom(room));
+    clearInterval(this.beatTimer);
+    let wasPaused = false;
+    this.beatTimer = setInterval(()=>{
+      if(!this.on()) return;
+      NET.patch(`${state.coop.code}/players/${this.me()}`, {beat:Date.now()}).catch(()=>{});
+      const pz = this.paused(); if(pz !== wasPaused){ wasPaused = pz; if(!busy) render(); }
+    }, 5000);
+  },
+  onRoom(room){
+    if(!this.on()) return;
+    const prev = this.room; this.room = room || {};
+    const p = this.partner();
+    if(p && p.beat !== this.partnerBeat){ this.partnerBeat = p.beat; this.partnerSeenAt = performance.now(); }
+    if(!p){ this.partnerBeat = null; }
+    if(room && room.lock && (!prev || !prev.lock || prev.lock.n !== room.lock.n)) this.lockSeenAt = performance.now();
+    // masmorra vinda do parceiro
+    if(room && room.dungeon){
+      const js = JSON.stringify(room.dungeon);
+      if(js !== this.lastPushed){
+        if(busy || this.myLock()) this.pending = room.dungeon;
+        else this.applyDungeon(room.dungeon);
+      }
+    }
+    this.checkLight();
+    if(!busy && ["explore","sheet","dungeon","city","combat"].includes(state.screen)) render();
+  },
+  applyDungeon(nd){
+    const d = state.dungeon || {};
+    state.dungeon = {...nd, pos:d.pos || null, inside:!!d.inside};
+    this.lastPushed = JSON.stringify(nd); this.pending = null; mapVersion++;
+  },
+  /* chamado em todo persist(): envia a masmorra se mudou, e o meu registro de jogador */
+  sync(){
+    if(!this.on() || !this.room || !state.dungeon) return;
+    const code = state.coop.code, nd = this.netDungeon(state.dungeon), js = JSON.stringify(nd);
+    if(js !== this.lastPushed && !busy){
+      this.lastPushed = js;
+      NET.put(`${code}/dungeon`, nd).then(()=>NET.put(`${code}/ver`, (this.room.ver||0)+1)).catch(()=>{});
+    }
+    NET.put(`${code}/players/${this.me()}`, this.playerRec()).catch(()=>{});
+    if(!busy && this.myLock()) this.unlock();
+  },
+  /* ---------- trava: um age por vez na masmorra ---------- */
+  myLock(){ return !!(this.room && this.room.lock && this.room.lock.by === this.me() && this.room.lock.n === this.myLockN); },
+  lockedByPartner(){ const l = this.room && this.room.lock; return !!(l && l.by !== this.me() && performance.now() - this.lockSeenAt < 20000); },
+  async lock(){
+    if(!this.on() || !this.room || !state.dungeon || !state.dungeon.inside) return true;
+    if(this.lockedByPartner()) return false;
+    if(this.pending) this.applyDungeon(this.pending);
+    const n = Math.random().toString(36).slice(2);
+    this.myLockN = n;
+    await NET.put(`${state.coop.code}/lock`, {by:this.me(), n});
+    await new Promise(r=>setTimeout(r, 250));
+    const l = await NET.get(`${state.coop.code}/lock`);
+    if(!l || l.n !== n){ this.myLockN = null; return false; }
+    if(this.room) this.room.lock = l;
+    return true;
+  },
+  unlock(){ if(!this.on()) return; this.myLockN = null; NET.put(`${state.coop.code}/lock`, null).catch(()=>{}); if(this.room) this.room.lock = null; },
+  /* ---------- tocha e luz ---------- */
+  holder(){ return this.room ? this.room.torch || "A" : null; },
+  /* este herói precisa segurar uma tocha com a mão? (fora da dupla, sempre que não tem Lamparina) */
+  holdsTorch(h){
+    if(!this.on() || h !== state.hero) return true;
+    if(!this.partnerHere()) return true;
+    return this.holder() === this.me() || !!state.coop.own;
+  },
+  paused(){ const p = this.partner(), d = state.dungeon; return !!(this.on() && d && d.inside && p && p.inside && !p.dead && !this.online(p)); },
+  lit(){
+    const h = state.hero; if(!h) return true;
+    if(hasLamp(h) || raceT("tongue", h) || this.holdsTorch(h)) return true;
+    const p = this.partner();
+    return this.partnerHere() && this.sameRoom() && this.holder() === this.other();
+  },
+  async takeTorch(){
+    if(!this.on()) return;
+    await NET.put(`${state.coop.code}/torch`, this.me()); if(this.room) this.room.torch = this.me();
+    state.coop.own = false; state.coop.dark = null; fixHands(); persist(); render();
+  },
+  /* chamado ao mudar de sala e quando o parceiro se move */
+  checkLight(moved){
+    if(!this.on() || !state.dungeon || !state.dungeon.inside || !state.hero) return;
+    const c = state.coop;
+    if(this.lit()){
+      if(c.dark != null){ c.dark = null; }
+      if(c.own && this.partnerHere() && this.sameRoom() && this.holder() === this.other()){ c.own = false; fixHands(); state.ui.msg = "Você voltou para a luz da tocha e guardou a sua."; }
+      return;
+    }
+    if(c.dark == null){ c.dark = 3; state.ui.msg = `Você está no escuro! Volte para perto de ${this.partner() ? this.partner().name : "seu parceiro"}, que está com a tocha.`; return; }
+    if(moved){ c.dark--; if(c.dark <= 0) this.forceTorch(); }
+  },
+  forceTorch(){
+    const h = state.hero, c = state.coop; c.dark = null;
+    if(h.torches <= 0){
+      const sp = h.spells.Luz && h.spells.Luz.left > 0, si = h.bag.findIndex(it=>it.n === "Pergaminho Mágico (Luz)");
+      if(sp){ h.spells.Luz.left--; h.torches = 1; log("Na escuridão, você conjura Luz para ter uma tocha."); }
+      else if(si >= 0 && !raceT("ogro")){ h.bag.splice(si,1); h.torches = 1; log("Na escuridão, você lê o Pergaminho de Luz para ter uma tocha."); }
+      else { log("Sem tochas e sem luz, você se perde na escuridão."); killHero("Perdido na escuridão"); return; }
+    }
+    c.own = true; fixHands(); log("Longe da luz por muito tempo, você acende uma tocha própria.");
+    state.ui.msg = "Você acendeu uma tocha própria: uma das mãos agora segura a tocha.";
+  },
+};
+/* depois de mudar quem segura a tocha: o que não cabe nas mãos vai para a mochila (a tocha tem prioridade) */
+function fixHands(){
+  const h = state.hero; if(!h) return;
+  const o = offs(h);
+  while(handsUsed(h) > handsFree(h) && o.length){ h.bag.push(wCopy(o.pop())); }
+  if(handsUsed(h) > handsFree(h) && !h.weapon.unarmed){ h.bag.push(wCopy(h.weapon)); h.weapon = UNARMED(); }
+}
+
 const actions = {
+  async coopCreate(){ state.ui.coopMsg = "Criando a sala..."; render(); try{ const e = await COOP.create(); state.ui.coopMsg = e || "Sala criada! Passe o código para o seu parceiro."; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } render(); },
+  async coopJoin(){ const c = ($("#coopCode")||{}).value; state.ui.coopMsg = "Entrando..."; render(); try{ const e = await COOP.join(c); state.ui.coopMsg = e || "Você entrou na dupla!"; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } mapVersion++; render(); },
+  async coopLeave(){ if(state.dungeon && state.dungeon.inside) return; await COOP.leave(); state.ui.coopMsg = "Você saiu da dupla."; mapVersion++; render(); },
+  takeTorch(){ COOP.takeTorch(); },
   go(b){ const keep = state.ui.lastDeath && b.dataset.to==="cemetery"; state.ui = keep ? state.ui : {}; go(b.dataset.to); },
   newHero(){
     if(state.hero){ state.ui.confirmNew = true; render(); return; }
@@ -4944,6 +5228,11 @@ const actions = {
   enter(){
     const d = state.dungeon, h = state.hero;
     if(mustRetire(h) && !d.inside){ go("city"); return; }
+    if(COOP.on() && d.levels[1] && COOP.partnerHere()){
+      d.pos = {level:1, seg:Object.values(d.levels[1].segs).find(s=>s.exit).id}; d.inside = true;
+      log(`Você entrou na masmorra para encontrar ${COOP.partner().name}.`);
+      state.ui = {}; rollLog = []; centerOn = true; mapVersion++; COOP.checkLight(); go("explore"); return;
+    }
     if(!d.levels[1]){ buildLevel1(); log(`Você entrou n${d.name.startsWith("A ")?"a":"o"} ${d.name.slice(2)}.`); }
     else {
       d.pos = {level:1, seg:Object.values(d.levels[1].segs).find(s=>s.exit).id};
@@ -5157,7 +5446,7 @@ const actions = {
     if(!txt || !txt.trim()){ say("A área de transferência está vazia. Copie o código primeiro."); return; }
     $("#importCode").value = txt.trim();
     try{ decodeSave(txt); say("Código colado. Confira e toque em Restaurar este save."); }
-    catch(e){ say("O texto copiado não parece um save do NoteQuest. Confira se copiou o código inteiro."); }
+    catch(e){ say("O texto copiado não parece um save do Dungeon Quest. Confira se copiou o código inteiro."); }
   },
   import(){
     const code = $("#importCode").value;
@@ -5167,7 +5456,7 @@ const actions = {
       state = {...freshState(), ...s, screen:"title", ui:{}};
       migrate(); applySkin(); persist(); toastMsg = ""; mapVersion++; render();
     }catch(e){
-      toastMsg = "Esse código não é um save do NoteQuest. Confira se copiou ele inteiro, começando por NQ1:";
+      toastMsg = "Esse código não é um save do Dungeon Quest. Confira se copiou ele inteiro, começando por DQ1:";
       $("#toast").textContent = toastMsg;
     }
   }
@@ -5189,9 +5478,24 @@ function torchCost(b){
   return 0;
 }
 let pendingTorch = null;
+/* ações que mexem na masmorra compartilhada: na dupla, só uma pessoa por vez */
+const COOP_LOCKED = new Set(["openDoor","unlock","chest","secret","disarm","loot","takeStash","confirmPick","descend","climb","fight","sneak","corpse","engulf","lastFinal","coutim","enter"]);
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-act]");
   if(!b || busy || b.disabled) return;
+  if(COOP.on() && COOP.paused()){ return; }
+  if(COOP.on() && COOP_LOCKED.has(b.dataset.act)){
+    const data = {...b.dataset};
+    COOP.lock().then(ok=>{
+      if(!ok){ state.ui.msg = `${COOP.partner() ? COOP.partner().name : "O outro aventureiro"} está agindo. Espere um instante.`; render(); return; }
+      dispatchAct({dataset:data, disabled:false});
+      setTimeout(()=>{ if(!busy && COOP.myLock()) persist(); }, 400);
+    });
+    return;
+  }
+  dispatchAct(b);
+});
+function dispatchAct(b){
   const h = state.hero, cost = torchCost(b);
   if(cost && h && h.torches > 0 && h.torches <= cost){
     pendingTorch = {act:b.dataset.act, data:{...b.dataset}};
@@ -5220,7 +5524,7 @@ document.addEventListener("click", e=>{
   }
   const fn = actions[b.dataset.act];
   if(fn) fn(b);
-});
+}
 document.addEventListener("change", e=>{
   if(e.target.id==="bagCap"){ state.settings.bagCap = [10,20,0][+e.target.value]; persist(); render(); }
 });
@@ -5259,6 +5563,7 @@ function loop(ts){
 function start(data){
   state = (data && data.state) ? data.state : loadState();
   migrate();
+  if(state.coop && state.coop.code) COOP.connect();
   applySkin();
   cam.z = isZ() ? .85 : 3;
   render();
