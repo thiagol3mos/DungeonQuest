@@ -1500,6 +1500,12 @@ function flushIncoming(){
   const items = incoming; incoming = [];
   if(!items.length || !state.hero) return;
   const h = state.hero;
+  if(SHARE.pendingPart && COOP.on()){ SHARE.create(items); return; }
+  if(COOP.on() && COOP.partnerHere() && COOP.sameRoom() && state.dungeon && state.dungeon.inside){
+    const seg = curSeg(); seg.pile = (seg.pile||[]).concat(items.map(it=>({...it, pid:Math.random().toString(36).slice(2,9)})));
+    log(`Saque na sala para dividir: ${items.map(it=>it.n.split(" (")[0]).join("; ")}.`);
+    return;
+  }
   if(items.length <= bagMax() - h.bag.length){ h.bag.push(...items); return; }
   const seg = curSeg();
   seg.stash = (seg.stash||[]).concat(items);
@@ -1638,6 +1644,7 @@ function hurt(n, cause){
 }
 function killHero(cause){
   const h = state.hero, d = D();
+  if(COOP.on() && d && d.inside){ state.coop.waitOut = true; state.coop.own = false; state.coop.dark = null; }
   state.cemetery.push({name:h.name, who:`${raceName(h)} ${classLabel(h)}`, where:d && d.inside ? d.name : (d? d.name : ""), cause});
   if(d && d.inside){
     d.corpses.push({level:d.pos.level, seg:d.pos.seg, name:h.name, bag:h.bag, coins:h.coins});
@@ -4058,6 +4065,13 @@ function viewExplore(){
     }
   }
   const canLeave = !isBlocked && pathClear();
+  banner = SHARE.view() + banner;
+  if(!isBlocked && seg.pile && seg.pile.length){
+    const full = h.bag.length >= bagMax();
+    banner += `<div class="sheet"><h3>Saque</h3><p class="small">${COOP.on() && COOP.partnerHere() && COOP.sameRoom() ? `Escolha o que levar. O que você pegar some para ${esc(COOP.partner().name)}.` : "Itens deixados nesta sala."}</p>
+      ${seg.pile.map(it=>`<div class="spell"><div class="txt"><b>${esc(itemName(it))}</b>${descHTML(it)}</div><button class="use" data-act="coopTake" data-u="${it.pid}" ${full?"disabled":""}>Pegar</button></div>`).join("")}
+      ${full ? `<p class="muted small">Sua mochila está cheia (${h.bag.length}/${bagMax()}).</p>` : ""}</div>`;
+  }
   if(COOP.on()){
     const p = COOP.partner();
     if(state.coop.dark != null) banner = `<div class="banner"><b>Você está no escuro!</b><p>Volte para perto de ${esc(p ? p.name : "seu parceiro")}, que está com a tocha. ${state.coop.dark === 1 ? "Último movimento" : `${state.coop.dark} movimentos`} antes de precisar acender uma tocha própria.</p></div>` + banner;
@@ -4205,7 +4219,7 @@ let fxPops = [], heroHitUntil = 0, monHit = {}, monAtk = {}, monDie = {};
 const C = () => state.combat;
 const alive = () => C().units.filter(u=>u.pv>0);
 const has = (u, t) => (u.tr||"").includes(t);
-function cLog(m){ const c = C(); c.log.unshift(m); if(c.log.length>30) c.log.length = 30; log(m); }
+function cLog(m){ const c = C(); c.log.unshift(c.coop && state.hero && /^Você/.test(m) ? `${state.hero.name}: ${m}` : m); if(c.log.length>30) c.log.length = 30; log(m); }
 function pop(i, txt, col){ fxPops.push({i, txt, col, t0:performance.now()}); }
 
 function startCombat(surprise){
@@ -4215,11 +4229,15 @@ function startCombat(surprise){
   const first = surprise || seg.mon.sneak || seg.mon.first === "hero" ? "hero" : "mon";
   if(seg.mon.sneak){ seg.mon.sneak = false; }
   state.combat = {level:D().pos.level, seg:seg.id, units, sel:0, phase:first, round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
+  if(COOP.on() && COOP.partnerHere() && COOP.sameRoom()){
+    const c0 = state.combat; c0.coop = true; c0.id = Math.random().toString(36).slice(2,9); c0.part = [COOP.me(), COOP.other()]; c0.mt = 0;
+    state.coop.cp = {id:c0.id, done:-1, applied:-1, alloc:{pv:0, ar:{}}};
+  }
   if(units.some(u=>has(u,"Morto-Vivo"))) H().undead++;
   fxPops = []; monHit = {}; monAtk = {}; monDie = {}; heroAtk = null; heroDieAt = 0;
-  cLog(first === "hero" ? "O combate começa. Você ataca primeiro." : "O combate começa. Os monstros atacam primeiro.");
+  cLog(first === "hero" ? (state.combat.coop ? "O combate começa. Vocês atacam primeiro." : "O combate começa. Você ataca primeiro.") : "O combate começa. Os monstros atacam primeiro.");
   go("combat");
-  if(first === "mon") runMonsterTurn();
+  if(first === "mon") (state.combat.coop ? runMonsterTurnCoop() : runMonsterTurn());
 }
 function heroDamageBonus(u, W){
   const h = state.hero; let b = 0; W = W || h.weapon;
@@ -4265,6 +4283,7 @@ async function afterHeroAction(){
   const c = C();
   if(!alive().length){ c.phase = "won"; cLog("Todos os monstros foram derrotados!"); busy = false; persist(); render(); return; }
   pickNextTarget();
+  if(COOPC.on()){ busy = false; COOPC.finishTurn(); return; }
   await runMonsterTurn();
 }
 function dualAttack(h){ return attacksPerTurn(h) > 1; }
@@ -4374,6 +4393,7 @@ async function heroItem(idx){
   await afterHeroAction();
 }
 async function runMonsterTurn(){
+  if(COOPC.on()) return runMonsterTurnCoop();
   const c = C(), h = state.hero;
   busy = true; c.phase = "mon"; render(); lockButtons();
   rollLog = []; const tr = $("#etray"); if(tr) tr.innerHTML = "";
@@ -4452,6 +4472,7 @@ async function startHeroTurn(){
   c.phase = "hero"; busy = false; persist(); render();
 }
 function finishDeath(cause){
+  if(COOPC.on()){ const m = COOPC.my(); m.dead = true; COOPC.sync(); }
   if(samambro()){ cLog("Você se levanta com 1 PV e continua lutando."); startHeroTurn(); return; }
   busy = false;
   state.combat = null;
@@ -4469,7 +4490,9 @@ function writeBackGroups(){
 }
 function fleeCombat(){
   const c = C(), lv = D().levels[c.level], seg = lv.segs[c.seg];
-  writeBackGroups();
+  const stay = COOPC.on() && COOPC.alive().filter(x=>x !== COOP.me()).length > 0;
+  if(COOPC.on()){ COOPC.my().fled = true; COOPC.sync(); }
+  if(!stay) writeBackGroups();
   let dest = null;
   if(seg.from && lv.doors[seg.from]) dest = lv.doors[seg.from].seg;
   if(!dest) dest = (Object.values(lv.segs).find(s=>s.exit || s.up) || {}).id;
@@ -4485,9 +4508,14 @@ async function winCombat(){
     if(c.deadFire && dead){ h.torches = Math.min(10, h.torches + 2*dead); log(`Fogo dos Mortos: +${2*dead} tochas.`); }
     if(raceT("gosma") && dead){ const sg = D().levels[c.level].segs[c.seg]; if(sg) sg.gosma = true; }
   }
+  const wasCoop = COOPC.on();
+  if(wasCoop){ const part = c.part.filter(x=>x === COOP.me() || (!COOPC.cp(x).dead && !COOPC.cp(x).fled)); SHARE.pendingPart = part.length > 1 ? part : null; }
+  if(wasCoop){ COOPC.my().left = true; COOPC.sync(); const others = COOPC.alive(); if(!others.length) NET.put(`${state.coop.code}/combat`, null).catch(()=>{}); }
   state.combat = null;
   go("explore");
+  if(wasCoop && !curSeg().mon){ SHARE.pendingPart = null; persist(); render(); return; }
   await doDefeat();
+  SHARE.pendingPart = null;
 }
 
 /* arena */
@@ -4537,7 +4565,10 @@ function drawArena(cv){
     const k = Math.min(1, (now - heroDieAt) / 700), d = dollCanvas(state.hero, "idle", true);
     ctx.save(); ctx.globalAlpha = 1 - k*.6; ctx.translate(W/2, H-4); ctx.rotate(k * Math.PI/2); ctx.drawImage(d.cv, -12, -(20 + DOLL_OY + 1)); ctx.restore();
   } else {
-    fl = drawHero(ctx, W/2 + dx, H - 4 + dy, t, pose, true, hurt && frame%2 ? .45 : undefined);
+    const co2 = COOPC.on() && COOP.partner() && COOPC.inFight(COOP.other());
+    if(co2){ const pl = COOP.partner(); const ph = {...pl.lite, armor:pl.lite.armor||{}, off:pl.lite.off||[], bag: pl.lite.lamp ? [{n:LAMP}] : [], noTorch: COOP.holder() !== COOP.other() && !pl.own};
+      const pf = drawHero(ctx, W/2 + 22, H - 4, t, frame % 12 >= 6 ? "breath" : "idle", true, undefined, ph); if(pf) flameZ(ctx, pf[0], pf[1], t, 5); }
+    fl = drawHero(ctx, W/2 + dx - (co2 ? 22 : 0), H - 4 + dy, t, pose, true, hurt && frame%2 ? .45 : undefined);
     if(fl) flameZ(ctx, fl[0], fl[1], t, 5);
   }
   if(heroAtk && ak < 520){ const pos = arenaPositions(c.units.length, W)[heroAtk.i]; if(pos) drawSlash(ctx, heroAtk.kind, pos[0], pos[1] - 10, (ak - 140) / 380); }
@@ -4612,12 +4643,38 @@ function viewCombat(){
   if(!c || !h) return viewExplore();
   const pct = Math.max(0, Math.min(100, h.pv/h.pvMax*100));
   const armor = ARMOR_SLOTS.filter(s=>h.armor[s]).map(s=>`<span class="chip">${s} ${N(armorCur(h.armor[s]))}/${N(h.armor[s].pv)}</span>`).join("");
-  const units = c.units.map((u,i)=>u.pv>0 ? `<button class="tgt ${i===c.sel?"sel":""}" data-act="target" data-i="${i}" ${c.phase!=="hero"?"disabled":""}>
+  const units = c.units.map((u,i)=>u.pv>0 ? `<button class="tgt ${i===c.sel?"sel":""}" data-act="target" data-i="${i}" ${c.phase!=="hero"||(COOPC.on() && COOPC.my().done === c.round)?"disabled":""}>
       <b>${esc(u.name)}</b><span class="hpbar"><i style="width:${u.pv/u.max*100}%"></i></span><span class="n">${u.pv}/${u.max}</span>
       ${u.tr ? `<span class="trs">${esc(u.tr)}</span>` : ""}${u.frozen ? `<span class="trs">congelado</span>` : ""}${u.doom ? `<span class="trs warn">golpe mortal!</span>` : ""}${u.paralNext ? `<span class="trs warn">golpe paralisante</span>` : ""}${u.fireNext ? `<span class="trs warn">em chamas</span>` : ""}
     </button>` : "").join("");
   let panel = "";
-  if(c.phase === "hero"){
+  const co = COOPC.on(), pn = co && COOP.partner() ? COOP.partner().name : "seu parceiro";
+  const myDone = co && COOPC.my().done === c.round;
+  if(co && c.phase === "hero" && myDone){
+    panel = `<p class="small">Você terminou o seu turno. ${COOPC.alive().length > 1 ? `Aguardando ${esc(pn)} terminar o dele...` : "Os monstros vão atacar."}</p>`;
+  } else if(co && c.phase === "alloc"){
+    const p = c.pending, need = p.total + p.poison, m = COOPC.my(), a = COOPC.allocOf(COOP.me());
+    const others = COOPC.alive().filter(x=>x !== COOP.me()), oa = others.map(x=>COOPC.allocOf(x));
+    const mine = COOPC.sum(a), theirs = oa.reduce((s2,x)=>s2+COOPC.sum(x),0), left = need - mine - theirs;
+    const armorAll = COOPC.armorSum(a) + oa.reduce((s2,x)=>s2+COOPC.armorSum(x),0);
+    const minEach = need >= COOPC.alive().length ? 1 : 0;
+    const okMin = mine >= minEach && oa.every(x=>COOPC.sum(x) >= minEach);
+    const ok = left === 0 && okMin && armorAll <= p.total;
+    const applied = m.applied === c.round;
+    const slots = ARMOR_SLOTS.filter(sl=>h.armor[sl] && armorCur(h.armor[sl])>0);
+    const row = (k, title, sub, v, max) => `<div class="alloc"><div class="txt"><b>${title}</b><span class="small">${sub}</span></div>
+      <button class="mini" data-act="coopAlloc" data-s="${k}" data-d="-1" ${v<=0||applied?"disabled":""} aria-label="Menos dano em ${title}">−</button>
+      <span class="n big2">${v}</span>
+      <button class="mini" data-act="coopAlloc" data-s="${k}" data-d="1" ${v>=max||left<=0||applied?"disabled":""} aria-label="Mais dano em ${title}">+</button></div>`;
+    panel = applied ? `<p class="small">Você recebeu a sua parte do dano. Aguardando ${esc(pn)}...</p>` : `<div class="stack">
+      <p><b>Os monstros causam ${N(need)} de dano ao grupo.</b>${p.poison ? ` ${N(p.poison)} é veneno e só pode ir para os PV.` : ""} Cada um escolhe quanto assume${minEach ? " (mínimo 1 para cada)" : ""}.</p>
+      <p class="small">Você: <b>${mine}</b> · ${esc(pn)}: <b>${theirs}</b> · Falta distribuir: <b class="${left?"lv-y":"lv-g"}">${left}</b></p>
+      ${slots.map(sl=>{ const pc = h.armor[sl], v = (a.ar||{})[sl]||0; return row(sl, sl, `${esc(pc.n.split(" (")[0])} · ${N(armorCur(pc)-v)}/${N(pc.pv)} PV`, v, armorCur(pc)); }).join("")}
+      ${row("pv", "Seus PV", `${N(Math.max(0, h.pv - (a.pv||0)))}/${N(h.pvMax)} depois do golpe${hasShield() ? " (o escudo ainda reduz)" : ""}`, a.pv||0, 99)}
+      ${armorAll > p.total ? `<p class="note">A armadura só pode absorver ${N(p.total)}: o veneno vai direto nos PV.</p>` : ""}
+      <button class="btn" data-act="coopRecv" ${ok?"":"disabled"}>Receber o dano</button>
+      ${!ok ? `<p class="muted small">${left > 0 ? `Ainda faltam ${left} de dano para distribuir entre vocês.` : left < 0 ? `Vocês assumiram ${-left} a mais do que o total.` : !okMin ? "Cada um precisa assumir pelo menos 1." : ""}</p>` : ""}</div>`;
+  } else if(c.phase === "hero"){
     const sel = c.units[c.sel];
     const spells = Object.entries(h.spells).filter(([n,s])=>s.left>0 && canCast(n, true));
     const items = raceT("ogro") ? [] : h.bag.map((it,i)=>({it,i})).filter(({it})=>/^Poção de Vida|^Poção da Fúria|^Poção de Magia|^Pergaminho Mágico/.test(it.n));
@@ -4664,6 +4721,7 @@ function viewCombat(){
   <canvas id="arena" class="arena" width="192" height="128" data-anim="arena" aria-label="Arena de combate"></canvas>
   <div class="etray" id="etray"></div>
   <div class="strip"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Fúria<b>${c.fury?"+"+c.fury:"-"}</b></span><span>Paralisia<b>${c.heroPar||"-"}</b></span></div>
+  ${co && COOP.partner() ? (()=>{ const pl = COOP.partner(), x = COOP.other(), st = !COOPC.inFight(x) ? (COOPC.cp(x).dead ? "caiu" : "fora do combate") : c.phase === "hero" ? (COOPC.cp(x).done === c.round ? "terminou o turno" : "no turno dele") : c.phase === "alloc" ? (COOPC.cp(x).applied === c.round ? "recebeu o dano" : "dividindo o dano") : ""; return `<p class="small" style="margin:0">${esc(pl.name)}: <b class="${lvc(pl.lite.pv, pl.lite.pvMax)}">${pl.lite.pv}/${pl.lite.pvMax} PV</b> · ${st}</p>`; })() : ""}
   <div class="hp" aria-hidden="true"><i style="width:${pct}%"></i></div>
   ${armor ? `<div class="stats">${armor}</div>` : ""}
   <div class="tgts">${units}</div>
@@ -4948,6 +5006,10 @@ const COOP = {
     this.beatTimer = setInterval(()=>{
       if(!this.on()) return;
       NET.patch(`${state.coop.code}/players/${this.me()}`, {beat:Date.now()}).catch(()=>{});
+      // confere se o servidor tem a minha ficha de combate e de partilha; se uma gravação se perdeu, reenvia
+      const rm = this.room || {}, me = this.me();
+      if(state.coop.cp && rm.cp && typeof rm.cp[me] === "string" && rm.cp[me] !== JSON.stringify(state.coop.cp)) NET.put(`${state.coop.code}/cp/${me}`, JSON.stringify(state.coop.cp)).catch(()=>{});
+      if(state.coop.sh && rm.share && (!rm.sh || rm.sh[me] !== JSON.stringify(state.coop.sh))) NET.put(`${state.coop.code}/sh/${me}`, JSON.stringify(state.coop.sh)).catch(()=>{});
       const pz = this.paused(); if(pz !== wasPaused){ wasPaused = pz; if(!busy) render(); }
     }, 5000);
   },
@@ -4961,15 +5023,18 @@ const COOP = {
     // masmorra vinda do parceiro
     if(room && room.dungeon){
       const js = typeof room.dungeon === "string" ? room.dungeon : JSON.stringify(room.dungeon);
-      if(js !== this.lastPushed){
+      if(js !== this.lastPushed || !state.dungeon){
         let nd = null; try{ nd = this.readDungeon(room.dungeon); }catch(e){}
         if(nd){ if(busy || this.myLock()) this.pending = nd; else this.applyDungeon(nd); }
       }
     }
     this.checkLight();
+    if(typeof COOPC !== "undefined") COOPC.onRoom(room);
+    if(typeof SHARE !== "undefined") SHARE.tick();
     if(!busy && ["explore","sheet","dungeon","city","combat"].includes(state.screen)) render();
   },
   applyDungeon(nd){
+    if(!nd) return;
     const d = state.dungeon || {};
     state.dungeon = {...nd, pos:d.pos || null, inside:!!d.inside};
     this.lastPushed = JSON.stringify(this.netDungeon(state.dungeon)); this.pending = null; mapVersion++;
@@ -4983,13 +5048,20 @@ const COOP = {
       NET.put(`${code}/dungeon`, js).then(()=>NET.put(`${code}/ver`, (this.room.ver||0)+1)).catch(()=>{});
     }
     NET.put(`${code}/players/${this.me()}`, this.playerRec()).catch(()=>{});
+    if(typeof COOPC !== "undefined") COOPC.sync();
     if(!busy && this.myLock()) this.unlock();
   },
   /* ---------- trava: um age por vez na masmorra ---------- */
   myLock(){ return !!(this.room && this.room.lock && this.room.lock.by === this.me() && this.room.lock.n === this.myLockN); },
   lockedByPartner(){ const l = this.room && this.room.lock; return !!(l && l.by !== this.me() && performance.now() - this.lockSeenAt < 20000); },
-  async lock(){
-    if(!this.on() || !this.room || !state.dungeon || !state.dungeon.inside) return true;
+  lock(){
+    if(!this.on() || !this.room || !state.dungeon || !state.dungeon.inside) return Promise.resolve(true);
+    if(this.myLock()) return Promise.resolve(true);
+    if(this._locking) return this._locking;
+    this._locking = this._lock().finally(()=>{ this._locking = null; });
+    return this._locking;
+  },
+  async _lock(){
     if(this.lockedByPartner()) return false;
     if(this.pending) this.applyDungeon(this.pending);
     const n = Math.random().toString(36).slice(2);
@@ -5054,7 +5126,241 @@ function fixHands(){
   if(handsUsed(h) > handsFree(h) && !h.weapon.unarmed){ h.bag.push(wCopy(h.weapon)); h.weapon = UNARMED(); }
 }
 
+
+/* ---------- PARTILHA DOS ESPÓLIOS (depois de uma batalha em dupla) ----------
+   room.share = texto {id, level, seg, items, part}; room.sh/A|B = texto {id, sel:{pid:hora}, ok, taken} */
+const SHARE = {
+  pendingPart: null, lastMine: "",
+  room(){ const r = COOP.room && COOP.room.share; if(!r) return null; try{ return typeof r === "string" ? JSON.parse(r) : r; }catch(e){ return null; } },
+  of(x, sh){ sh = sh || this.room(); if(!sh) return null;
+    if(x === COOP.me()){ const m = state.coop.sh; return m && m.id === sh.id ? m : (state.coop.sh = {id:sh.id, sel:{}, ok:false, taken:false}); }
+    const r = COOP.room && COOP.room.sh ? COOP.room.sh[x] : null; let o = null; try{ o = typeof r === "string" ? JSON.parse(r) : r; }catch(e){}
+    return o && o.id === sh.id ? o : {sel:{}, ok:false, taken:false}; },
+  active(){ const sh = this.room(), d = state.dungeon; return !!(COOP.on() && sh && state.hero && d && d.inside && sh.part.includes(COOP.me()) && d.pos.level === sh.level && d.pos.seg === sh.seg && !this.of(COOP.me(), sh).taken); },
+  /* dono final de cada item: quem marcou primeiro */
+  owner(pid, sh){ let best = null; sh.part.forEach(x=>{ const t = (this.of(x, sh).sel||{})[pid]; if(t && (!best || t < best.t || (t === best.t && x < best.x))) best = {x, t}; }); return best ? best.x : null; },
+  create(items){
+    const d = state.dungeon, part = this.pendingPart || [COOP.me()]; this.pendingPart = null;
+    const sh = {id:Math.random().toString(36).slice(2,9), level:d.pos.level, seg:d.pos.seg, part, items:items.map(it=>({...it, pid:Math.random().toString(36).slice(2,9)}))};
+    state.coop.sh = {id:sh.id, sel:{}, ok:false, taken:false};
+    if(COOP.room) COOP.room.share = JSON.stringify(sh);
+    NET.put(`${state.coop.code}/share`, JSON.stringify(sh)).catch(()=>{});
+    log(`Espólios para dividir: ${items.map(it=>it.n.split(" (")[0]).join("; ")}.`);
+  },
+  push(){ if(!COOP.on() || !state.coop.sh) return; const js = JSON.stringify(state.coop.sh); if(js !== this.lastMine){ this.lastMine = js; NET.put(`${state.coop.code}/sh/${COOP.me()}`, js).catch(()=>{}); } },
+  toggle(pid){
+    const sh = this.room(); if(!sh) return; const m = this.of(COOP.me(), sh); if(m.ok) return;
+    const others = sh.part.filter(x=>x !== COOP.me());
+    if(others.some(x=>(this.of(x, sh).sel||{})[pid])) return;
+    if(m.sel[pid]) delete m.sel[pid];
+    else { if(state.hero.bag.length + Object.keys(m.sel).length >= bagMax()){ state.ui.msg = "Não cabe mais nada na sua mochila."; render(); return; } m.sel[pid] = Date.now(); }
+    this.push(); persist(); render();
+  },
+  confirm(on){ const sh = this.room(); if(!sh) return; const m = this.of(COOP.me(), sh); m.ok = !!on; this.push(); persist(); render(); this.tick(); },
+  /* quando todos confirmam: cada um pega os seus; o último a pegar deixa o resto na sala e fecha a partilha */
+  tick(){
+    const sh = this.room(); if(!sh || !COOP.on() || !state.hero || busy) return;
+    const me = COOP.me(), m = this.of(me, sh);
+    if(!sh.part.includes(me) || m.taken) return this.cleanup(sh);
+    if(!sh.part.every(x=>this.of(x, sh).ok || this.of(x, sh).taken)) return;
+    const mine = sh.items.filter(it=>this.owner(it.pid, sh) === me);
+    mine.forEach(it=>{ const {pid, ...item} = it; state.hero.bag.push(item); });
+    m.taken = true; this.push();
+    log(mine.length ? `Você pegou ${mine.map(it=>it.n.split(" (")[0]).join("; ")}.` : "Você não pegou nenhum espólio.");
+    persist(); render();
+    this.cleanup(sh);
+  },
+  cleanup(sh){
+    if(!sh.part.every(x=>this.of(x, sh).taken)) return;
+    const me = COOP.me(); if(sh.part.slice().sort()[0] !== me && sh.part.includes(me)) return;
+    COOP.lock().then(ok=>{
+      if(!ok || !this.room() || this.room().id !== sh.id) return;
+      const lv = state.dungeon.levels[sh.level], seg = lv && lv.segs[sh.seg];
+      const rest = sh.items.filter(it=>!this.owner(it.pid, sh));
+      if(seg && rest.length){ seg.pile = (seg.pile||[]).concat(rest); log(`Ficaram na sala: ${rest.map(it=>it.n.split(" (")[0]).join("; ")}.`); }
+      if(COOP.room) COOP.room.share = null;
+      NET.put(`${state.coop.code}/share`, null).catch(()=>{});
+      mapVersion++; persist(); render();
+    });
+  },
+  view(){
+    if(!this.active()) return "";
+    const sh = this.room(), me = COOP.me(), m = this.of(me, sh), pn = COOP.partner() ? COOP.partner().name : "seu parceiro";
+    const otherSel = pid => sh.part.some(x=>x !== me && (this.of(x, sh).sel||{})[pid]);
+    const others = sh.part.filter(x=>x !== me), othersOk = others.every(x=>this.of(x, sh).ok || this.of(x, sh).taken);
+    const free = bagMax() - state.hero.bag.length - Object.keys(m.sel).length;
+    return `<div class="sheet"><h3>Espólios da batalha</h3>
+      <p class="small">Marque o que você quer levar. O que ${esc(pn)} marcar fica bloqueado para você. ${free > 0 ? `Cabem mais ${free} na sua mochila.` : "Sua mochila não comporta mais nada."}</p>
+      ${sh.items.map(it=>{ const mine = !!m.sel[it.pid], theirs = !mine && otherSel(it.pid);
+        return `<button class="opt ${mine?"on":""}" data-act="shareToggle" data-u="${it.pid}" ${theirs || m.ok ? "disabled" : ""}><b>${esc(itemName(it))}</b><span>${esc(itemDesc(it) || "")}${theirs ? ` · ${esc(pn)} escolheu` : ""}</span></button>`; }).join("")}
+      <p class="small">${esc(pn)}: ${othersOk ? "pronto" : "escolhendo..."}</p>
+      ${m.ok ? `<button class="btn ghost" data-act="shareConfirm" data-v="0">Cancelar</button><p class="muted small">Aguardando ${esc(pn)} confirmar.</p>`
+             : `<button class="btn" data-act="shareConfirm" data-v="1">Pegar itens${Object.keys(m.sel).length ? ` (${Object.keys(m.sel).length})` : ""}</button>`}</div>`;
+  },
+};
+
+/* ---------- COMBATE EM DUPLA ----------
+   room.combat  = texto com a parte comum (monstros, fase, turno, dano pendente, diário)
+   room.cp/A|B  = texto com a ficha de combate de cada jogador (terminou o turno, dano assumido, recebeu, morreu/fugiu) */
+const COOPC = {
+  SHARED: ["coop","id","level","seg","units","phase","round","part","pending","log","mt","kill","par"],
+  lastJs: "", lastCpJs: "", pendingShared: null,
+  on(){ return COOP.on() && !!(state.combat && state.combat.coop); },
+  pick(c){ const o = {}; this.SHARED.forEach(k=>{ if(c[k] !== undefined) o[k] = c[k]; }); return o; },
+  my(){ const c = state.coop; if(!c.cp || !state.combat || c.cp.id !== state.combat.id) c.cp = {id: state.combat ? state.combat.id : null, done:-1, applied:-1, alloc:{pv:0, ar:{}}}; return c.cp; },
+  cp(x){
+    if(x === COOP.me()) return this.my();
+    const r = COOP.room && COOP.room.cp ? COOP.room.cp[x] : null;
+    let o = null; try{ o = typeof r === "string" ? JSON.parse(r) : r; }catch(e){}
+    return o && state.combat && o.id === state.combat.id ? o : {done:-1, applied:-1, alloc:{pv:0, ar:{}}};
+  },
+  inFight(x){ const p = this.cp(x); return !(p.dead || p.fled || p.left); },
+  alive(){ const c = state.combat; return c && c.part ? c.part.filter(x=>this.inFight(x)) : []; },
+  leader(){ const a = this.alive().slice().sort(); return a[0]; },
+  allDone(){ const c = state.combat; return this.alive().every(x=>this.cp(x).done === c.round); },
+  allApplied(){ const c = state.combat; return this.alive().every(x=>this.cp(x).applied === c.round); },
+  allocOf(x){ const p = this.cp(x), c = state.combat; return p.allocRound === (c && c.round) && p.alloc ? p.alloc : {pv:0, ar:{}}; },
+  sum(a){ return (a.pv||0) + Object.values(a.ar||{}).reduce((s,v)=>s+(v||0),0); },
+  armorSum(a){ return Object.values(a.ar||{}).reduce((s,v)=>s+(v||0),0); },
+  /* envio: parte comum (se mudou) e a minha ficha */
+  sync(){
+    const c = state.combat; if(!this.on() || !COOP.room) return;
+    const js = JSON.stringify(this.pick(c));
+    if(js !== this.lastJs){ this.lastJs = js; NET.put(`${state.coop.code}/combat`, js).catch(()=>{}); }
+    const cj = JSON.stringify(this.my());
+    if(cj !== this.lastCpJs){ this.lastCpJs = cj; NET.put(`${state.coop.code}/cp/${COOP.me()}`, cj).catch(()=>{}); }
+  },
+  /* recebido do parceiro */
+  onRoom(room){
+    const js = room && typeof room.combat === "string" ? room.combat : null;
+    if(js && js !== this.lastJs){
+      let sh = null; try{ sh = JSON.parse(js); }catch(e){}
+      if(sh){ if(busy) this.pendingShared = sh; else { this.lastJs = js; this.apply(sh); } }
+    }
+    this.tick();
+  },
+  apply(sh){
+    const me = COOP.me(), d = state.dungeon;
+    if(!sh.part || !sh.part.includes(me) || !state.hero || !d || !d.inside) return;
+    if(state.coop.cp && state.coop.cp.id === sh.id && (state.coop.cp.dead || state.coop.cp.fled || state.coop.cp.left)) return;
+    const fresh = !state.combat || state.combat.id !== sh.id;
+    if(fresh && (d.pos.level !== sh.level || d.pos.seg !== sh.seg)) return;
+    const c = fresh ? {sel:0, fury:0, heroPar:0, alloc:{}, hits:0} : state.combat;
+    Object.assign(c, sh); state.combat = c;
+    if(fresh){ fxPops = []; monHit = {}; monAtk = {}; monDie = {}; heroAtk = null; heroDieAt = 0; this.my(); }
+    pickNextTarget();
+    this.selfEffects();
+    if(state.combat && state.screen !== "combat") state.screen = "combat";
+  },
+  /* efeitos dos monstros que caíram em mim (rolados no aparelho do parceiro) */
+  selfEffects(){
+    const c = state.combat, me = COOP.me(), m = this.my(); if(!c) return;
+    if(c.par && c.par[me] && m.parRound !== c.round){ m.parRound = c.round; c.heroPar = (c.heroPar||0) + c.par[me]; }
+    if(c.kill && c.kill[me] && !m.dead){ const cause = c.kill[me]; m.dead = true; this.sync(); finishDeath(cause); }
+  },
+  /* passos automáticos: turno dos monstros, novo turno, paralisia */
+  tick(){
+    if(!this.on() || busy) return;
+    const c = state.combat, me = COOP.me(), m = this.my();
+    if(c.phase === "hero" && m.done !== c.round && c.heroPar > 0 && !m.dead){
+      c.heroPar--; m.done = c.round; cLog(`${state.hero.name} está paralisado e perde o turno.`); persist();
+    }
+    if(this.leader() !== me) return;
+    if(c.phase === "hero" && this.alive().length && this.allDone() && c.mt !== c.round && alive().length){
+      if(this._busy) return; this._busy = true;
+      COOP.lock().then(ok=>{ this._busy = false; if(ok && this.on() && !busy && C().phase === "hero" && C().mt !== C().round && this.allDone()) runMonsterTurnCoop(); });
+    } else if(c.phase === "alloc" && this.allApplied()){
+      if(this._busy) return; this._busy = true;
+      COOP.lock().then(ok=>{ this._busy = false; if(ok && this.on() && !busy && C().phase === "alloc" && this.allApplied()){ C().round++; C().phase = "hero"; C().pending = null; persist(); render(); } });
+    }
+  },
+  /* meu turno acabou */
+  finishTurn(){ const m = this.my(); m.done = state.combat.round; persist(); render(); setTimeout(()=>this.tick(), 50); },
+};
+async function runMonsterTurnCoop(){
+  const c = C();
+  busy = true; c.phase = "mon"; c.mt = c.round; render(); lockButtons();
+  rollLog = []; const tr = $("#etray"); if(tr) tr.innerHTML = "";
+  const targets = COOPC.alive();
+  const pickT = () => targets[Math.floor(Math.random()*targets.length)];
+  const hasDeuses = x => x === COOP.me() ? ARMOR_SLOTS.some(s=>state.hero.armor[s] && /dos Deuses/.test(state.hero.armor[s].n)) : Object.values((COOP.partner()||{}).lite?.armor||{}).some(p=>/dos Deuses/.test(p.n));
+  const nameOf = x => x === COOP.me() ? state.hero.name : (COOP.partner() ? COOP.partner().name : "?");
+  let total = 0, poison = 0; c.kill = {}; c.par = {};
+  for(let i=0;i<c.units.length;i++){
+    const u = c.units[i];
+    if(u.pv <= 0) continue;
+    if(u.frozen){ u.frozen--; cLog(`${u.name} está congelado e não ataca.`); continue; }
+    if(u.doom){ const t = pickT(); cLog(`${u.name} desfere o golpe de Morte Súbita em ${nameOf(t)}!`);
+      if(hasDeuses(t)){ cLog("A armadura dos Deuses protege da Morte Súbita."); u.doom = false; } else { c.kill[t] = `Morte Súbita de ${u.name}`; u.doom = false; } }
+    let dmg = u.dano;
+    if(u.fireNext){ u.fireNext = false; dmg += 10; cLog(`${u.name} ataca envolto em fogo: +10 de dano!`); }
+    if(u.magicNext){ dmg += u.magicNext; cLog(`A magia de ${u.name} soma ${u.magicNext} ao dano.`); u.magicNext = 0; }
+    if(u.paralNext){ const [p] = await roll("Paralisia", 1); const t = pickT(); c.par[t] = p; u.paralNext = false; cLog(`${u.name} paralisa ${nameOf(t)} por ${p} turno${p>1?"s":""}!`); }
+    const abil = ABILITIES.filter(a=>has(u,a));
+    let exploded = false;
+    if(abil.length){
+      const [r] = await roll(u.name, 1);
+      if(r === 1){
+        if(has(u,"Explosivo")){ dmg = u.pv; u.pv = 0; exploded = true; cLog(`${u.name} explode causando ${dmg} de dano!`); }
+        if(has(u,"Fogo")){ u.fireNext = true; cLog(`${u.name} pega fogo: o próximo ataque causa +10.`); }
+        if(has(u,"Horda")){ c.units.push({key:"Orc", name:"Orc", pv:6, max:6, dano:3, tr:"", g:-1}); cLog("Horda! Um Orc entra na sala."); }
+        if(has(u,"Magia")){ const [mg] = await roll(`Magia de ${u.name}`, 1); u.magicNext = mg; cLog(`${u.name} prepara uma magia: +${mg} no próximo ataque.`); }
+        if(has(u,"Morte Súbita")){ u.doom = true; cLog(`${u.name} prepara um golpe mortal. O próximo ataque dele vai matar alguém!`); }
+        if(has(u,"Necromancia")){ c.units.push({key:"Esqueleto", name:"Esqueleto", pv:4, max:4, dano:1, tr:"Morto-Vivo", g:-1}); cLog("Necromancia! Um Esqueleto se levanta."); }
+        if(has(u,"Regeneração")){ const before = u.pv; u.pv = Math.min(u.max, u.pv+6); if(u.pv>before){ cLog(`${u.name} se regenera (+${u.pv-before} PV).`); pop(i, "+"+(u.pv-before), "#6af06a"); } }
+        if(has(u,"Paralisar")){ u.paralNext = true; cLog(`${u.name} prepara um golpe paralisante para o próximo ataque.`); }
+      }
+    }
+    if(has(u,"Veneno")) poison += dmg; else total += dmg;
+    monAtk[i] = performance.now() + 320;
+    if(!exploded) cLog(`${u.name} ataca: ${dmg} de dano${has(u,"Veneno") ? " de veneno" : ""}.`);
+  }
+  if(total + poison === 0){ c.round++; c.phase = "hero"; c.pending = null; }
+  else { c.pending = {total, poison}; c.phase = "alloc"; cLog(`Os monstros causam ${total+poison} de dano ao grupo. Dividam entre vocês.`); }
+  busy = false; persist(); render();
+  COOPC.selfEffects();
+}
+/* recebo a minha parte do dano */
+async function applyCoopDamage(){
+  const c = C(), h = state.hero, m = COOPC.my(), a = COOPC.allocOf(COOP.me());
+  let absorbed = 0;
+  Object.entries(a.ar||{}).forEach(([slot, v])=>{
+    const p = h.armor[slot]; if(!p || !v) return;
+    p.cur = armorCur(p) - v; absorbed += v;
+    if(p.cur <= 0){ cLog(`${slot} (${p.n.split(" (")[0]}) de ${h.name} foi destruído.`); if(!p.stone) H(h).armorLost++; delete h.armor[slot]; }
+  });
+  let toPV = a.pv || 0;
+  if(toPV > 0 && hasShield()){ const r = Math.min(toPV, shieldVal()); toPV -= r; if(r) cLog(`O escudo de ${h.name} segura ${r} de dano.`); }
+  if(toPV > 0 && c.ethereal){ toPV -= 1; }
+  if(toPV > 0 && h.shield > 0){ const r = Math.min(h.shield, toPV); h.shield -= r; toPV -= r; cLog(`O Escudo Mágico absorve ${r} de dano.`); }
+  h.pv = Math.max(0, h.pv - toPV);
+  heroHitUntil = performance.now() + 450;
+  cLog(`${h.name} recebe ${absorbed + (a.pv||0)} de dano${absorbed ? ` (${absorbed} na armadura)` : ""} e fica com ${h.pv}/${h.pvMax} PV.`);
+  m.applied = c.round;
+  const revive = h.pv <= 0 && samambro();
+  if(h.pv <= 0 && !revive){ busy = true; lockButtons(); heroDieAt = performance.now(); await new Promise(r=>setTimeout(r, 900)); heroDieAt = 0; busy = false; m.dead = true; persist(); finishDeath(`Morto em combate ao lado de ${COOP.partner() ? COOP.partner().name : "um amigo"}`); return; }
+  if(revive) cLog(`${h.name} se levanta com 1 PV e continua lutando.`);
+  persist(); render(); setTimeout(()=>COOPC.tick(), 50);
+}
+
 const actions = {
+  shareToggle(b){ SHARE.toggle(b.dataset.u); },
+  shareConfirm(b){ SHARE.confirm(b.dataset.v === "1"); },
+  coopTake(b){
+    const seg = curSeg(), h = state.hero, pile = seg.pile || [], i = pile.findIndex(it=>it.pid === b.dataset.u);
+    if(i < 0){ state.ui.msg = "Esse item já foi pego."; render(); return; }
+    if(h.bag.length >= bagMax()){ state.ui.msg = "Sua mochila está cheia."; render(); return; }
+    const [it] = pile.splice(i,1); const {pid, ...item} = it; h.bag.push(item);
+    log(`Você pegou ${it.n.split(" (")[0]}.`); mapVersion++; persist(); render();
+  },
+  coopAlloc(b){
+    const c = C(), m = COOPC.my(); if(m.allocRound !== c.round){ m.alloc = {pv:0, ar:{}}; m.allocRound = c.round; }
+    const a = m.alloc, d = +b.dataset.d, k = b.dataset.s;
+    if(k === "pv") a.pv = Math.max(0, (a.pv||0) + d);
+    else { a.ar = a.ar || {}; const p = state.hero.armor[k]; const cap = p ? armorCur(p) : 0; a.ar[k] = Math.max(0, Math.min(cap, (a.ar[k]||0) + d)); }
+    persist(); render();
+  },
+  coopRecv(){ if(COOPC.on() && C().phase === "alloc") applyCoopDamage(); },
   async coopCreate(){ state.ui.coopMsg = "Criando a sala..."; render(); try{ const e = await COOP.create(); state.ui.coopMsg = e || "Sala criada! Passe o código para o seu parceiro."; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } render(); },
   async coopJoin(){ const c = ($("#coopCode")||{}).value; state.ui.coopMsg = "Entrando..."; render(); try{ const e = await COOP.join(c); state.ui.coopMsg = e || "Você entrou na dupla!"; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } mapVersion++; render(); },
   async coopLeave(){ if(state.dungeon && state.dungeon.inside) return; await COOP.leave(); state.ui.coopMsg = "Você saiu da dupla."; mapVersion++; render(); },
@@ -5261,6 +5567,10 @@ const actions = {
   cancelReroll(){ state.ui = {}; render(); },
   enter(){
     const d = state.dungeon, h = state.hero;
+    if(COOP.on() && state.coop.waitOut){
+      if(COOP.partnerHere()){ state.ui.coopMsg = "Aguarde até que o outro aventureiro retorne à cidade (ou morra)!"; render(); return; }
+      state.coop.waitOut = false;
+    }
     if(mustRetire(h) && !d.inside){ go("city"); return; }
     if(COOP.on() && d.levels[1] && COOP.partnerHere()){
       d.pos = {level:1, seg:Object.values(d.levels[1].segs).find(s=>s.exit).id}; d.inside = true;
@@ -5513,7 +5823,7 @@ function torchCost(b){
 }
 let pendingTorch = null;
 /* ações que mexem na masmorra compartilhada: na dupla, só uma pessoa por vez */
-const COOP_LOCKED = new Set(["openDoor","unlock","chest","secret","disarm","loot","takeStash","confirmPick","descend","climb","fight","sneak","corpse","engulf","lastFinal","coutim","enter"]);
+const COOP_LOCKED = new Set(["coopTake","attack","cspell","citem","horn","playDead","win","rechargePick","stonePick","coopRecv","openDoor","unlock","chest","secret","disarm","loot","takeStash","confirmPick","descend","climb","fight","sneak","corpse","engulf","lastFinal","coutim","enter"]);
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-act]");
   if(!b || busy || b.disabled) return;
