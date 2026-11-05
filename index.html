@@ -758,6 +758,8 @@ function loadState(){
   return freshState();
 }
 function migrate(){
+  if(state.dungeon) fixDungeon(state.dungeon);
+  if(state.soloDungeon) fixDungeon(state.soloDungeon);
   if(!state.ui) state.ui = {};
   if(!state.settings) state.settings = defaultSettings();
   if(state.settings.bagCap === undefined){ state.settings.bagCap = state.settings.bagLimit === false ? 0 : 10; delete state.settings.bagLimit; }
@@ -4794,7 +4796,17 @@ const NET = {
   // ---- banco simulado (testes): localStorage compartilhado entre abas do mesmo navegador
   simDB(){ try{ return JSON.parse(localStorage.getItem("nq-sim-db") || "{}"); }catch(e){ return {}; } },
   simAt(db, parts){ let o = db; for(const p of parts){ if(o == null) return null; o = o[p]; } return o === undefined ? null : o; },
+  /* o Firebase apaga listas/objetos vazios e transforma objetos com chaves numéricas em listas */
+  fbNorm(v){
+    if(v === null || typeof v !== "object") return v;
+    if(Array.isArray(v)){ const a = v.map(x=>this.fbNorm(x)); return a.some(x=>x!==null && x!==undefined) ? a : null; }
+    const o = {}; Object.keys(v).forEach(k=>{ const x = this.fbNorm(v[k]); if(x !== null && x !== undefined) o[k] = x; });
+    const ks = Object.keys(o); if(!ks.length) return null;
+    if(ks.every(k=>/^\d+$/.test(k))){ const mx = Math.max(...ks.map(Number)); if(ks.length*2 > mx){ const a = []; ks.forEach(k=>a[+k]=o[k]); return a; } }
+    return o;
+  },
   simWrite(path, val, merge){
+    val = this.fbNorm(JSON.parse(JSON.stringify(val === undefined ? null : val)));
     const db = this.simDB(), parts = path.split("/").filter(Boolean);
     let o = db; for(let i=0;i<parts.length-1;i++){ o[parts[i]] = (o[parts[i]] && typeof o[parts[i]]==="object") ? o[parts[i]] : {}; o = o[parts[i]]; }
     const k = parts[parts.length-1];
@@ -4847,12 +4859,29 @@ const NET = {
   }
 };
 
+/* masmorra que passou pelo Firebase sem estar em texto: reconstrói listas e objetos vazios */
+function fixDungeon(d){
+  if(!d || typeof d !== "object") return d;
+  if(Array.isArray(d.levels)){ const o = {}; d.levels.forEach((lv,i)=>{ if(lv) o[i] = lv; }); d.levels = o; }
+  d.levels = d.levels || {}; d.corpses = d.corpses || []; d.log = d.log || [];
+  Object.keys(d.levels).forEach(k=>{
+    const lv = d.levels[k]; if(!lv){ delete d.levels[k]; return; }
+    lv.segs = lv.segs || {}; lv.doors = lv.doors || {}; lv.occ = lv.occ || {}; if(lv.n === undefined) lv.n = +k;
+    Object.values(lv.segs).forEach(sg=>{ sg.doors = sg.doors || []; if(sg.chests === undefined) sg.chests = 0; if(sg.mon){ [sg.mon, ...(sg.mon.extra||[])].forEach(g=>{ g.list = g.list || []; }); } });
+  });
+  return d;
+}
 const COOP = {
   room: null, close: null, lastPushed: "", pending: null, partnerBeat: null, partnerSeenAt: 0, lockSeenAt: 0, beatTimer: null, myLockN: null,
   on(){ return !!(state.coop && state.coop.code); },
   me(){ return state.coop && state.coop.me; },
   other(){ return this.me() === "A" ? "B" : "A"; },
-  partner(){ return this.room && this.room.players ? this.room.players[this.other()] || null : null; },
+  partner(){
+    const r = this.room && this.room.players ? this.room.players[this.other()] : null;
+    if(!r) return null;
+    if(typeof r.data === "string"){ if(r.data !== this._pd){ this._pd = r.data; try{ this._pp = JSON.parse(r.data); }catch(e){ this._pp = null; } } return this._pp ? {...this._pp, beat:r.beat} : null; }
+    return r;
+  },
   online(p){ return !!p && (performance.now() - this.partnerSeenAt) < 16000; },
   /* o parceiro está na masmorra, vivo e conectado? */
   partnerHere(){ const p = this.partner(); return !!(p && p.inside && !p.dead && this.online(p)); },
@@ -4870,7 +4899,7 @@ const COOP = {
     const d = state.dungeon, h = state.hero; if(!d || !h) return "Role uma masmorra antes.";
     let code = this.code();
     for(let i=0;i<5;i++){ const ex = await NET.get(code); if(!ex) break; code = this.code(); }
-    await NET.put(code, {dungeon:this.netDungeon(d), ver:1, torch:"A", lock:null, players:{A:this.playerRec()}});
+    await NET.put(code, {dungeon:JSON.stringify(this.netDungeon(d)), ver:1, torch:"A", players:{A:this.playerRec()}});
     state.coop = {code, me:"A"}; state.soloDungeon = null; this.lastPushed = JSON.stringify(this.netDungeon(d));
     persist(); this.connect(); return null;
   },
@@ -4879,16 +4908,18 @@ const COOP = {
     if(!/^[A-Z0-9]{4}$/.test(code)) return "O código tem 4 letras ou números.";
     const room = await NET.get(code);
     if(!room || !room.dungeon) return "Sala não encontrada. Confira o código.";
-    const P = room.players || {}, fresh = x => x && Date.now() - (x.beat||0) < 20000;
+    const P = {}; Object.entries(room.players || {}).forEach(([k,v])=>{ P[k] = this.unwrap(v); });
+    const fresh = x => x && Date.now() - (x.beat||0) < 20000;
     let me;
     if(P.A && P.A.name === state.hero.name) me = "A";
     else if(!P.B || P.B.name === state.hero.name || !fresh(P.B)) me = "B";
     else return "Esta sala já tem dois aventureiros.";
     if(state.dungeon && !(state.coop && state.coop.code)) state.soloDungeon = state.dungeon;
-    state.dungeon = {...room.dungeon, pos:null, inside:false};
+    const nd = this.readDungeon(room.dungeon);
+    state.dungeon = {...nd, pos:null, inside:false};
     state.coop = {code, me};
     await NET.put(`${code}/players/${me}`, this.playerRec());
-    this.lastPushed = JSON.stringify(room.dungeon); persist(); this.connect(); return null;
+    this.lastPushed = JSON.stringify(this.netDungeon(state.dungeon)); persist(); this.connect(); return null;
   },
   async leave(){
     if(!this.on()) return;
@@ -4899,7 +4930,10 @@ const COOP = {
     else if(state.dungeon){ state.dungeon = {...state.dungeon, inside:false}; }
     state.soloDungeon = null; state.coop = null; persist();
   },
-  playerRec(){
+  unwrap(r){ if(!r) return null; if(typeof r.data === "string"){ try{ return {...JSON.parse(r.data), beat:r.beat}; }catch(e){ return null; } } return r; },
+  readDungeon(x){ return fixDungeon(typeof x === "string" ? JSON.parse(x) : JSON.parse(JSON.stringify(x))); },
+  playerRec(){ const r = this.playerData(); return {data:JSON.stringify(r), beat:Date.now()}; },
+  playerData(){
     const d = state.dungeon, h = state.hero;
     return {name:h ? h.name : "?", lite:this.lite(h), pos: d && d.inside ? d.pos : null, inside: !!(d && d.inside), dead: !h,
       own: !!(state.coop && state.coop.own), dark: state.coop ? (state.coop.dark ?? null) : null, beat: Date.now()};
@@ -4926,10 +4960,10 @@ const COOP = {
     if(room && room.lock && (!prev || !prev.lock || prev.lock.n !== room.lock.n)) this.lockSeenAt = performance.now();
     // masmorra vinda do parceiro
     if(room && room.dungeon){
-      const js = JSON.stringify(room.dungeon);
+      const js = typeof room.dungeon === "string" ? room.dungeon : JSON.stringify(room.dungeon);
       if(js !== this.lastPushed){
-        if(busy || this.myLock()) this.pending = room.dungeon;
-        else this.applyDungeon(room.dungeon);
+        let nd = null; try{ nd = this.readDungeon(room.dungeon); }catch(e){}
+        if(nd){ if(busy || this.myLock()) this.pending = nd; else this.applyDungeon(nd); }
       }
     }
     this.checkLight();
@@ -4938,7 +4972,7 @@ const COOP = {
   applyDungeon(nd){
     const d = state.dungeon || {};
     state.dungeon = {...nd, pos:d.pos || null, inside:!!d.inside};
-    this.lastPushed = JSON.stringify(nd); this.pending = null; mapVersion++;
+    this.lastPushed = JSON.stringify(this.netDungeon(state.dungeon)); this.pending = null; mapVersion++;
   },
   /* chamado em todo persist(): envia a masmorra se mudou, e o meu registro de jogador */
   sync(){
@@ -4946,7 +4980,7 @@ const COOP = {
     const code = state.coop.code, nd = this.netDungeon(state.dungeon), js = JSON.stringify(nd);
     if(js !== this.lastPushed && !busy){
       this.lastPushed = js;
-      NET.put(`${code}/dungeon`, nd).then(()=>NET.put(`${code}/ver`, (this.room.ver||0)+1)).catch(()=>{});
+      NET.put(`${code}/dungeon`, js).then(()=>NET.put(`${code}/ver`, (this.room.ver||0)+1)).catch(()=>{});
     }
     NET.put(`${code}/players/${this.me()}`, this.playerRec()).catch(()=>{});
     if(!busy && this.myLock()) this.unlock();
