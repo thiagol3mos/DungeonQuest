@@ -286,6 +286,8 @@ input[type=range]:focus-visible{outline:3px dashed var(--ink);outline-offset:3px
 .slot .idesc{font-size:14px;line-height:1.2}
 .lockb{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:2px solid var(--ink-soft);background:transparent;color:var(--ink-soft);cursor:pointer;padding:0;margin-right:8px;align-self:center}
 .lockb.on{border-color:#e0b038;color:#e0b038}
+.use.lockact{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.use.lockact.on{border-color:#e0b038;color:#e0b038}
 .maphud{position:absolute;left:8px;top:8px;right:60px;display:flex;justify-content:space-between;gap:6px;background:var(--paper);border:2px solid var(--ink);padding:5px 8px;z-index:2;pointer-events:none}
 .maphud span{font-family:var(--display);font-size:10px;letter-spacing:.08em;text-transform:uppercase;display:flex;flex-direction:column;gap:2px;color:var(--ink-soft)}
 .mapbuff{position:absolute;left:8px;top:52px;display:flex;align-items:center;gap:6px;background:var(--paper);border:2px solid #e0a040;color:#e0a040;padding:3px 8px 3px 6px;z-index:2;pointer-events:none;font-family:var(--display);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
@@ -1692,6 +1694,16 @@ function leaveDungeon(){
 }
 
 /* armadilhas */
+/* pergunta se quer descartar um item do Cultista para ignorar a armadilha */
+let cultResolve = null;
+function askCultist(list, txt){
+  return new Promise(res=>{ cultResolve = res; state.ui.cult = {list:list.map(o=>({n:o.it.n, where:o.where, i:o.i})), txt}; state.ui._cultObjs = list; render(); });
+}
+function cultAnswer(k){
+  const r = cultResolve; cultResolve = null;
+  const objs = state.ui._cultObjs || []; state.ui.cult = null; state.ui._cultObjs = null;
+  if(r) r(k === null ? null : objs[k]);
+}
 async function trap(origin){
   const seg = curSeg(), h = state.hero;
   seg.trapSeen = true;
@@ -1703,6 +1715,12 @@ async function trap(origin){
   rollNote(t[0]==="nada" ? "Nada acontece" : t[0]==="blade" ? "Lâmina" : t[0]==="pit" ? "Fosso" : t[0]==="mon" ? "Monstros!" : t[0]==="dmg" ? `${t[2]} de dano` : "Armadilha");
   if(t[0] === "nada"){ log(t[1]); return true; }
   if(luck >= 0){ h.bag.splice(luck,1); log(`${t[1]} A Poção da Sorte te livrou da armadilha.`); return true; }
+  const cult = [...h.bag.map((it,i)=>({it, where:"bag", i})), ...ARMOR_SLOTS.filter(sl=>h.armor[sl]).map(sl=>({it:h.armor[sl], where:"armor", i:sl}))].filter(o=>/do Cultista/.test(o.it.n));
+  if(cult.length){
+    const pick = await askCultist(cult, t[1]);
+    if(pick){ if(pick.where === "bag") h.bag.splice(h.bag.indexOf(pick.it),1); else delete h.armor[pick.i];
+      log(`${t[1]} Você descartou ${pick.it.n.split(" (")[0]} e escapou da armadilha.`); persist(); return true; }
+  }
   if(seg.mon && seg.mon.sneak){ seg.mon.sneak = false; log("O barulho da armadilha alertou os monstros: você não está mais escondido."); }
   if(t[0]==="blade"){
     const [b] = await roll("Lâmina", 1);
@@ -1841,6 +1859,7 @@ async function reveal(door, quiet){
     const c = cv[0]+cv[1], m = mv[0]+mv[1];
     applyContent(seg, c);
     seg.mon = monsterGroup(DT().mon[m-2], quiet ? "hero" : "mon"); if(seg.mon && !quiet) seg.mon.broke = true;
+    if(COOP.two()){ const [m2] = await rollPar([["Monstros (2º jogador)",2]]); const g2 = monsterGroup(DT().mon[m2[0]+m2[1]-2], quiet ? "hero" : "mon"); if(g2){ seg.mon = mergeMon(seg.mon, g2); if(!quiet) seg.mon.broke = true; seg.mon.first = quiet ? "hero" : "mon"; } }
     rollNote(DT().cont[c-2][0].replace(/\.$/,""), "Conteúdo");
     rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro", "Monstros");
     lv.last = seg.id;
@@ -1876,6 +1895,7 @@ async function teleTo(level, id){
     seg.ret = d.visits;
     const mv = await roll("Monstros", 2);
     seg.mon = monsterGroup(DT().mon[mv[0]+mv[1]-2], "hero");
+    if(COOP.two()){ const m2 = await roll("Monstros (2º jogador)", 2); const g2 = monsterGroup(DT().mon[m2[0]+m2[1]-2], "hero"); if(g2) seg.mon = mergeMon(seg.mon, g2); }
     rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro");
     log(seg.mon ? `Enquanto você esteve fora, ${seg.mon.qty} ${seg.mon.name} ocuparam ${seg.name.toLowerCase()}.` : `${seg.name} continua vazia.`);
     endAction();
@@ -1918,6 +1938,7 @@ async function doWalk(id){
       const mv = await roll("Monstros", 2);
       const m = mv[0]+mv[1];
       seg.mon = monsterGroup(DT().mon[m-2], "hero");
+      if(COOP.two()){ const m2 = await roll("Monstros (2º jogador)", 2); const g2 = monsterGroup(DT().mon[m2[0]+m2[1]-2], "hero"); if(g2) seg.mon = mergeMon(seg.mon, g2); }
       rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro");
       if(seg.mon) log(`Enquanto você esteve fora, ${seg.mon.qty} ${seg.mon.name} ocuparam ${seg.name.toLowerCase()}.`);
       else log(`${seg.name} continua vazia.`);
@@ -3738,7 +3759,11 @@ function itemActs(it, i){
   const combatOnly = /^Poção da Fúria/.test(it.n) || (sp && !/^(Cura|Luz)$/.test(sp) && !(sp === "Teletransporte" && inDg));
   if(/^Vela dos Protetores/.test(it.n)) acts.push(`<button class="use" data-act="useItem" data-i="${i}">Acender</button>`);
   if(/^Poção|^Pergaminho|^Safira/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="useItem" data-i="${i}" ${noPot && /^Poção|^Pergaminho/.test(it.n)?"disabled":""}>Usar</button>`);
+  if(/^Apito Goblin/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="whistle" data-i="${i}">Apitar</button>`);
+  if(COOP.on() && COOP.partner() && !combatOnly){ const pt = COOP.partner(), full = pt.lite && pt.lite.bagN >= pt.lite.bagMax;
+    acts.push(`<button class="use" data-act="giveItem" data-i="${i}" ${!COOP.online(pt) || full || pt.dead || it.locked ? "disabled" : ""}>Enviar para ${esc(pt.name)}</button>`); }
   acts.push(`<button class="use" data-act="drop" data-i="${i}">Descartar</button>`);
+  if(!combatOnly) acts.push(`<button class="use lockact ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Destravar":"Travar"} ${esc(itemName(it))}">${lockIcon(!!it.locked)} ${it.locked?"Destravar":"Travar"}</button>`);
   const handNote = () => handsFree() === 0 ? "A única mão que sobra segura a tocha." : !hasLamp() && !raceT("tongue") ? "Todas as mãos estão ocupadas, e a tocha segura uma delas. A Lamparina libera essa mão." : "Todas as mãos estão ocupadas. Desequipe algo para liberar uma.";
   const note = isShield(it) && handsLeft() < 1 ? `<p class="muted small">O escudo ocupa uma mão. ${handNote()}</p>` : it.slot && noArmor ? `<p class="muted small">Sua raça não pode vestir armadura.</p>` : noPot && /^Poção|^Pergaminho/.test(it.n) ? `<p class="muted small">Ogros não usam poções nem pergaminhos.</p>` : combatOnly ? `<p class="muted small">${sp === "Teletransporte" ? "Só dá para usar dentro da masmorra." : "Só dá para usar durante um combate."}</p>` : it.weapon && handsFree() < (it.two ? 2 : 1) ? `<p class="muted small">${it.two ? "Armas de Duas Mãos precisam de duas mãos livres." : ""} ${handNote()}</p>` : "";
   return `<div class="item-acts">${acts.join("")}</div>${note}`;
@@ -4078,7 +4103,8 @@ function viewExplore(){
   }
   return `
   <div class="bar"><button class="back" data-act="go" data-to="sheet" aria-label="Ficha">◀</button><h2 class="sm">${esc(d.name)}<br><span class="label">Nível ${N(d.pos.level)}</span></h2></div>
-  ${COOP.on() ? (()=>{ const p = COOP.partner(); return `<p class="small" style="margin:0">Dupla ${esc(state.coop.code)} · ${p ? `${esc(p.name)}: ${!COOP.online(p) ? "desconectado" : p.dead ? "morto" : !p.inside ? "na cidade" : p.pos && p.pos.level !== d.pos.level ? `nível ${p.pos.level}` : COOP.sameRoom() ? "aqui com você" : "em outra sala"}` : "sem parceiro"}${COOP.holder() === COOP.me() && !hasLamp() ? " · você está com a tocha" : ""}</p>`; })() : ""}
+  ${COOP.on() ? (()=>{ const p = COOP.partner(); return `<p class="small" style="margin:0">Dupla ${esc(state.coop.code)} · ${p ? `${esc(p.name)}: ${!COOP.online(p) ? "desconectado" : p.dead ? "morto" : !p.inside ? "na cidade" : p.pos && p.pos.level !== d.pos.level ? `nível ${p.pos.level}` : COOP.sameRoom() ? "aqui com você" : "em outra sala"}` : "sem parceiro"}${COOP.holder() === COOP.me() && !hasLamp() ? " · você está com a tocha" : ""}</p>
+    ${p && !p.dead ? `<button class="btn ghost" data-act="follow" aria-pressed="${!!state.coop.follow}" style="margin-top:4px;padding:6px 10px">${state.coop.follow ? `Parar de seguir ${esc(p.name)}` : `Seguir ${esc(p.name)}`}</button>` : ""}`; })() : ""}
   <p class="muted small" style="margin:0">Toque numa porta, sala, monstro, baú, escada ou saída. Arraste para mover e pince para dar zoom.</p>
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span><span>Moedas<b>${h.coins}</b></span><span>Mochila<b>${bagLabel(h)}</b></span></div>
@@ -4230,7 +4256,11 @@ function startCombat(surprise){
   if(seg.mon.sneak){ seg.mon.sneak = false; }
   state.combat = {level:D().pos.level, seg:seg.id, units, sel:0, phase:first, round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
   if(COOP.on() && COOP.partnerHere() && COOP.sameRoom()){
-    const c0 = state.combat; c0.coop = true; c0.id = Math.random().toString(36).slice(2,9); c0.part = [COOP.me(), COOP.other()]; c0.mt = 0;
+    const c0 = state.combat;
+    const gs = [seg.mon, ...((seg.mon && seg.mon.extra) || [])], fresh = gs.map(g=>!!(g && g.boss && !g.dbl));
+    gs.forEach((g,gi)=>{ if(fresh[gi]){ g.dbl = true; g.list.forEach(x=>{ x.pv *= 2; x.max *= 2; }); } });
+    c0.units.forEach(u=>{ if(fresh[u.g]){ u.pv *= 2; u.max *= 2; } });
+    if(fresh.some(Boolean)) cLog("Dois aventureiros: o Chefe tem o dobro de vida."); c0.coop = true; c0.id = Math.random().toString(36).slice(2,9); c0.part = [COOP.me(), COOP.other()]; c0.mt = 0;
     state.coop.cp = {id:c0.id, done:-1, applied:-1, alloc:{pv:0, ar:{}}};
   }
   if(units.some(u=>has(u,"Morto-Vivo"))) H().undead++;
@@ -4693,6 +4723,7 @@ function viewCombat(){
       ${offWeapons(h).map(({w,i})=>`<button class="btn" data-act="attack" data-w="${i}">Atacar com ${esc(w.n.split(" (")[0])} <small>(${w.d})</small></button>`).join("")}`}
       ${raceT("zumbi") ? `<button class="btn ghost" data-act="playDead">Fingir de morto e fugir</button>` : ""}
       ${raceT("horn") ? `<button class="btn ghost" data-act="horn">Chifrada <small>(1d6)</small></button>` : ""}
+      ${hasItem(/^Apito Goblin/) >= 0 && c.units.some(u=>u.pv > 0 && /^Goblin/.test(u.key)) ? `<button class="btn ghost" data-act="cwhistle">Usar Apito Goblin</button>` : ""}
       ${spells.length ? `<span class="label">Magias</span><div class="dlist">${spells.map(([n,s])=>`<button class="dbtn" data-act="cspell" data-n="${esc(n)}">${n} ×${s.left}</button>`).join("")}</div>` : ""}
       ${items.length ? `<span class="label">Itens</span><div class="dlist">${items.map(({it,i})=>`<button class="dbtn" data-act="citem" data-i="${i}">${esc(/^Pergaminho Mágico \(/.test(it.n) ? "Pergaminho: " + it.n.match(/\((.+)\)/)[1] : it.n.split(" (")[0])}</button>`).join("")}</div>` : ""}
       <p class="muted small">Magias e itens gastam o seu turno de ataque.</p></div>`}`;
@@ -4808,7 +4839,9 @@ function render(){
   if(["sheet","dungeon","explore","city","advclass"].includes(state.screen) && !state.hero) state.screen = "title";
   if(state.screen==="explore" && !(state.dungeon && state.dungeon.inside)) state.screen = "sheet";
   if(state.screen==="combat" && !(state.combat && state.hero)) state.screen = state.hero && state.dungeon && state.dungeon.inside ? "explore" : "title";
-  $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)() + (COOP.on() && COOP.paused() ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Jogo pausado</h3><p>Aguardando ${esc(COOP.partner().name)} se reconectar. Nada se perde enquanto isso.</p></div></div>` : "");
+  $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)() + (state.ui.cult ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Armadilha!</h3><p>${esc(state.ui.cult.txt)}</p><p>Descartar um item do Cultista para ignorar a armadilha?</p>
+    ${state.ui.cult.list.map((o,k)=>`<button class="btn" data-act="cultUse" data-k="${k}">Descartar ${esc(o.n.split(" (")[0])}${o.where === "armor" ? " (equipado)" : ""}</button>`).join("")}
+    <button class="btn ghost" data-act="cultNo">Não, enfrentar a armadilha</button></div></div>` : "") + (COOP.on() && COOP.paused() ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Jogo pausado</h3><p>Aguardando ${esc(COOP.partner().name)} se reconectar. Nada se perde enquanto isso.</p></div></div>` : "");
   const dr = state.draft;
   if(state.screen==="create" && dr){
     const tray = $("#tray");
@@ -4946,7 +4979,7 @@ const COOP = {
   sameRoom(){ const p = this.partner(), d = state.dungeon; return !!(p && p.pos && d && d.pos && p.pos.level === d.pos.level && p.pos.seg === d.pos.seg); },
   lite(h){
     h = h || state.hero; if(!h) return null;
-    return {name:h.name, race:h.race, race2:h.race2||null, arms:h.arms||2, pv:h.pv, pvMax:h.pvMax, torches:h.torches,
+    return {name:h.name, race:h.race, race2:h.race2||null, arms:h.arms||2, pv:h.pv, pvMax:h.pvMax, torches:h.torches, bagN:h.bag.length, bagMax:bagMax(h),
       weapon:{n:h.weapon.n, unarmed:!!h.weapon.unarmed, two:!!h.weapon.two}, off:offs(h).map(o=>({n:o.n, shield:!!o.shield})),
       armor:Object.fromEntries(ARMOR_SLOTS.filter(s=>h.armor[s]).map(s=>[s,{n:h.armor[s].n}])), lamp:hasLamp(h), tongue:!!raceT("tongue", h)};
   },
@@ -5029,6 +5062,8 @@ const COOP = {
       }
     }
     this.checkLight();
+    this.receiveGifts(room);
+    this.followTick();
     if(typeof COOPC !== "undefined") COOPC.onRoom(room);
     if(typeof SHARE !== "undefined") SHARE.tick();
     if(!busy && ["explore","sheet","dungeon","city","combat"].includes(state.screen)) render();
@@ -5074,6 +5109,30 @@ const COOP = {
     return true;
   },
   unlock(){ if(!this.on()) return; this.myLockN = null; NET.put(`${state.coop.code}/lock`, null).catch(()=>{}); if(this.room) this.room.lock = null; },
+  receiveGifts(room){
+    const g = room && room.gift && room.gift[this.me()]; if(!g || !state.hero) return;
+    const got = state.coop.gotGifts = state.coop.gotGifts || [];
+    Object.entries(g).forEach(([gid, js])=>{
+      if(got.includes(gid)) { NET.put(`${state.coop.code}/gift/${this.me()}/${gid}`, null).catch(()=>{}); return; }
+      let o = null; try{ o = typeof js === "string" ? JSON.parse(js) : js; }catch(e){}
+      got.push(gid); if(got.length > 50) got.shift();
+      if(o && o.item){ state.hero.bag.push(o.item); state.ui.msg = `${o.from} te enviou ${o.item.n.split(" (")[0]}.`; if(state.dungeon && state.dungeon.inside) log(`Você recebeu ${o.item.n.split(" (")[0]} de ${o.from}.`); }
+      NET.put(`${state.coop.code}/gift/${this.me()}/${gid}`, null).catch(()=>{});
+      persist();
+    });
+  },
+  /* ---------- seguir o parceiro ---------- */
+  followTick(){
+    if(!this.on() || !state.coop.follow || busy || state.combat || !state.hero) return;
+    const d = state.dungeon, p = this.partner();
+    if(!d || !d.inside || !p || !p.inside || p.dead || !p.pos || !this.online(p)) return;
+    if(p.pos.level !== d.pos.level || p.pos.seg === d.pos.seg) return;
+    const lv = d.levels[d.pos.level]; if(!lv || !lv.segs[p.pos.seg]) return;
+    if(curSeg().mon && blocked(curSeg())) return;
+    if(!reachable(lv, d.pos.seg, p.pos.seg)) return;
+    if(this._following) return; this._following = true;
+    setTimeout(()=>{ this.lock().then(ok=>{ this._following = false; if(ok && !busy && !state.combat && state.coop.follow && this.partner() && this.partner().pos && this.partner().pos.seg !== state.dungeon.pos.seg) doWalk(this.partner().pos.seg); }); }, 600);
+  },
   /* ---------- tocha e luz ---------- */
   holder(){ return this.room ? this.room.torch || "A" : null; },
   /* este herói precisa segurar uma tocha com a mão? (fora da dupla, sempre que não tem Lamparina) */
@@ -5082,6 +5141,8 @@ const COOP = {
     if(!this.partnerHere()) return true;
     return this.holder() === this.me() || !!state.coop.own;
   },
+  /* os dois aventureiros estão na masmorra (regras de grupo: monstros rolados 2x, chefe com vida dobrada) */
+  two(){ return this.on() && !!(state.dungeon && state.dungeon.inside) && this.partnerHere(); },
   paused(){ const p = this.partner(), d = state.dungeon; return !!(this.on() && d && d.inside && p && p.inside && !p.dead && !this.online(p)); },
   lit(){
     const h = state.hero; if(!h) return true;
@@ -5343,7 +5404,29 @@ async function applyCoopDamage(){
   persist(); render(); setTimeout(()=>COOPC.tick(), 50);
 }
 
+function goblinGroup(g){ return !!g && /^Goblin/.test(monKey(g)); }
+const actionsApito = {
+  whistle(){
+    const seg = curSeg(); if(!state.dungeon || !state.dungeon.inside){ state.ui.msg = "Não há Goblins por aqui."; render(); return; }
+    const gs = seg.mon ? [seg.mon, ...(seg.mon.extra||[])] : [];
+    const gob = gs.filter(goblinGroup);
+    if(!gob.length){ log("Você apita, mas não há Goblins nesta sala."); state.ui.msg = "Não há Goblins nesta sala."; persist(); render(); return; }
+    const n = gob.reduce((a,g)=>a+g.list.length,0), rest = gs.filter(g=>!goblinGroup(g));
+    if(!rest.length) seg.mon = null; else { const [f, ...others] = rest; f.extra = others.length ? others : undefined; f.qty = f.list.length; seg.mon = f; }
+    log(`Você sopra o Apito Goblin: ${n} Goblin${n>1?"s":""} fo${n>1?"gem":"ge"} apavorado${n>1?"s":""}.`);
+    state.ui.bagSel = null; mapVersion++; persist(); render();
+  },
+  async cwhistle(){
+    const c = C(); if(!c || c.phase !== "hero" || busy) return;
+    busy = true;
+    let n = 0; c.units.forEach(u=>{ if(u.pv > 0 && /^Goblin/.test(u.key)){ u.pv = 0; u.fled = true; n++; } });
+    cLog(`Você sopra o Apito Goblin: ${n} Goblin${n>1?"s":""} fo${n>1?"gem":"ge"} da batalha.`);
+    busy = false;
+    await afterHeroAction();
+  },
+};
 const actions = {
+  ...actionsApito,
   shareToggle(b){ SHARE.toggle(b.dataset.u); },
   shareConfirm(b){ SHARE.confirm(b.dataset.v === "1"); },
   coopTake(b){
@@ -5365,6 +5448,18 @@ const actions = {
   async coopJoin(){ const c = ($("#coopCode")||{}).value; state.ui.coopMsg = "Entrando..."; render(); try{ const e = await COOP.join(c); state.ui.coopMsg = e || "Você entrou na dupla!"; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } mapVersion++; render(); },
   async coopLeave(){ if(state.dungeon && state.dungeon.inside) return; await COOP.leave(); state.ui.coopMsg = "Você saiu da dupla."; mapVersion++; render(); },
   takeTorch(){ COOP.takeTorch(); },
+  giveItem(b){
+    const h = state.hero, i = +b.dataset.i, it = h.bag[i], pt = COOP.partner();
+    if(!it || !pt || !COOP.online(pt)) return;
+    if(pt.lite && pt.lite.bagN >= pt.lite.bagMax){ state.ui.msg = `A mochila de ${pt.name} está cheia.`; render(); return; }
+    if(it.locked){ state.ui.msg = "Destrave o item antes de enviar."; render(); return; }
+    h.bag.splice(i,1); state.ui.bagSel = null;
+    const gid = Math.random().toString(36).slice(2,10);
+    NET.put(`${state.coop.code}/gift/${COOP.other()}/${gid}`, JSON.stringify({item:it, from:h.name})).catch(()=>{});
+    if(state.dungeon && state.dungeon.inside) log(`Você entregou ${it.n.split(" (")[0]} para ${pt.name}.`);
+    state.ui.msg = `${it.n.split(" (")[0]} enviado para ${pt.name}.`; persist(); render();
+  },
+  follow(){ state.coop.follow = !state.coop.follow; persist(); render(); if(state.coop.follow) COOP.followTick(); },
   go(b){ const keep = state.ui.lastDeath && b.dataset.to==="cemetery"; state.ui = keep ? state.ui : {}; go(b.dataset.to); },
   newHero(){
     if(state.hero){ state.ui.confirmNew = true; render(); return; }
@@ -5823,9 +5918,10 @@ function torchCost(b){
 }
 let pendingTorch = null;
 /* ações que mexem na masmorra compartilhada: na dupla, só uma pessoa por vez */
-const COOP_LOCKED = new Set(["coopTake","attack","cspell","citem","horn","playDead","win","rechargePick","stonePick","coopRecv","openDoor","unlock","chest","secret","disarm","loot","takeStash","confirmPick","descend","climb","fight","sneak","corpse","engulf","lastFinal","coutim","enter"]);
+const COOP_LOCKED = new Set(["whistle","cwhistle","coopTake","attack","cspell","citem","horn","playDead","win","rechargePick","stonePick","coopRecv","openDoor","unlock","chest","secret","disarm","loot","takeStash","confirmPick","descend","climb","fight","sneak","corpse","engulf","lastFinal","coutim","enter"]);
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-act]");
+  if(b && (b.dataset.act === "cultUse" || b.dataset.act === "cultNo") && !b.disabled){ cultAnswer(b.dataset.act === "cultUse" ? +b.dataset.k : null); return; }
   if(!b || busy || b.disabled) return;
   if(COOP.on() && COOP.paused()){ return; }
   if(COOP.on() && COOP_LOCKED.has(b.dataset.act)){
