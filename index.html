@@ -325,6 +325,8 @@ b,strong{font-weight:400 !important}
 .gdots button.on{background:currentColor}
 .linkbtn{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:6px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .linkbtn.on{font-weight:bold;text-decoration:none}
+.bigcode{font-size:34px;letter-spacing:8px;text-align:center;margin:8px 0;font-weight:bold}
+.codein{width:100%;font-size:24px;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:10px;box-sizing:border-box;margin:6px 0}
 </style>
 </head>
 <body>
@@ -4890,13 +4892,30 @@ function viewSave(){
     <p>O jogo salva sozinho neste aparelho a cada ação. No iPhone, deixe o jogo instalado na tela de início para o Safari não apagar o progresso.</p>
   </div>
   <div class="sheet">
-    <h3>Exportar</h3>
-    <p class="small">Copie o código abaixo e guarde onde quiser (Notas, Drive, WhatsApp). Ele leva aventureiro, cemitério e masmorra.</p>
+    <h3>Enviar backup</h3>
+    <p class="small">Guarda o jogo na nuvem e mostra um código curto. No outro aparelho, use esse código em "Carregar backup".</p>
+    ${state.ui.cloudCode ? `<p class="bigcode" aria-label="Código do backup">${esc(state.ui.cloudCode)}</p>
+      <button class="btn ghost" data-act="cloudCopy">Copiar código</button>
+      <p class="muted small">O código vale uma vez: depois de carregado no outro aparelho, o backup é apagado da nuvem. Enviar de novo gera um código novo.</p>` : ""}
+    <button class="btn" data-act="cloudSend" ${NET.ready() ? "" : "disabled"}>${state.ui.cloudCode ? "Enviar de novo" : "Enviar backup"}</button>
+    ${NET.ready() ? "" : `<p class="muted small">A conexão com a nuvem não está configurada.</p>`}
+  </div>
+  <div class="sheet">
+    <h3>Carregar backup</h3>
+    <p class="small">Digite o código gerado no outro aparelho. Isso substitui o jogo atual deste aparelho.</p>
+    <input id="cloudIn" class="codein" maxlength="6" placeholder="Código" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" value="${esc(state.ui.cloudIn||"")}">
+    ${state.ui.cloudAsk ? `<p class="small"><b>Tem certeza?</b> O jogo deste aparelho será substituído pelo backup.</p>
+      <div class="row"><button class="btn ghost" data-act="cloudCancel">Cancelar</button><button class="btn" data-act="cloudLoad" data-ok="1">Substituir</button></div>`
+      : `<button class="btn" data-act="cloudLoad" ${NET.ready() ? "" : "disabled"}>Carregar backup</button>`}
+  </div>
+  <div class="sheet">
+    <h3>Código em texto (sem internet)</h3>
+    <p class="small">Copie o código abaixo e guarde onde quiser. Em jogos longos ele fica grande demais para mensagens; nesse caso, use "Enviar backup".</p>
     <textarea id="exportCode" readonly>${code}</textarea>
     <button class="btn" data-act="copy">Copiar código</button>
   </div>
   <div class="sheet">
-    <h3>Importar</h3>
+    <h3>Restaurar código em texto</h3>
     <p class="small">Cole um código salvo. Isso substitui o jogo atual deste aparelho.</p>
     <textarea id="importCode" placeholder="DQ1:..." autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></textarea>
     ${navigator.clipboard && navigator.clipboard.readText ? `<button class="btn ghost" data-act="pasteSave">Colar da área de transferência</button>` : ""}
@@ -7691,6 +7710,49 @@ const actions = {
     $("#importCode").value = txt.trim();
     try{ decodeSave(txt); say("Código colado. Confira e toque em Restaurar este save."); }
     catch(e){ say("O texto copiado não parece um save do Dungeon Quest. Confira se copiou o código inteiro."); }
+  },
+  async cloudSend(){
+    if(busy || !NET.ready()) return;
+    busy = true; lockButtons(); toastMsg = "Enviando...";
+    const t = $("#toast"); if(t) t.textContent = toastMsg;
+    try{
+      const L = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = null;
+      for(let i=0;i<6 && !code;i++){ const c = Array.from({length:6},()=>L[Math.floor(Math.random()*L.length)]).join(""); const ex = await NET.get(`backups/${c}`); if(ex == null) code = c; }
+      if(!code) throw new Error("código");
+      const old = state.settings && state.settings.lastBackup;
+      await NET.put(`backups/${code}`, {d:encodeSave(), t:Date.now()});
+      const back = await NET.get(`backups/${code}`);
+      if(!back || !back.d) throw new Error("gravação");
+      if(old && old !== code) NET.put(`backups/${old}`, null).catch(()=>{});
+      state.settings = state.settings || {}; state.settings.lastBackup = code;
+      state.ui.cloudCode = code; toastMsg = "Backup enviado. Use o código no outro aparelho.";
+    }catch(e){ toastMsg = "Não foi possível enviar o backup. Confira a internet e tente de novo."; }
+    busy = false; persist(); render();
+  },
+  cloudCopy(){
+    const c = state.ui.cloudCode; if(!c) return;
+    const done = ()=>{ toastMsg = "Código copiado."; const t = $("#toast"); if(t) t.textContent = toastMsg; };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(c).then(done).catch(done); else done();
+  },
+  cloudCancel(){ state.ui.cloudAsk = false; render(); },
+  async cloudLoad(b){
+    if(busy || !NET.ready()) return;
+    const inp = $("#cloudIn"), code = ((inp ? inp.value : state.ui.cloudIn) || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    state.ui.cloudIn = code;
+    if(code.length !== 6){ toastMsg = "O código tem 6 letras e números."; render(); return; }
+    if(!b.dataset.ok){ state.ui.cloudAsk = true; toastMsg = ""; render(); return; }
+    busy = true; lockButtons(); toastMsg = "Carregando..."; const t = $("#toast"); if(t) t.textContent = toastMsg;
+    try{
+      const rec = await NET.get(`backups/${code}`);
+      if(!rec || !rec.d){ busy = false; state.ui.cloudAsk = false; toastMsg = "Código não encontrado. Ele pode ter sido usado ou digitado errado."; render(); return; }
+      const sv = decodeSave(rec.d), keepFb = state.settings && state.settings.fbUrl;
+      state = {...freshState(), ...sv, screen:"title", ui:{}};
+      if(keepFb && state.settings && !state.settings.fbUrl) state.settings.fbUrl = keepFb;
+      migrate(); applySkin(); mapVersion++;
+      NET.put(`backups/${code}`, null).catch(()=>{});
+      busy = false; persist(); toastMsg = ""; render();
+    }catch(e){ busy = false; state.ui.cloudAsk = false; toastMsg = "Não foi possível carregar. Confira a internet e o código."; render(); }
   },
   import(){
     const code = $("#importCode").value;
