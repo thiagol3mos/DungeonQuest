@@ -309,6 +309,10 @@ input[type=range]:focus-visible{outline:3px dashed var(--ink);outline-offset:3px
 /* sem negrito: o peso único facilita a leitura */
 *,*::before,*::after{font-weight:400 !important}
 b,strong{font-weight:400 !important}
+.allies{display:flex;flex-wrap:wrap;gap:6px}
+.allies .chip.dead{opacity:.4;text-decoration:line-through}
+.allyb{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px dotted currentColor}
+.allyb.done{opacity:.55}
 </style>
 </head>
 <body>
@@ -368,24 +372,24 @@ const RACES_X = {
   i6:{n:"Meio-Humano",pv:20,adv:"Role uma nova raça e use a vantagem deste.",t:"half"},
   e1:{n:"Rinoceróide",pv:24,adv:"Pode atacar com seu chifre (Dano 1d6).",t:"horn"},
   e2:{n:"Samambro",pv:10,adv:"Quando morrer, role um dado. Se cair 3 ou mais irá voltar a vida com 1 PV.",t:"samambro"},
-  e3:{n:"Corvino",pv:14,adv:"Começa o jogo com 2 Magias Avançadas e pode ignorar eventos na viagem.",randAdv:2,part:"ignorar eventos na viagem"},
-  e4:{n:"Patovsky",pv:15,adv:"Pode andar em territórios de água e pode ignorar eventos na viagem.",soon:true},
-  e5:{n:"Pandakhan",pv:30,adv:"Gasta o dobro de provisões.",soon:true},
-  e6:{n:"Sharkin",pv:18,adv:"Pode andar em territórios de água.",soon:true},
+  e3:{n:"Corvino",pv:14,adv:"Começa o jogo com 2 Magias Avançadas e pode ignorar eventos na viagem.",randAdv:2},
+  e4:{n:"Patovsky",pv:15,adv:"Pode andar em territórios de água e pode ignorar eventos na viagem."},
+  e5:{n:"Pandakhan",pv:30,adv:"Gasta o dobro de provisões."},
+  e6:{n:"Sharkin",pv:18,adv:"Pode andar em territórios de água."},
   m1:{n:"Goblin",pv:3,adv:"Se rolar 1 no dado de dano você explode causando 5 de dano em todos da sala.",t:"goblin"},
   m2:{n:"Orc",pv:21,adv:"Nenhuma."},
-  m3:{n:"Centauro",pv:19,adv:"Gasta metade de provisões ao se mover no mapa.",soon:true},
+  m3:{n:"Centauro",pv:19,adv:"Gasta metade de provisões ao se mover no mapa."},
   m4:{n:"Fungóide",pv:10,adv:"A qualquer momento, gaste 1 provisão e recupere 1d6 Pontos de Vida.",t:"fungo"},
   m5:{n:"Ogro",pv:40,adv:"Não pode usar poções, pergaminhos ou vestir armadura. Causa +2 de Dano.",t:"ogro"},
   m6:{n:"Meio-Dragão",pv:30,adv:"Começa com 3 Bolas de Fogo.",fixed:{"Bola de Fogo":3}},
-  z11:{n:"Steambot",pv:18,adv:"Não precisa consumir Provisões. Quando morre explode destruindo tudo na sala.",soon:true},
+  z11:{n:"Steambot",pv:18,adv:"Não precisa consumir Provisões. Quando morre explode destruindo tudo na sala.",part:"explodir ao morrer"},
   z12:{n:"Capivoraz",pv:16,adv:"Começa o jogo com 20 moedas.",coins:20},
   z13:{n:"Blankin",pv:20,adv:"Possui dois usos da magia Relâmpago.",fixed:{"Relâmpago":2}},
   z14:{n:"Lobisóide",pv:20,adv:"Quando destrói portas, pode atacar primeiro.",t:"lobis"},
-  z15:{n:"Tri-kri-kri",pv:12,adv:"Possui 4 braços e consome apenas 1 provisão em desertos.",arms:4,part:"provisão em desertos"},
-  z16:{n:"Gnoblin",pv:5,adv:"Pode se passar por gnomo ou por goblin.",soon:true},
+  z15:{n:"Tri-kri-kri",pv:12,adv:"Possui 4 braços e consome apenas 1 provisão em desertos.",arms:4},
+  z16:{n:"Gnoblin",pv:5,adv:"Pode se passar por gnomo ou por goblin."},
   z21:{n:"Arenoso",pv:7,adv:"Pode passar por portas trancadas ou com armadilha sem ativá-la.",t:"arenoso"},
-  z22:{n:"Homem-Boto",pv:11,adv:"Pode mover em terreno de água.",soon:true},
+  z22:{n:"Homem-Boto",pv:11,adv:"Pode mover em terreno de água."},
   z23:{n:"Lagartichano",pv:10,adv:"Quando Mover em Silêncio, role dois dados e descarte o menor.",t:"sneak2"},
   z24:{n:"Zumbi Esperto",pv:8,adv:"Pode se fazer de morto e fugir de combate.",t:"zumbi"},
   z25:{n:"Semi-deus",pv:30,adv:"Perde 3 PV sempre que cai 1 no seu dado de dano.",t:"semideus"},
@@ -398,18 +402,18 @@ const RACES_X = {
   z36:{n:"Povo-Cão",pv:18,adv:"Não pode usar armadura.",t:"noArmor"},
   z41:{n:"Vampirão",pv:18,adv:"Se recupera PV quando mata monstro (ganha 1 PV por monstro morto).",t:"vampirao"},
   z42:{n:"Cachorrinho",pv:8,adv:"Só pode pegar coisas com sua boca.",soon:true},
-  z43:{n:"Ponão",pv:21,adv:"Apenas se dá bem com Centauros e Anões.",soon:true},
+  z43:{n:"Ponão",pv:21,adv:"Apenas se dá bem com Centauros e Anões."},
   z44:{n:"Alienígena",pv:4,adv:"Começa com uma Pistola Laser (Dano 1d6+5).",gun:true},
-  z45:{n:"Meio-Cabra",pv:18,adv:"Gasta apenas 1 provisão para mover em Montanhas.",soon:true},
+  z45:{n:"Meio-Cabra",pv:18,adv:"Gasta apenas 1 provisão para mover em Montanhas."},
   z46:{n:"Metamorfo",pv:16,adv:"Pode ganhar a Vantagem de uma raça que tenha encontrado em jogo.",soon:true},
   z51:{n:"Keyroz",pv:17,adv:"Se cair 1 no dado de dano, você desaparece.",t:"keyroz"},
   z52:{n:"Olavoides",pv:17,adv:"Enxerga tudo na cor vermelha. Detesta a cor vermelha.",soon:true},
   z53:{n:"Mimiminion",pv:17,adv:"Só pode usar amarelo. Obedece qualquer soldado ou guarda (e fica feliz).",soon:true},
   z54:{n:"Sereia reversa",pv:20,adv:"Fede a peixe.",soon:true},
-  z55:{n:"Jenypher",pv:16,adv:"Possui 4 braços, é careca e pode se passar por goblin ou gnoma.",arms:4,part:"se passar por goblin ou gnoma"},
+  z55:{n:"Jenypher",pv:16,adv:"Possui 4 braços, é careca e pode se passar por goblin ou gnoma.",arms:4},
   z56:{n:"Coutim",pv:18,adv:"Pode ignorar combate com criaturas com Espólios, e ainda ficará com eles.",t:"coutim"},
-  z61:{n:"Levent",pv:15,adv:"Pode ignorar eventos de viagem.",soon:true},
-  z62:{n:"Aesir",pv:20,adv:"É imune a efeitos climáticos.",soon:true},
+  z61:{n:"Levent",pv:15,adv:"Pode ignorar eventos de viagem."},
+  z62:{n:"Aesir",pv:20,adv:"É imune a efeitos climáticos."},
   z63:{n:"Fira",pv:16,adv:"Pode usar sua própria luz em vez de tocha, mas gasta 2 PV para cada uso.",t:"fira"},
   z64:{n:"Mahok",pv:28,adv:"Não pode usar armadura.",t:"noArmor"},
   z65:{n:"Tailox",pv:16,adv:"Quando rolar para Achar Passagens Secretas, role dois dados e descarte o menor.",t:"secret2"},
@@ -441,22 +445,22 @@ const SPELL_INFO = {
   "Bola de Fogo":{e:"Ataque que causa 5 de dano em todos oponentes da sala onde estiver.",use:"combat"},
   "Cura Natural":{e:"Recupera 12 PV.",use:"any"},
   "Vimes":{e:"Deixa um monstro sem atacar por 1d6 turnos.",use:"combat"},
-  "Camuflagem":{e:"Pode ignorar um Evento gerado em um território de floresta ou pântano.",use:"soon"},
+  "Camuflagem":{e:"Pode ignorar um Evento gerado em um território de floresta ou pântano.",use:"world"},
   "Criar Comida":{e:"Cria 2d6 Provisões.",use:"any"},
-  "Invocar Lobo":{e:"Invoca um Lobo (4 PV; Dano 2) para te ajudar até o final do combate.",use:"soon"},
+  "Invocar Lobo":{e:"Invoca um Lobo (4 PV; Dano 2) para te ajudar até o final do combate.",use:"combat"},
   "Chuva de Insetos":{e:"Ataque que causa 7 de dano em todos oponentes.",use:"combat"},
   "Corpo Etéreo":{e:"Até o final do combate, todo dano que você receber será reduzido em 1 ponto.",use:"combat"},
   "Absorver Alma":{e:"Depois de um combate, recupere 5 PV para cada monstro morto.",use:"combat"},
   "Banir Mortos":{e:"Destrói qualquer morto-vivo que esteja na mesma área que você.",use:"combat"},
   "Fogo dos Mortos":{e:"Depois de um combate, você ganha 2 tochas para cada monstro que você matou.",use:"combat"},
-  "Invocar Esqueleto":{e:"Invoca um Esqueleto (4 PV; Dano 1; Morto-Vivo) que ficará até você sair da masmorra.",use:"soon"},
-  "Invocar Mortos":{e:"Invoca 1d6 Esqueletos (4 PV; Dano 1; Morto-Vivo) para te ajudar até o final do combate.",use:"soon"},
-  "Invocar Elemental":{e:"Invoca um Elemental (3 PV; Dano 2) para te ajudar até o final do combate.",use:"soon"},
+  "Invocar Esqueleto":{e:"Invoca um Esqueleto (4 PV; Dano 1; Morto-Vivo) que ficará até você sair da masmorra.",use:"dg"},
+  "Invocar Mortos":{e:"Invoca 1d6 Esqueletos (4 PV; Dano 1; Morto-Vivo) para te ajudar até o final do combate.",use:"combat"},
+  "Invocar Elemental":{e:"Invoca um Elemental (3 PV; Dano 2) para te ajudar até o final do combate.",use:"combat"},
   "Armadura de Pedra":{e:"Cria uma peça de armadura com 5 PV. Se destrói depois que sair da masmorra.",use:"dg"},
   "Desmoronamento":{e:"Uma sala de uma masmorra é completamente destruída com tudo dentro.",use:"soon"},
   "Abrir Portal":{e:"Pode abrir um Portal temporário. Você não sabe para onde ele vai dar.",use:"soon"},
   "Paralisar":{e:"Deixa todos monstros de uma sala sem atacar por 2 turnos.",use:"combat"},
-  "Voar":{e:"Pode se mover por um terreno qualquer sem gastar qualquer Provisão e ativar Evento.",use:"soon"},
+  "Voar":{e:"Pode se mover por um terreno qualquer sem gastar qualquer Provisão e ativar Evento.",use:"world"},
   "Recarregar Mana":{e:"Recupera 1 uso de uma outra magia.",use:"any"},
   "Escudo Mágico":{e:"Depois de criado, pode absorver 4 pontos de dano. Pode conjurar mais de um.",use:"any"},
   "Rajada Mágica":{e:"Ataque que causa 12 de dano.",use:"combat"}
@@ -474,46 +478,46 @@ const ADV_CLASSES = [
   {n:"Goblinator",cost:20,req:"Ter matado 20 goblins",pv:0,adv:"Recebe -2 de dano por Explosão.",goal:(h,H)=>[H.tags.goblin||0,20]},
   {n:"Minerador",cost:20,req:"Ter sobrevivido duas masmorras.",pv:1,adv:"Se acabar tochas, pode mover 3 salas vazias.",how:"No app: vale a vantagem do Minerador básico (sai da masmorra no escuro se o caminho estiver livre).",goal:(h,H)=>[H.dungeons,2]},
   {n:"Coveiro",cost:30,req:"Ter perdido um outro personagem.",pv:0,adv:"Causa +2 de dano em Mortos-Vivos.",ok:(h)=>state.cemetery.some(g=>!g.retired && g.name!==h.name)},
-  {n:"Gladiador",cost:30,req:"Ter lutado em uma Arena.",pv:3,adv:"Nenhuma.",map:true},
-  {n:"Limpa-Esgoto",cost:30,req:"Matado todas criaturas de um Esgoto",pv:1,adv:"Nenhuma.",map:true},
+  {n:"Gladiador",cost:30,req:"Ter lutado em uma Arena.",pv:3,adv:"Nenhuma.",goal:(h,H)=>[H.arena,1]},
+  {n:"Limpa-Esgoto",cost:30,req:"Matado todas criaturas de um Esgoto",pv:1,adv:"Nenhuma.",soon:true},
   {n:"Colecionador",cost:30,req:"Achado todas peças de uma armadura",pv:0,adv:"Vende uma peça de armadura por 5 moedas.",goal:(h,H)=>[Math.max(0,...Object.values(H.sets).map(s=>s.length)),6]},
-  {n:"Hotep",cost:30,req:"Ter matado 3 múmias",pv:1,adv:"Nenhuma.",map:true},
+  {n:"Hotep",cost:30,req:"Ter matado 3 múmias",pv:1,adv:"Nenhuma.",soon:true},
   {n:"Dedetizador",cost:30,req:"Ter matado 10 insetos ou aracnídeos",pv:0,adv:"Ganha +1 de dano contra insetos e aracnídeos.",goal:(h,H)=>[H.tags.inseto||0,10]},
   {n:"Mata-Orc",cost:40,req:"Ter matado um Rei ou Líder Orc",pv:2,adv:"Nenhuma.",goal:(h,H)=>[H.tags.reiOrc||0,1]},
   {n:"Dragonslayer",cost:50,req:"Ter matado um dragão",pv:3,adv:"Nenhuma.",goal:(h,H)=>[H.tags.dragao||0,1]},
   {n:"Guarda",cost:50,req:"Ter matado pelo menos 3 monstros.",pv:1,adv:"Nenhuma.",goal:(h,H)=>[H.total,3]},
   {n:"Helsing",cost:50,req:"Ter matado 2 vampiros",pv:0,adv:"Dano +1 contra Vampiros e Carniçais.",goal:(h,H)=>[H.tags.vampiro||0,2]},
   {n:"Estudante",cost:70,req:"Ter usado uma magia ou pergaminho.",pv:0,adv:"Ganha 3 Magias Básicas aleatórias.",ok:(h,H)=>H.magic>0,give:[["basica",3]]},
-  {n:"Lenhador",cost:70,req:"Ter percorrido duas florestas.",pv:1,adv:"Nenhuma.",map:true},
+  {n:"Lenhador",cost:70,req:"Ter percorrido duas florestas.",pv:1,adv:"Nenhuma.",goal:(h,H)=>[H.forests,2]},
   {n:"Caça-Fantasma",cost:80,req:"Ter matado 10 seres intangíveis",pv:0,adv:"Pode ignorar Intangível no primeiro turno.",goal:(h,H)=>[H.tags.intangivel||0,10]},
-  {n:"Cozinheiro",cost:100,req:"Ter gastado 20 provisões em viagem.",pv:0,adv:"Ganha 1 Provisão por monstro derrotado.",map:true},
+  {n:"Cozinheiro",cost:100,req:"Ter gastado 20 provisões em viagem.",pv:0,adv:"Ganha 1 Provisão por monstro derrotado.",goal:(h,H)=>[H.provSpent,20]},
   {n:"Ferreiro",cost:100,req:"Ter tido uma armadura destruida.",pv:1,adv:"Pode recuperar armaduras gastando 1 Tocha.",ok:(h,H)=>H.armorLost>0},
   {n:"Ambidestro",cost:100,req:"Ter matado 2 chefes de masmorra",pv:0,adv:"Pode atacar com 2 armas (uma em cada mão).",goal:(h,H)=>[H.bosses,2]},
   {n:"Mago",cost:100,req:"Saber 3 magias básicas.",pv:0,adv:"Ganha 4 Magias Básicas aleatórias.",goal:(h)=>[knownSpells(h).filter(n=>BASIC_SPELLS.includes(n)).length,3],give:[["basica",4]]},
   {n:"Guerreiro",cost:100,req:"Ter matado um Chefe de Masmorra.",pv:2,adv:"Nenhuma.",goal:(h,H)=>[H.bosses,1]},
   {n:"Comerciante",cost:100,req:"Ter vendido algum item.",pv:0,adv:"Pode vender itens pelo dobro do valor.",ok:(h,H)=>H.sold>0},
-  {n:"Pirata",cost:100,req:"Ter andado de barco por 5 territórios.",pv:1,adv:"Ignora Veneno.",map:true},
-  {n:"Sobrevivente",cost:100,req:"Ter andado por dois desertos.",pv:4,adv:"Nenhuma.",map:true},
+  {n:"Pirata",cost:100,req:"Ter andado de barco por 5 territórios.",pv:1,adv:"Ignora Veneno.",goal:(h,H)=>[H.boat,5]},
+  {n:"Sobrevivente",cost:100,req:"Ter andado por dois desertos.",pv:4,adv:"Nenhuma.",goal:(h,H)=>[H.deserts,2]},
   {n:"Ladrão",cost:120,req:"Ter aberto pelo menos 4 fechaduras.",pv:0,adv:"Não gasta tochas quando Abrir Fechaduras.",goal:(h,H)=>[H.locks,4]},
   {n:"Multidestro",cost:200,req:"Ser Ambidestro",pv:0,adv:"Pode atacar com cada arma que estiver usando",ok:(h)=>hasClass("Ambidestro",h)},
-  {n:"Nobre",cost:200,req:"Falar com o Rei de uma Fortaleza.",pv:0,adv:"Pode construir um castelo em uma região vazia.",map:true},
+  {n:"Nobre",cost:200,req:"Falar com o Rei de uma Fortaleza.",pv:0,adv:"Pode construir um castelo em uma região vazia.",how:"No app: as construções ainda vão chegar.",ok:(h,H)=>H.king>0},
   {n:"Clérigo",cost:200,req:"Ter enfrentado um Morto-Vivo.",pv:1,adv:"Ganha 2 usos da magia Cura.",ok:(h,H)=>H.undead>0,fixed:{"Cura":2}},
-  {n:"Druida",cost:200,req:"Ter passado por 6 florestas.",pv:0,adv:"Ganha 4 Magias da Natureza aleatórias.",map:true,give:[["natureza",4]]},
+  {n:"Druida",cost:200,req:"Ter passado por 6 florestas.",pv:0,adv:"Ganha 4 Magias da Natureza aleatórias.",goal:(h,H)=>[H.forests,6],give:[["natureza",4]]},
   {n:"Necromante",cost:200,req:"Saber usar Raio de Gelo.",pv:0,adv:"Ganha 4 Magias da Morte aleatórias.",ok:(h)=>knownSpells(h).includes("Raio de Gelo"),give:[["morte",4]]},
-  {n:"Bardo",cost:200,req:"Ter passado por 3 cidades.",pv:1,adv:"Ganha 3 usos da magia avançada Paralisar.",map:true,fixed:{"Paralisar":3}},
+  {n:"Bardo",cost:200,req:"Ter passado por 3 cidades.",pv:1,adv:"Ganha 3 usos da magia avançada Paralisar.",goal:(h,H)=>[H.cities.length,3],fixed:{"Paralisar":3}},
   {n:"Paladino",cost:200,req:"Ser Cavaleiro e Clérigo.",pv:3,adv:"Ganha 3 usos da magia Cura.",ok:(h)=>hasClass("Cavaleiro",h)&&hasClass("Clérigo",h),fixed:{"Cura":3}},
   {n:"Anti-Paladino",cost:200,req:"Ter sido Paladino.",pv:3,adv:"Ganha 4 Magias da Morte mas perde toda Cura.",ok:(h)=>hasClass("Paladino",h),give:[["morte",4]],loseCura:true},
   {n:"Elementalista",cost:300,req:"Ter magia de Fogo e Gelo.",pv:2,adv:"Ganha 4 Magias Elementais aleatórias.",ok:(h)=>knownSpells(h).includes("Bola de Fogo")&&knownSpells(h).includes("Raio de Gelo"),give:[["elemental",4]]},
   {n:"Campeão",cost:300,req:"Ter limpado 4 masmorras.",pv:6,adv:"Não precisa gastar moeda para se recuperar.",goal:(h,H)=>[H.dungeons,4]},
-  {n:"Cavaleiro",cost:400,req:"Ser Nobre.",pv:2,adv:"Ganha um Cavalo.",map:true},
+  {n:"Cavaleiro",cost:400,req:"Ser Nobre.",pv:2,adv:"Ganha um Cavalo.",ok:(h)=>hasClass("Nobre",h)},
   {n:"Necromestre",cost:400,req:"Ser Necromante e ter matado 1 Lich.",pv:4,adv:"Ganha 4 Magias da Morte aleatórias.",ok:(h,H)=>hasClass("Necromante",h)&&(H.tags.lich||0)>0,give:[["morte",4]]},
   {n:"Assassino",cost:400,req:"Ser Ladrão e ter matado um chefe.",pv:3,adv:"Causa 3 vezes o dano no seu primeiro ataque.",ok:(h,H)=>hasClass("Ladrão",h)&&H.bosses>0},
   {n:"Alquimista",cost:400,req:"Conhecer 4 magias quaisquer.",pv:2,adv:"Gastando 50 moedas faz 1 Poção de Vida.",goal:(h)=>[knownSpells(h).length,4]},
   {n:"Arcano",cost:500,req:"Saber 6 Magias diferentes.",pv:3,adv:"Ganha 4 Magias Avançadas aleatórias.",goal:(h)=>[knownSpells(h).length,6],give:[["avancada",4]]},
   {n:"Lich",cost:500,req:"Ser Necromestre e ter morrido.",pv:6,adv:"Ganha 4 Magias da Morte aleatórias.",soon:true,give:[["morte",4]]},
-  {n:"Lorde",cost:600,req:"Ter construído um castelo.",pv:0,adv:"Pode construir uma Cidade.",map:true},
-  {n:"Rei",cost:1000,req:"Ter construído uma cidade.",pv:0,adv:"Pode construir uma Fortaleza.",map:true},
-  {n:"Imperador",cost:6000,req:"Ter 1 Fortaleza e 3 vassalos.",pv:0,adv:"Governar o mundo.",map:true}
+  {n:"Lorde",cost:600,req:"Ter construído um castelo.",pv:0,adv:"Pode construir uma Cidade.",soon:true},
+  {n:"Rei",cost:1000,req:"Ter construído uma cidade.",pv:0,adv:"Pode construir uma Fortaleza.",soon:true},
+  {n:"Imperador",cost:6000,req:"Ter 1 Fortaleza e 3 vassalos.",pv:0,adv:"Governar o mundo.",soon:true}
 ];
 const ADV_BY_NAME = Object.fromEntries(ADV_CLASSES.map(a=>[a.n,a]));
 function hasClass(n, h){ h = h || state.hero; if(!h) return false; return (CLASSES[h.cls] && CLASSES[h.cls].n === n) || (h.adv||[]).includes(n); }
@@ -523,7 +527,8 @@ function H(h){
   h = h || state.hero;
   if(!h.hist) h.hist = {};
   const x = h.hist;
-  ["total","bosses","dungeons","locks","sold","magic","armorLost","undead","avenged"].forEach(k=>{ if(x[k]===undefined) x[k] = 0; });
+  ["total","bosses","dungeons","locks","sold","magic","armorLost","undead","avenged","forests","deserts","boat","provSpent","arena","king"].forEach(k=>{ if(x[k]===undefined) x[k] = 0; });
+  if(!x.cities) x.cities = [];
   if(!x.kills) x.kills = {}; if(!x.tags) x.tags = {}; if(!x.sets) x.sets = {};
   return x;
 }
@@ -747,7 +752,7 @@ let mapVersion = 1, mapHero = null;
 function freshState(){ return {v:1, screen:"title", hero:null, draft:null, cemetery:[], dungeon:null, ui:{}, settings:defaultSettings()}; }
 function defaultSettings(){ return {skin:"zelda", bagCap:10, map:"auto"}; }
 const isZ = () => !!(state && state.settings && state.settings.skin === "zelda");
-const bagMax = () => (state.settings && state.settings.bagCap) ? state.settings.bagCap : Infinity;
+const bagMax = () => (state.settings && state.settings.bagCap) ? state.settings.bagCap + (state.hero ? partyCargo(state.hero) : 0) : Infinity;
 const bagLabel = h => bagMax()===Infinity ? String(h.bag.length) : `${h.bag.length}/${bagMax()}`;
 function applySkin(){
   document.documentElement.dataset.skin = state.settings.skin;
@@ -1205,7 +1210,7 @@ function rollShopItem(){
   return pick(SHOP_POOL[tier])();
 }
 function shopStock(){
-  const d = state.dungeon, key = d ? (d.uid || (d.uid = d.name + d.dice.join(""))) : "inicio";
+  const d = state.dungeon, key = (state.world ? "w" + state.world.pos + "|" : "") + (d ? (d.uid || (d.uid = d.name + d.dice.join(""))) : "inicio");
   if(!state.shop || state.shop.key !== key || state.shop.v !== 2){
     const rand = [];
     for(let k=0; rand.length<5 && k<60; k++){ const it = rollShopItem(); if(!rand.some(x=>x.n.split(" (")[0] === it.n.split(" (")[0])) rand.push(it); }
@@ -1242,9 +1247,10 @@ function shieldVal(h){ h = h || state.hero; if(!h) return 0; return offs(h).filt
 function hasShield(h){ return shieldVal(h) > 0; }
 function D(){ return state.dungeon; }
 function DT(){ return DUNGEONS[state.dungeon.type]; }
+function DT0(){ return state.dungeon ? DUNGEONS[state.dungeon.type] : null; }
 function LV(n){ return state.dungeon.levels[n || state.dungeon.pos.level]; }
 function curSeg(){ const p = state.dungeon.pos; return LV(p.level).segs[p.seg]; }
-function log(msg){ const d = D(); if(state.coop && state.coop.code && state.hero) msg = `${state.hero.name}: ${msg}`; d.log.unshift(msg); if(d.log.length>40) d.log.length = 40; }
+function log(msg){ const d0 = D(), d = state.world && !(d0 && d0.inside) ? state.world : d0; if(!d) return; if(state.coop && state.coop.code && state.hero) msg = `${state.hero.name}: ${msg}`; d.log.unshift(msg); if(d.log.length>40) d.log.length = 40; }
 
 function newLevel(n){ return {n, segs:{}, doors:{}, occ:{}, next:1, last:null, finalAsked:false}; }
 function occupy(lv, seg){ [seg, seg.neck].forEach(r=>{ if(r) for(let y=r.y;y<r.y+r.h;y++) for(let x=r.x;x<r.x+r.w;x++) lv.occ[x+","+y] = seg.id; }); }
@@ -1465,7 +1471,7 @@ function makeArmor(rest){
   return {n:`${slot} ${rest}`, slot, pv:Math.max(0,total), magic:true};
 }
 function makeWeapon(suffix, magic){
-  const [n, dmg, two] = DT().arma[d6()-1];
+  const [n, dmg, two] = (rtDT || DT()).arma[d6()-1];
   return {n: suffix ? `${n} ${suffix}` : n, weapon:true, d:dmg, two:!!two, magic:!!magic};
 }
 function itemFrom(text, magic){
@@ -1483,8 +1489,10 @@ function fixWearable(it){
 const CROWN_RX = /^Coroa do Príncipe Degolado/;
 function crownize(it){ if(it && CROWN_RX.test(it.n) && !it.slot){ it.slot = "Elmo"; it.pv = 2; it.magic = true; it.crown = true; } return it; }
 const wearing = rx => !!(state.hero && ARMOR_SLOTS.some(s=>state.hero.armor[s] && rx.test(state.hero.armor[s].n)));
-function rollTreasure(){
-  const dt = DT(), e = dt.tes[d6()-1];
+let rtDT = null;
+function rollTreasure(dt){
+  if(dt && dt !== DT0()){ rtDT = dt; try{ return rollTreasure(); } finally{ rtDT = null; } }
+  dt = rtDT || DT(); const e = dt.tes[d6()-1];
   if(e==="@mar") return itemFrom(dt.mar[d6()-1], true);
   if(e==="@mag") return itemFrom(dt.mag[d6()-1], true);
   if(e==="@arma") return makeWeapon("", false);
@@ -1537,7 +1545,7 @@ function collectLoot(seg){
    ========================================================= */
 function blocked(seg){ return seg.mon && !seg.mon.sneak; }
 function lvc(cur, max){ const p = max > 0 ? cur/max : 0; return p > .5 ? "lv-g" : p > .2 ? "lv-y" : "lv-r"; }
-function hasLamp(h){ h = h || state.hero; return !!h && h.bag.some(it=>/^Lamparina/.test(it.n)); }
+function hasLamp(h){ h = h || state.hero; return !!h && (h.bag.some(it=>/^Lamparina/.test(it.n)) || (h === state.hero && !!torchHolder(h))); }
 function wCopy(w){ return w.shield ? {n:w.n} : {n:w.n, weapon:true, d:w.d, two:w.two, magic:w.magic}; }
 /* mãos: cada braço segura uma coisa; a tocha ocupa uma mão (a Lamparina libera); Duas Mãos ocupa duas */
 const UNARMED = () => ({n:"Mãos nuas", d:"1d6-3", unarmed:true});
@@ -1629,7 +1637,9 @@ function spendTorch(n, why){
   return true;
 }
 function samambro(){
-  const h = state.hero; if(!h || !raceT("samambro")) return false;
+  const h = state.hero; if(!h) return false;
+  if(hasAlly("Corvo", h)){ const v = d6(); if(v >= 4){ h.pv = 1; log(`O Corvo grasna, e o dado deu ${v}: você volta à vida com 1 PV!`); return true; } log(`O Corvo grasna, mas o dado deu ${v}.`); }
+  if(!raceT("samambro")) return false;
   const v = d6();
   if(v >= 3){ h.pv = 1; log(`Samambro: você caiu, mas o dado deu ${v} e você voltou à vida com 1 PV!`); return true; }
   log(`Samambro: o dado deu ${v}. Não foi dessa vez.`); return false;
@@ -1647,7 +1657,9 @@ function hurt(n, cause){
 function killHero(cause){
   const h = state.hero, d = D();
   if(COOP.on() && d && d.inside){ state.coop.waitOut = true; state.coop.own = false; state.coop.dark = null; }
-  state.cemetery.push({name:h.name, who:`${raceName(h)} ${classLabel(h)}`, where:d && d.inside ? d.name : (d? d.name : ""), cause});
+  const wh = state.world && !(d && d.inside) ? state.world.hex[state.world.pos] : null;
+  state.cemetery.push({name:h.name, who:`${raceName(h)} ${classLabel(h)}`, where:wh ? hexDesc(state.world.pos) : d && d.inside ? d.name : (d? d.name : ""), cause});
+  if(wh){ wh.corpses = (wh.corpses||[]).concat({name:h.name, bag:h.bag, coins:h.coins}); wLog(`${h.name} morreu aqui. ${cause}.`); }
   if(d && d.inside){
     d.corpses.push({level:d.pos.level, seg:d.pos.seg, name:h.name, bag:h.bag, coins:h.coins});
     d.inside = false;
@@ -1689,6 +1701,8 @@ function leaveDungeon(){
     ARMOR_SLOTS.forEach(sl=>{ if(h.armor[sl] && h.armor[sl].stone){ delete h.armor[sl]; log("A Armadura de Pedra se desfaz em pó."); } });
     h.bag = h.bag.filter(it=>!it.stone);
   }
+  partyLeaveDungeon(d);
+  if(state.world){ log("Você saiu da masmorra."); state.screen = "world"; wcenterOn = true; return; }
   log("Você saiu da masmorra e voltou para a cidade.");
   state.screen = "city";
 }
@@ -1786,7 +1800,7 @@ async function doUnlock(id, how){
   startAction();
   let quiet = true;
   if(how === "pick"){
-    if(hasClass("Chaveiro") || hasClass("Ladrão")) log("Como Chaveiro, você abriu a fechadura sem gastar tocha.");
+    if(freeLock()) log(hasAlly("Arrombador") && !hasClass("Chaveiro") && !hasClass("Ladrão") ? "O Arrombador abriu a fechadura sem gastar tocha." : "Como Chaveiro, você abriu a fechadura sem gastar tocha.");
     else if(!spendTorch(1, "Abrindo a fechadura")){ endAction(); return; }
     door.st = "open";
     H(h).locks++;
@@ -1981,7 +1995,7 @@ async function doSecret(){
   startAction();
   if(!spendTorch(1, "Procurando passagem secreta")){ endAction(); return; }
   seg.secretTried = true;
-  const dwarf = raceT("secret2");
+  const dwarf = raceT("secret2") || hasAlly("Minerador Anão");
   const v = await roll(dwarf ? "Passagem (Anão)" : "Passagem", dwarf ? 2 : 1);
   const r = Math.max(...v);
   rollNote(r === 1 ? "Armadilha!" : r <= 3 ? "Nada" : r <= 5 ? "Baú escondido" : "Passagem secreta!");
@@ -2047,7 +2061,7 @@ async function doDefeat(){
   }
   if(hasClass("Cozinheiro")){
     const prov = groups.filter(x=>!/Morto-Vivo/.test(x.tr)).reduce((a,x)=>a+x.list.length,0);
-    if(prov){ h.provisions = (h.provisions||0) + prov; log(`Como Cozinheiro, você preparou ${prov} provisões.`); }
+    if(prov){ h.provisions = Math.min(provMax(), (h.provisions||0) + prov); log(`Como Cozinheiro, você preparou ${prov} provisões.`); }
   }
   const wasBoss = g.boss;
   seg.mon = null;
@@ -3022,7 +3036,7 @@ function weaponKind(n){
   if(/Machado|Picareta/.test(n)) return "axe";
   if(/Martelo|Maça|Panela|Pá\b/.test(n)) return "hammer";
   if(/Chicote/.test(n)) return "whip";
-  if(/Fêmur|Remo|Castiçal|Espeto|Garra/.test(n)) return "club";
+  if(/Fêmur|Remo|Castiçal|Espeto|Garra|Cajado|Porrete/.test(n)) return "club";
   if(/Adaga|Kukri|Facão|Serrote/.test(n)) return "dagger";
   return "sword";
 }
@@ -3531,16 +3545,17 @@ function placeDoorPop(cv, lv){
   pop.style.transform = `translate(${left}px, ${top}px)`;
 }
 /* toque, arrasto e pinça no mapa */
-function bindMap(cv){
+function bindMap(cv, cm, onTap, cz){
+  cm = cm || cam; onTap = onTap || mapTap; cz = cz || clampZ;
   const pts = new Map();
   let start = null, pinch = null;
   cv.addEventListener("pointerdown", e=>{
     cv.setPointerCapture(e.pointerId);
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
-    if(pts.size===1) start = {x:e.clientX, y:e.clientY, cx:cam.x, cy:cam.y, t:performance.now(), moved:false};
+    if(pts.size===1) start = {x:e.clientX, y:e.clientY, cx:cm.x, cy:cm.y, t:performance.now(), moved:false};
     if(pts.size===2){
       const [a,b] = [...pts.values()];
-      pinch = {dist:Math.hypot(a.x-b.x,a.y-b.y), z:cam.z};
+      pinch = {dist:Math.hypot(a.x-b.x,a.y-b.y), z:cm.z};
       if(start) start.moved = true;
     }
   });
@@ -3550,13 +3565,13 @@ function bindMap(cv){
     if(pts.size===2 && pinch){
       const [a,b] = [...pts.values()];
       const dd = Math.hypot(a.x-b.x,a.y-b.y);
-      cam.z = clampZ(pinch.z * dd / pinch.dist);
+      cm.z = cz(pinch.z * dd / pinch.dist);
       return;
     }
     if(pts.size===1 && start){
       const dx = e.clientX - start.x, dy = e.clientY - start.y;
       if(Math.abs(dx)+Math.abs(dy) > 6) start.moved = true;
-      cam.x = start.cx - dx/cam.z; cam.y = start.cy - dy/cam.z;
+      cm.x = start.cx - dx/cm.z; cm.y = start.cy - dy/cm.z;
     }
   });
   const end = e=>{
@@ -3565,15 +3580,15 @@ function bindMap(cv){
     if(pts.size<2) pinch = null;
     if(wasTap){
       const r = cv.getBoundingClientRect();
-      const wx = cam.x + (e.clientX - r.left - r.width/2)/cam.z;
-      const wy = cam.y + (e.clientY - r.top - r.height/2)/cam.z;
-      mapTap(wx, wy);
+      const wx = cm.x + (e.clientX - r.left - r.width/2)/cm.z;
+      const wy = cm.y + (e.clientY - r.top - r.height/2)/cm.z;
+      onTap(wx, wy);
     }
     if(pts.size===0) start = null;
   };
   cv.addEventListener("pointerup", end);
   cv.addEventListener("pointercancel", e=>{ pts.delete(e.pointerId); pinch=null; start=null; });
-  cv.addEventListener("wheel", e=>{ e.preventDefault(); cam.z = clampZ(cam.z * (e.deltaY<0?1.15:1/1.15)); }, {passive:false});
+  cv.addEventListener("wheel", e=>{ e.preventDefault(); cm.z = cz(cm.z * (e.deltaY<0?1.15:1/1.15)); }, {passive:false});
 }
 function mapTap(wx, wy){
   if(busy || !state.hero) return;
@@ -3762,6 +3777,7 @@ function itemActs(it, i){
   if(/^Apito Goblin/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="whistle" data-i="${i}">Apitar</button>`);
   if(COOP.on() && COOP.partner() && !combatOnly){ const pt = COOP.partner(), full = pt.lite && pt.lite.bagN >= pt.lite.bagMax;
     acts.push(`<button class="use" data-act="giveItem" data-i="${i}" ${!COOP.online(pt) || full || pt.dead || it.locked ? "disabled" : ""}>Enviar para ${esc(pt.name)}</button>`); }
+  if((it.weapon || it.slot) && !combatOnly && !(state.combat)) partyOf("merc").filter(p=>!(MERCS[p.n] && (MERCS[p.n].noGear || MERCS[p.n].nofight))).forEach(p=>acts.push(`<button class="use" data-act="giveMerc" data-i="${i}" data-id="${p.id}">Dar para ${esc(p.n)}</button>`));
   acts.push(`<button class="use" data-act="drop" data-i="${i}">Descartar</button>`);
   if(!combatOnly) acts.push(`<button class="use lockact ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Destravar":"Travar"} ${esc(itemName(it))}">${lockIcon(!!it.locked)} ${it.locked?"Destravar":"Travar"}</button>`);
   const handNote = () => handsFree() === 0 ? "A única mão que sobra segura a tocha." : !hasLamp() && !raceT("tongue") ? "Todas as mãos estão ocupadas, e a tocha segura uma delas. A Lamparina libera essa mão." : "Todas as mãos estão ocupadas. Desequipe algo para liberar uma.";
@@ -3818,10 +3834,11 @@ function viewSheet(){
     <div class="spell">
       <div class="txt"><b>${n}</b><span class="small">${SPELL_BY_NAME[n]||""}</span>
         <div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<s.left?"on":""}"></i>`).join("")}</div></div>
-      ${SPELL_INFO[n] && SPELL_INFO[n].use==="soon" ? `<span class="soon">Em breve</span>` : canCast(n, false) ? `<button class="use" data-act="cast" data-spell="${esc(n)}" ${s.left?"":"disabled"}>Usar</button>` : ""}
+      ${SPELL_INFO[n] && SPELL_INFO[n].use==="soon" ? `<span class="soon">Em breve</span>` : SPELL_INFO[n] && SPELL_INFO[n].use==="world" ? `<span class="soon">No mapa</span>` : canCast(n, false) ? `<button class="use" data-act="cast" data-spell="${esc(n)}" ${s.left?"":"disabled"}>Usar</button>` : ""}
     </div>`).join("");
   let nav;
   if(d && d.inside) nav = `<button class="btn" data-act="go" data-to="explore">Voltar para a masmorra</button>`;
+  else if(state.world) nav = `<div class="row">${worldCityHere() ? `<button class="btn ghost" data-act="go" data-to="city">Cidade</button>` : ""}<button class="btn" data-act="go" data-to="world">Mapa do mundo</button></div>`;
   else nav = `<div class="row"><button class="btn ghost" data-act="go" data-to="city">Cidade</button>
      <button class="btn" data-act="go" data-to="dungeon">${d ? "Masmorra" : "Procurar masmorra"}</button></div>`;
   return `
@@ -3873,6 +3890,7 @@ function viewSheet(){
       ${eq==="weapon"||/^off/.test(eq||"") ? eqActs : ""}
       ${handsFree() >= 2 ? `<p class="muted small">${(h.arms||2) > 2 ? `${h.arms} braços. ` : ""}${hasLamp() ? "A Lamparina libera a mão da tocha." : raceT("tongue") ? "A língua segura a tocha." : "Uma das mãos segura a tocha."} ${offWeapons(h).length ? (attacksPerTurn(h) > 1 ? `Como ${hasClass("Multidestro")?"Multidestro":"Ambidestro"}, ${attacksPerTurn(h)} armas atacam no mesmo turno.` : "No combate, você escolhe com qual arma atacar.") : ""}</p>` : ""}
     </div>
+  ${partySheetHTML()}
   <div class="sheet"><h3>Armadura</h3><div class="slots">${armor}</div>${eq && eq!=="weapon" && !/^off/.test(eq) ? eqActs : ""}${wearing(/^Chapéu do Bobo/) ? `<p class="muted small">Com o Chapéu do Bobo você não consegue Mover em Silêncio.</p>` : ""}</div>
   <div class="sheet">
     ${foldHead("bag", "Mochila", h.bag.length ? bagTools() : "")}
@@ -3989,7 +4007,7 @@ function viewExplore(){
 </div>`;
     if(isBlocked){
       if(raceT("coutim") && !g.boss && [g, ...(g.extra||[])].every(x=>/Espólios/.test(x.tr||""))) acts.push(`<button class="btn ghost" data-act="coutim">Ignorar o combate e pegar os espólios</button>`);
-      if(g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak")) acts.push(`<button class="btn ghost" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>`);
+      if(g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") && !hasAlly("Cachorro")) acts.push(`<button class="btn ghost" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>`);
       acts.unshift(`<button class="btn" data-act="fight">Lutar!</button>`);
       acts.push(`<button class="btn ghost" data-act="go" data-to="sheet">Abrir ficha</button>`);
     } else acts.push(`<button class="btn ghost" data-act="fight" data-surprise="1">Atacar de surpresa</button>`);
@@ -4009,7 +4027,7 @@ function viewExplore(){
       return `<button class="dbtn ${selDoor&&selDoor.id===dd.id?"sel":""}" data-act="selDoor" data-id="${dd.id}">${lab}</button>`;
     }).join("")}</div>`;
     if(selDoor && selDoor.seg===seg.id){
-      const chav0 = hasClass("Chaveiro") || hasClass("Ladrão");
+      const chav0 = freeLock();
       popHTML = selDoor.st==="closed"
         ? `<button class="pbtn" data-act="openDoor" data-id="${selDoor.id}">Abrir porta <small>(1 tocha)</small></button>`
         : `<button class="pbtn" data-act="unlock" data-how="pick" data-id="${selDoor.id}">Destrancar <small>(${chav0?"sem tocha":"+1 tocha"})</small></button>
@@ -4018,7 +4036,7 @@ function viewExplore(){
       if(isBossDoor(lv, selDoor)){ popHTML = `<span class="pwarn">O Chefe está atrás desta porta</span>` + popHTML; acts.push(`<p class="note">Esta é a última porta do nível e não há escada para descer. Ao abri-la, você entra na Sala Final e enfrenta o Chefe da Masmorra.</p>`); }
       if(selDoor.st==="closed") acts.push(`<button class="btn" data-act="openDoor" data-id="${selDoor.id}">Abrir porta <small>(1 tocha)</small></button>`);
       else {
-        const chav = hasClass("Chaveiro") || hasClass("Ladrão");
+        const chav = freeLock();
         acts.push(`<button class="btn" data-act="unlock" data-how="pick" data-id="${selDoor.id}">Destrancar <small>(${chav?"sem tocha extra":"+1 tocha"})</small></button>`);
         acts.push(`<button class="btn ghost" data-act="unlock" data-how="break" data-id="${selDoor.id}">Quebrar porta <small>(faz barulho)</small></button>`);
         if(keyIdx() >= 0) acts.push(`<button class="btn ghost" data-act="unlock" data-how="key" data-id="${selDoor.id}">Usar chave</button>`);
@@ -4029,7 +4047,7 @@ function viewExplore(){
   if(selObj === "mon" && seg.mon){
     const g = seg.mon;
     popHTML = isBlocked
-      ? `<button class="pbtn" data-act="fight">Lutar!</button>${g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") ? `<button class="pbtn alt" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>` : ""}`
+      ? `<button class="pbtn" data-act="fight">Lutar!</button>${g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") && !hasAlly("Cachorro") ? `<button class="pbtn alt" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>` : ""}`
       : `<button class="pbtn" data-act="fight" data-surprise="1">Atacar de surpresa</button>`;
     popHTML = `<span class="pwarn">${g.qty} ${esc(g.name)}</span>` + popHTML;
   } else if(selObj === "chest" && seg.chests>0 && !isBlocked){
@@ -4130,7 +4148,7 @@ function viewExplore(){
     ${doorsHTML}
     ${acts.length ? `<div class="stack">${acts.join("")}</div>` : (!closed.length && !seg.mon ? `<p class="muted small">Nada para fazer aqui. Toque em outra sala no mapa para andar até ela.</p>` : "")}
   </div>
-  ${canLeave ? `<button class="btn ghost" data-act="leave">Sair para a cidade</button>` : (!isBlocked && exitRoute().by.length ? `<p class="muted small">Para sair da masmorra você precisa passar por ${esc(exitRoute().by.map(n=>n.toLowerCase()).join(" ou "))}, onde há monstros.</p>` : "")}`}
+  ${canLeave ? `<button class="btn ghost" data-act="leave">${state.world ? "Sair da masmorra" : "Sair para a cidade"}</button>` : (!isBlocked && exitRoute().by.length ? `<p class="muted small">Para sair da masmorra você precisa passar por ${esc(exitRoute().by.map(n=>n.toLowerCase()).join(" ou "))}, onde há monstros.</p>` : "")}`}
   <div class="sheet"><h3>Diário</h3><div class="log">${d.log.slice(0,8).map(l=>`<p>${esc(l)}</p>`).join("")}</div></div>`;
 }
 
@@ -4143,10 +4161,11 @@ function sellValue(it){
   if(raceT("catSell") && (it.weapon || it.slot)) v *= 2;
   if(hasClass("Colecionador") && it.slot) v = Math.max(v, 5);
   if(hasClass("Comerciante")) v *= 2;
+  if(state.world && wHere() && wHere().loc && wHere().loc.k === "fort") v *= 2;
   return v;
 }
 /* descansar só faz sentido se faltar PV ou uso de magia (não conserta armadura) */
-function needRest(h){ return h.pv < h.pvMax || Object.values(h.spells||{}).some(s=>s.left < s.max); }
+function needRest(h){ return h.pv < h.pvMax || Object.values(h.spells||{}).some(s=>s.left < s.max) || party(h).some(p=>p.pv < p.max || (p.spells && Object.values(p.spells).some(x=>x.left < x.max))); }
 function viewCity(){
   const h = state.hero, d = state.dungeon;
   if(!h) return viewTitle();
@@ -4158,9 +4177,11 @@ function viewCity(){
     <p class="small">O próximo aventureiro herda os itens, as armas e as armaduras de ${esc(h.name)}, consertadas. As moedas ficam para trás.</p>
     <button class="btn" data-act="retire">Passar o legado adiante</button></div>`;
   const broken = ARMOR_SLOTS.filter(s=>h.armor[s] && h.armor[s].cur !== undefined && h.armor[s].cur < h.armor[s].pv);
+  const wc = worldCityHere();
   return `
-  ${bar("Cidade","sheet")}
-  <div class="strip"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span><span>Moedas<b>${h.coins}</b></span></div>
+  ${bar(wc ? locLabel(wc) : "Cidade", wc ? "world" : "sheet")}
+  <div class="strip"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Tochas<b class="${lvc(h.torches,10)}">${h.torches}</b></span>${wc ? `<span>Provisões<b class="${lvc(h.provisions||0,20)}">${h.provisions||0}</b></span>` : ""}<span>Moedas<b>${h.coins}</b></span></div>
+  ${wc ? `${state.ui.cityMsg ? `<p class="toast">${esc(state.ui.cityMsg)}</p>` : ""}<div class="etray" id="etray"></div>` : ""}
   <div class="sheet">
     <h3>Taverna e mercado</h3>
     ${!needRest(h) ? `<p class="muted small">PV e magias estão completos: não há por que descansar.</p>` : ""}
@@ -4169,6 +4190,7 @@ function viewCity(){
     ${broken.length ? `<span class="label" style="margin-top:6px">Consertar armadura (1 moeda por peça)</span>
     ${broken.map(sl=>{ const p = h.armor[sl]; return `<div class="spell"><div class="txt"><b>${esc(itemName(p))}</b><span class="small" style="display:block">${sl} · <span class="${lvc(armorCur(p), p.pv)}">${armorCur(p)}/${p.pv} PV</span></span>${descHTML(p, false)}</div><button class="use" data-act="repair" data-s="${sl}" ${h.coins<1?"disabled":""}>Consertar</button></div>`; }).join("")}` : ""}
   </div>
+  ${wc ? worldCityTop() : ""}
   <div class="sheet">
     <h3>Vendedor</h3>
     <p class="muted small">O estoque muda a cada nova masmorra.</p>
@@ -4181,15 +4203,26 @@ function viewCity(){
     <p class="small">${(()=>{ const n = ADV_CLASSES.filter(a=>!hasClass(a.n) && advStatus(a,h).ok).length; return n ? `${n} classe${n>1?"s":""} com requisitos cumpridos.` : "Nenhuma classe com requisitos cumpridos ainda."; })()}</p>
     <button class="btn" data-act="go" data-to="advclass">Ver Classes Avançadas</button>
   </div>
+  ${mercCityHTML()}
+  ${wc ? mountCityHTML() : ""}
+  ${wc ? worldCityBottom() : ""}
   <div class="sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>Vender</h3>${h.bag.length > 1 ? sortBtn() : ""}</div>
     ${h.bag.length ? h.bag.map((it,i)=>`<div class="spell"><button class="lockb ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Desbloquear":"Bloquear"} a venda de ${esc(itemName(it))}">${lockIcon(!!it.locked)}</button><div class="txt">${esc(itemName(it))}${descHTML(it)}</div><button class="use" data-act="sell" data-i="${i}" ${it.locked?"disabled":""}>Vender</button></div>`).join("")
       : `<p class="muted small">Nada para vender.</p>`}
     <p class="muted small">Itens comuns valem 1 moeda. Itens mágicos valem 1d6−1. Toque no cadeado para impedir a venda de um item.</p>
   </div>
+  ${wc ? `<button class="btn" data-act="go" data-to="world">Sair para o mapa</button>` : `
   ${state.ui.cityMsg ? `<p class="toast">${esc(state.ui.cityMsg)}</p>` : ""}
   ${d && !d.complete ? `<button class="btn" data-act="enter">Voltar para ${esc(d.name)}</button>` : ""}
-  <button class="btn ghost" data-act="go" data-to="dungeon">${d && !d.complete ? "Ver masmorra" : "Procurar nova masmorra"}</button>`;
+  <button class="btn ghost" data-act="go" data-to="dungeon">${d && !d.complete ? "Ver masmorra" : "Procurar nova masmorra"}</button>
+  <div class="sheet">
+    <h3>Mundo Expandido</h3>
+    ${COOP.on() ? `<p class="muted small">O Mundo Expandido ainda não funciona no jogo em dupla. Saia da dupla para viajar pelo mundo.</p>`
+      : state.ui.worldAsk ? `<p class="small">O mapa do mundo começa ${String(h.race)[0]==="e" ? "num barco, no meio do mar (sua raça vem de um continente distante)" : "nesta cidade"}. A partir daí, as masmorras são descobertas na taverna e pelo mapa, e cada dia de viagem gasta 1 provisão. ${esc(h.name)} recebe 20 provisões.${d && !d.complete ? ` ${esc(d.name)} vai aparecer num hexágono vizinho.` : ""}</p>
+        <div class="row"><button class="btn ghost" data-act="worldCancel">Agora não</button><button class="btn" data-act="worldStart">Começar a viagem</button></div>`
+      : `<p class="muted small">Saia pelos portões e explore um mundo de hexágonos: outras cidades, fortalezas, desertos, pântanos e masmorras escondidas.</p><button class="btn" data-act="worldAsk">Explorar o mundo</button>`}
+  </div>`}`;
 }
 
 /* classes avançadas (cidade) */
@@ -4255,6 +4288,7 @@ function startCombat(surprise){
   const first = surprise || seg.mon.sneak || seg.mon.first === "hero" ? "hero" : "mon";
   if(seg.mon.sneak){ seg.mon.sneak = false; }
   state.combat = {level:D().pos.level, seg:seg.id, units, sel:0, phase:first, round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
+  state.combat.allies = buildAllies(false, false);
   if(COOP.on() && COOP.partnerHere() && COOP.sameRoom()){
     const c0 = state.combat;
     const gs = [seg.mon, ...((seg.mon && seg.mon.extra) || [])], fresh = gs.map(g=>!!(g && g.boss && !g.dbl));
@@ -4280,6 +4314,7 @@ function heroDamageBonus(u, W){
   if(hasClass("Helsing") && /Vampir|Carniçal/.test(u.name)) b += 1;
   if(hasClass("Dedetizador") && RX_INSETO.test(u.name)) b += 1;
   if(raceT("ogro")) b += 2;
+  if(alliesIn().some(a=>MERCS[a.n] && MERCS[a.n].music)) b += 2;
   b += C().fury;
   return b;
 }
@@ -4305,7 +4340,7 @@ async function hitMonster(i, base, opts){
       rollNote(r === 1 ? "Levanta de novo!" : "Fica no chão");
       if(r === 1){ u.pv = 1; cLog(`${u.name} se levanta de novo com 1 PV!`); pop(i, "+1", "#6af06a"); }
     }
-    if(u.pv <= 0 && !u.counted){ u.counted = true; recordKill(u); }
+    if(u.pv <= 0 && !u.counted){ u.counted = true; if(!opts.ally) recordKill(u); }
   }
 }
 function pickNextTarget(){ const c = C(); if(c.units[c.sel] && c.units[c.sel].pv > 0) return; const i = c.units.findIndex(u=>u.pv>0); if(i>=0) c.sel = i; }
@@ -4314,7 +4349,7 @@ async function afterHeroAction(){
   if(!alive().length){ c.phase = "won"; cLog("Todos os monstros foram derrotados!"); busy = false; persist(); render(); return; }
   pickNextTarget();
   if(COOPC.on()){ busy = false; COOPC.finishTurn(); return; }
-  await runMonsterTurn();
+  await toAllies();
 }
 function dualAttack(h){ return attacksPerTurn(h) > 1; }
 async function heroAttack(kind, wn){
@@ -4356,7 +4391,10 @@ async function heroAttack(kind, wn){
 function rechargeable(){ const h = state.hero; return Object.entries(h.spells).filter(([n,s])=>n!=="Recarregar Mana" && s.left < s.max).map(([n])=>n); }
 function freeSlot(){ const h = state.hero; return ARMOR_SLOTS.find(sl=>!h.armor[sl]); }
 function canCast(n, inCombat){
-  const i = SPELL_INFO[n], d = state.dungeon, inDg = d && d.inside; if(!i || i.use === "soon") return false;
+  const i = SPELL_INFO[n], d = state.dungeon, inDg = d && d.inside; if(!i || i.use === "soon" || i.use === "world") return false;
+  if(n === "Teletransporte" && state.combat && state.combat.world) return false;
+  if(/^Invocar/.test(n) && ((state.combat && (state.combat.coop || state.combat.arena)) || COOP.on())) return false;
+  if(n === "Invocar Esqueleto" && !inDg) return false;
   if(n === "Recarregar Mana" && !rechargeable().length) return false;
   if(n === "Armadura de Pedra" && (!freeSlot() || raceT("noArmor") || raceT("ogro"))) return false;
   if(inCombat) return true;
@@ -4397,8 +4435,12 @@ async function heroSpell(n){
   if(n === "Absorver Alma"){ c.absorb = true; cLog("Absorver Alma: depois do combate, você recupera 5 PV por monstro morto."); }
   if(n === "Fogo dos Mortos"){ c.deadFire = true; cLog("Fogo dos Mortos: depois do combate, você ganha 2 tochas por monstro morto."); }
   if(n === "Escudo Mágico"){ h.shield = (h.shield||0) + 4; cLog(`Escudo Mágico: ele absorve os próximos ${h.shield} de dano.`); }
-  if(n === "Criar Comida"){ const v = await roll("Comida", 2); h.provisions = (h.provisions||0) + v[0]+v[1]; cLog(`Criar Comida: ${v[0]+v[1]} provisões.`); }
+  if(n === "Criar Comida"){ const v = await roll("Comida", 2); h.provisions = Math.min(provMax(), (h.provisions||0) + v[0]+v[1]); cLog(`Criar Comida: ${v[0]+v[1]} provisões.`); }
   if(n === "Teletransporte"){ cLog("Você se teletransporta para fora do combate."); fleeCombat(); return; }
+  if(n === "Invocar Lobo"){ summonAlly("Lobo", 4, "2", "", "Lobo"); cLog("Você invoca um Lobo para lutar ao seu lado."); }
+  if(n === "Invocar Elemental"){ summonAlly("Elemental", 3, "2", "", "Elemental"); cLog("Você invoca um Elemental para lutar ao seu lado."); }
+  if(n === "Invocar Mortos"){ const [q] = await roll("Esqueletos", 1); for(let k=0;k<q;k++) summonAlly("Esqueleto", 4, "1", "Morto-Vivo", "Esqueleto"); cLog(`Você invoca ${q} Esqueleto${q>1?"s":""} até o fim do combate.`); }
+  if(n === "Invocar Esqueleto"){ summonSkeleton(); cLog("Um Esqueleto se levanta e vai te seguir até você sair da masmorra."); }
   await afterHeroAction();
 }
 async function heroItem(idx){
@@ -4407,6 +4449,7 @@ async function heroItem(idx){
   if(/^Pergaminho/.test(it.n)) H().magic++;
   busy = true; lockButtons();
   if(/^Poção de Vida/.test(it.n)){ h.pv = h.pvMax; cLog("Você bebe a Poção de Vida e recupera todos os PV."); }
+  else if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3){ h.pv = h.pvMax; cLog(`Poção Verdosa (${v}): você recupera todos os PV.`); } else cLog(`Poção Verdosa (${v}): só te deu coceira.`); }
   else if(/^Poção da Fúria/.test(it.n)){ c.fury = 2; cLog("Você bebe a Poção da Fúria: +2 de dano até o fim do combate."); }
   else if(/^Poção de Magia/.test(it.n)){ Object.values(h.spells).forEach(s=>s.left=s.max); cLog("Você bebe a Poção de Magia e recupera todas as magias."); }
   else if(/^Pergaminho Mágico \((.+)\)/.test(it.n)){
@@ -4465,6 +4508,11 @@ async function runMonsterTurn(){
     h.shield -= a + b2; cLog(`O Escudo Mágico absorve ${a+b2} de dano${h.shield ? ` (restam ${h.shield})` : ""}.`);
   }
   if(total + poison === 0){ startHeroTurn(); return; }
+  if(alliesIn().length){
+    c.pending = {total, poison}; c.split = {}; c.phase = "split";
+    const mn = total + poison >= alliesIn().length + 1 ? 1 : 0; alliesIn().forEach(a=>c.split[splitKey(a)] = mn);
+    busy = false; persist(); render(); return;
+  }
   const absorb = ARMOR_SLOTS.filter(s=>h.armor[s] && armorCur(h.armor[s]) > 0);
   if(total > 0 && absorb.length){
     c.pending = {total, poison}; c.alloc = {}; c.phase = "alloc";
@@ -4497,7 +4545,7 @@ async function startHeroTurn(){
     c.heroPar--; cLog(`Você está paralisado e perde o turno${c.heroPar ? ` (faltam ${c.heroPar})` : ""}.`);
     persist(); render();
     await new Promise(r=>setTimeout(r, 700));
-    await runMonsterTurn(); return;
+    await toAllies(); return;
   }
   c.phase = "hero"; busy = false; persist(); render();
 }
@@ -4510,6 +4558,7 @@ function finishDeath(cause){
   persist(); render(); window.scrollTo(0,0);
 }
 function writeBackGroups(){
+  if(C() && C().world) return;
   const c = C(), lv = D().levels[c.level], seg = lv.segs[c.seg];
   if(!seg || !seg.mon) return;
   const groups = [seg.mon, ...(seg.mon.extra||[])];
@@ -4519,6 +4568,8 @@ function writeBackGroups(){
   seg.mon = keep[0]; seg.mon.extra = keep.slice(1); seg.mon.first = "hero"; seg.mon.sneak = false;
 }
 function fleeCombat(){
+  syncAllies();
+  if(C() && C().world){ fleeWorldCombat(); return; }
   const c = C(), lv = D().levels[c.level], seg = lv.segs[c.seg];
   const stay = COOPC.on() && COOPC.alive().filter(x=>x !== COOP.me()).length > 0;
   if(COOPC.on()){ COOPC.my().fled = true; COOPC.sync(); }
@@ -4531,6 +4582,8 @@ function fleeCombat(){
   mapVersion++; go("explore");
 }
 async function winCombat(){
+  syncAllies();
+  if(C() && C().world){ await winWorldCombat(); return; }
   const c = C(), h = state.hero;
   if(c && h){
     const dead = c.units.filter(u=>u.counted).length;
@@ -4552,13 +4605,16 @@ async function winCombat(){
 function drawArena(cv){
   const c = C(); if(!c) return;
   const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, t = frame/8, now = performance.now();
-  const type = state.dungeon.type, P = PALZ[type], TX = texFor(type);
   ctx.imageSmoothingEnabled = false;
+  if(c.world) drawOutdoor(ctx, W, H, c);
+  else {
+  const type = state.dungeon.type, TX = texFor(type);
   ctx.fillStyle = VOID; ctx.fillRect(0,0,W,H);
   for(let y=34; y<H; y+=32) for(let x=0; x<W; x+=32) ctx.drawImage(TX.floors[Math.min(3, Math.floor(zh(x,y)*4))], x, y);
   ctx.drawImage(TX.face, 40, 0, W, 40, 0, 0, W, 40);
   for(let i=0;i<8;i++){ ctx.fillStyle = `rgba(0,0,0,${.45-i*.055})`; ctx.fillRect(0, 40+i, W, 1); }
   [[24,12],[W-26,12]].forEach(([x,y],i)=>{ ctx.fillStyle = IRON[1]; ctx.fillRect(x-3, y+7, 7, 2); ctx.fillStyle = WOOD[2]; ctx.fillRect(x-1, y+1, 3, 6); flameZ(ctx, x, y-1, t, i*2.1); });
+  }
   const units = c.units, pos = arenaPositions(units.length, W);
   units.forEach((u,i)=>{
     const [x, y] = pos[i];
@@ -4598,6 +4654,7 @@ function drawArena(cv){
     const co2 = COOPC.on() && COOP.partner() && COOPC.inFight(COOP.other());
     if(co2){ const pl = COOP.partner(); const ph = {...pl.lite, armor:pl.lite.armor||{}, off:pl.lite.off||[], bag: pl.lite.lamp ? [{n:LAMP}] : [], noTorch: COOP.holder() !== COOP.other() && !pl.own};
       const pf = drawHero(ctx, W/2 + 22, H - 4, t, frame % 12 >= 6 ? "breath" : "idle", true, undefined, ph); if(pf) flameZ(ctx, pf[0], pf[1], t, 5); }
+    drawAllies(ctx, W, H, t);
     fl = drawHero(ctx, W/2 + dx - (co2 ? 22 : 0), H - 4 + dy, t, pose, true, hurt && frame%2 ? .45 : undefined);
     if(fl) flameZ(ctx, fl[0], fl[1], t, 5);
   }
@@ -4658,7 +4715,7 @@ function arenaPositions(n, W){
   return pos;
 }
 function arenaTap(e){
-  const c = C(); if(!c || busy || c.phase !== "hero") return;
+  const c = C(); if(!c || busy || (c.phase !== "hero" && c.phase !== "ally")) return;
   const cv = e.currentTarget, r = cv.getBoundingClientRect();
   const x = (e.clientX - r.left) * cv.width / r.width, y = (e.clientY - r.top) * cv.height / r.height;
   const pos = arenaPositions(c.units.length, cv.width);
@@ -4673,7 +4730,7 @@ function viewCombat(){
   if(!c || !h) return viewExplore();
   const pct = Math.max(0, Math.min(100, h.pv/h.pvMax*100));
   const armor = ARMOR_SLOTS.filter(s=>h.armor[s]).map(s=>`<span class="chip">${s} ${N(armorCur(h.armor[s]))}/${N(h.armor[s].pv)}</span>`).join("");
-  const units = c.units.map((u,i)=>u.pv>0 ? `<button class="tgt ${i===c.sel?"sel":""}" data-act="target" data-i="${i}" ${c.phase!=="hero"||(COOPC.on() && COOPC.my().done === c.round)?"disabled":""}>
+  const units = c.units.map((u,i)=>u.pv>0 ? `<button class="tgt ${i===c.sel?"sel":""}" data-act="target" data-i="${i}" ${(c.phase!=="hero" && c.phase!=="ally")||(COOPC.on() && COOPC.my().done === c.round)?"disabled":""}>
       <b>${esc(u.name)}</b><span class="hpbar"><i style="width:${u.pv/u.max*100}%"></i></span><span class="n">${u.pv}/${u.max}</span>
       ${u.tr ? `<span class="trs">${esc(u.tr)}</span>` : ""}${u.frozen ? `<span class="trs">congelado</span>` : ""}${u.doom ? `<span class="trs warn">golpe mortal!</span>` : ""}${u.paralNext ? `<span class="trs warn">golpe paralisante</span>` : ""}${u.fireNext ? `<span class="trs warn">em chamas</span>` : ""}
     </button>` : "").join("");
@@ -4742,6 +4799,10 @@ function viewCombat(){
       <div class="alloc"><div class="txt"><b>Seus PV</b><span class="small">${N(Math.max(0,h.pv - toPV))}/${N(h.pvMax)} depois do golpe</span></div><span class="n big2">${toPV}</span></div>
       <div class="row"><button class="btn ghost" data-act="allocAll">Tudo na armadura</button><button class="btn ghost" data-act="allocNone">Tudo nos PV</button></div>
       <button class="btn" data-act="allocOk">Receber o golpe</button></div>`;
+  } else if(c.phase === "ally"){
+    panel = allyPanelHTML();
+  } else if(c.phase === "split"){
+    panel = splitPanelHTML();
   } else if(c.phase === "won"){
     panel = `<div class="banner"><b>Vitória!</b><p>Os monstros caíram. Recolha os espólios e siga explorando.</p><button class="btn" data-act="win">Continuar</button></div>`;
   } else {
@@ -4754,6 +4815,7 @@ function viewCombat(){
   <div class="strip"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Fúria<b>${c.fury?"+"+c.fury:"-"}</b></span><span>Paralisia<b>${c.heroPar||"-"}</b></span></div>
   ${co && COOP.partner() ? (()=>{ const pl = COOP.partner(), x = COOP.other(), st = !COOPC.inFight(x) ? (COOPC.cp(x).dead ? "caiu" : "fora do combate") : c.phase === "hero" ? (COOPC.cp(x).done === c.round ? "terminou o turno" : "no turno dele") : c.phase === "alloc" ? (COOPC.cp(x).applied === c.round ? "recebeu o dano" : "dividindo o dano") : ""; return `<p class="small" style="margin:0">${esc(pl.name)}: <b class="${lvc(pl.lite.pv, pl.lite.pvMax)}">${pl.lite.pv}/${pl.lite.pvMax} PV</b> · ${st}</p>`; })() : ""}
   <div class="hp" aria-hidden="true"><i style="width:${pct}%"></i></div>
+  ${allyStripHTML()}
   ${armor ? `<div class="stats">${armor}</div>` : ""}
   <div class="tgts">${units}</div>
   <div class="sheet">${panel}</div>
@@ -4832,11 +4894,1556 @@ function viewSave(){
 /* =========================================================
    RENDER E AÇÕES
    ========================================================= */
-const VIEWS = {advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
+/* =========================================================
+   MUNDO EXPANDIDO: MAPA DO MUNDO (páginas 26 a 30)
+   Hexágonos com a face reta em cima (o lado 1 é o de cima, contando em sentido horário).
+   Por enquanto só existem as regiões quentes.
+   ========================================================= */
+const TERR = {pl:{n:"Planície", a:"a", cost:1}, mo:{n:"Montanha", a:"a", cost:3}, fl:{n:"Floresta", a:"a", cost:2}, pa:{n:"Pântano", a:"o", cost:2}, de:{n:"Deserto", a:"o", cost:2}, ag:{n:"Água", a:"a", cost:2}};
+/* Tabela: Terreno (Região Quente). Coluna = terreno atual, linha = 1d6 */
+const TERR_HOT = {
+  pl:["ag","mo","fl","pl","pl","pl"],
+  mo:["de","mo","mo","fl","fl","pl"],
+  fl:["ag","pa","mo","fl","fl","pl"],
+  pa:["ag","ag","fl","pa","pa","pa"],
+  de:["de","de","de","mo","mo","mo"],
+  ag:["ag","ag","ag","ag","pa","pl"]
+};
+/* Tabela: Localidade (role 1d6 quando o dado do hexágono der 6) */
+const LOC_HOT = {
+  pl:[["city","Orc"],["city","Goblin"],["ruins"],["city","Humana"],["city","Humana"],["fort","Humana"]],
+  mo:[["fort","Orc"],["city","Orc"],["ruins"],["volcano"],["city","Anã"],["fort","Anã"]],
+  fl:[["city","Goblin"],["city","Goblin"],["ruins"],["city","Gnoma"],["city","Élfica"],["fort","Élfica"]],
+  ag:[["rocks"],["rocks"],["nothing"],["nothing"],["corals"],["corals"]],
+  pa:[["city","Orc"],["city","Goblin"],["portal"],["portal"],["portal"],["city","Humana"]],
+  de:[["city","Orc"],["oasis"],["oasis"],["oasis"],["portal"],["city","Humana"]]
+};
+/* Tabela: Eventos. [resultado 2, resultado 3 ou 4, resultado 5 ou 6] */
+const WM = (n, pl, pv, dano, tr, q, key) => ({k:"mon", n, pl, pv, dano, tr, q, key});
+const WC = (n, txt, eff, v) => ({k:"clima", n, txt, eff, v});
+const EVENTS_HOT = {
+  ag:[WM("Kraken","Krakens",50,10,"","1","Deus Tentáculo"), WM("Pirata","Piratas",5,2,"Espólios","4","Cultista"), WC("Tempestade","Uma tempestade arrasta você para um hexágono aleatório.","drift")],
+  pl:[WM("Wyvern","Wyverns",12,6,"Fogo","1","Dragão"), WM("Orc","Orcs",6,3,"Espólios","1","Orc"), WC("Chuva pesada","A chuva estraga 1 provisão.","prov",1)],
+  mo:[WM("Dragão","Dragões",30,7,"Fogo","1","Dragão"), WM("Orc","Orcs",6,3,"Espólios","2","Orc"), WC("Avalanche","Uma avalanche te atinge: 2 de dano.","pv",2)],
+  fl:[WM("Troll","Trolls",10,6,"Regeneração","1","Ogro Maldito"), WM("Goblin","Goblins",3,1,"Explosivo","1d6","Goblin"), WC("Chuva pesada","A chuva estraga 1 provisão.","prov",1)],
+  pa:[WM("Gigante de Musgo","Gigantes de Musgo",20,2,"","1","Fungóide"), WC("Chuva pesada","A chuva estraga 1 provisão.","prov",1), WC("Tempestade","A tempestade estraga 2 provisões.","prov",2)],
+  de:[WM("Verme Gigante","Vermes Gigantes",30,10,"","1","Sangue Suga Gigante"), WC("Tempestade de Areia","A tempestade de areia estraga 2 provisões.","prov",2), WC("Tempestade de Areia","A tempestade de areia estraga 2 provisões.","prov",2)]
+};
+/* Tabela: Tipo de Masmorra (página 29). Tipos que ainda não existem no jogo são rolados de novo */
+const DG_TYPE = {
+  pl:["Palácio","Cripta","Tumba","Santuário","Templo","Calabouço"],
+  mo:["Cripta","Santuário","Calabouço","Cidadela","Mina","Caverna"],
+  fl:["Tumba","Templo","Palácio","Zigurate","Laboratório","Caverna"],
+  pa:["Cripta","Tumba","Santuário","Templo","Calabouço","Necrópole"],
+  de:["Calabouço","Palácio","Santuário","Templo","Pirâmide","Pirâmide"]
+};
+const DG_ID = {"Palácio":1,"Cripta":2,"Tumba":3,"Santuário":4,"Templo":5,"Calabouço":6};
+/* nomes elaborados: 3d6 em cada coluna (página 29) */
+const WN2 = {3:["Sagrado","Sagrada"],4:["Opaco","Opaca"],5:["Traiçoeiro","Traiçoeira"],6:["Sangrento","Sangrenta"],7:["Sinistro","Sinistra"],8:["Nebuloso","Nebulosa"],9:["Secreto","Secreta"],10:["Perdido","Perdida"],11:["Amaldiçoado","Amaldiçoada"],12:["Maligno","Maligna"],13:["Abandonado","Abandonada"],14:["Sujo","Suja"],15:["Rachado","Rachada"],16:["Torto","Torta"],17:["Fedorento","Fedorenta"],18:["Demoníaco","Demoníaca"]};
+const WN3 = {3:["do Anjo","m"],4:["da Estátua","f"],5:["da Serpente","f"],6:["da Estrada","f"],7:["do Vale","m"],8:["do Monte","m"],9:["do Segredo","m"],10:["do Rei","m"],11:["da Rainha","f"],12:["do Horror","m"],13:["do Caminho","m"],14:["da Morte","f"],15:["da Feiticeira","f"],16:["do Guerreiro","m"],17:["do Cão","m"],18:["do Inferno","m"]};
+const WN4 = {3:["Celeste","Celeste"],4:["Sagrado","Sagrada"],5:["do Azar","do Azar"],6:["Sangrento","Sangrenta"],7:["da Tristeza","da Tristeza"],8:["Sombrio","Sombria"],9:["Eterno","Eterna"],10:["Mortal","Mortal"],11:["Gélido","Gélida"],12:["Flamejante","Flamejante"],13:["Noturno","Noturna"],14:["Radiante","Radiante"],15:["Raivoso","Raivosa"],16:["da Sorte","da Sorte"],17:["Emplumado","Emplumada"],18:["Infernal","Infernal"]};
+function worldDungeonName(type, a, b, c){
+  const t = DUNGEONS[type], [p3, g] = WN3[b];
+  return `${t.a} ${t.n} ${WN2[a][t.a==="O"?0:1]} ${p3} ${WN4[c][g==="m"?0:1]}`;
+}
+/* Tabela: Afinidade (página 28). Colunas: Humana, Anã, Élfica, Gnoma, Goblin, Orc */
+const AFF_COLS = ["Humana","Anã","Élfica","Gnoma","Goblin","Orc"];
+const AFF = {
+  "Humano":[1,1,1,1,1,0], "Anão":[1,1,0,1,0,0], "Elfo":[1,0,1,1,0,0], "Gnomo":[1,1,1,1,1,0], "Pequenino":[1,1,1,1,1,1],
+  "Fada":[1,0,1,1,1,0], "Povo-Gato":[1,1,1,1,1,0], "Rinoceróide":[1,1,1,1,1,0], "Vagalóide":[1,1,1,1,1,0], "Homem-Gosma":[1,1,1,1,1,1],
+  "Meio-Dragão":[1,0,0,1,1,1], "Goblin":[1,0,0,1,1,1], "Orc/Ogro":[0,0,0,0,1,1], "Outra":[1,1,1,1,1,0],
+  "Ponão":[0,1,0,0,0,0], "Gnoblin":[1,1,1,1,1,1], "Jenypher":[1,1,1,1,1,1]
+};
+function affRow(h){
+  const n = R(h.race) ? R(h.race).n : "";
+  if(AFF[n]) return AFF[n];
+  if(n === "Meio-Humano") return AFF["Humano"];
+  if(n === "Orc" || n === "Ogro") return AFF["Orc/Ogro"];
+  if(n === "Centauro" || n === "Fungóide") return AFF["Goblin"];   /* aliados de orcs e goblins (página 35) */
+  return AFF["Outra"];
+}
+function canEnterCity(loc, h){ h = h || state.hero; if(!loc || !h) return false; return !!affRow(h)[AFF_COLS.indexOf(loc.race)]; }
+/* ação extra de cada cultura (página 28) */
+const CULTURE = {
+  "Humana":{t:"Eliminar uma Maldição", price:200, k:"curse"},
+  "Anã":{t:"Comprar uma Lamparina", price:40, k:"lamp", item:()=>({n:LAMP})},
+  "Élfica":{t:"Comprar Botas Élficas", price:60, k:"boots", item:()=>({n:"Botas Élficas (2 PV; gasta só 1 provisão para andar em florestas)", slot:"Botas", pv:2, magic:true})},
+  "Gnoma":{t:"Aprender uma Magia Básica aleatória", price:80, k:"spell"},
+  "Goblin":{t:"Comprar uma Poção Verdosa", price:30, k:"verdosa", item:()=>({n:"Poção Verdosa (role um dado: 3 ou mais recupera todos os PV)"})},
+  "Orc":{t:"Comprar um Gládio Orc", price:70, k:"gladio", item:()=>({n:"Gládio Orc (Dano 1d6+1)", weapon:true, d:"1d6+1"})}
+};
+/* Tabela: Campeão da Arena (3d6) */
+const ARENA = {3:["O Ceifador",30,6,"Morte Súbita","Barqueiro da Morte"],4:["O Rocha",50,4,"Corpo de Pedra","Gárgula"],5:["Verme Gigante",30,10,"","Sangue Suga Gigante"],6:["Ogro Verde",23,11,"","Ogro Maldito"],
+  7:["Aranha de Guerra",18,5,"Veneno","Aranha Gigante"],8:["Bárbaro de Tanguinha",16,7,"","Cultista"],9:["Ogro & Goblin",30,6,"Ponto Fraco","Ogro Maldito"],10:["Orc Gladiador",7,4,"","Orc"],
+  11:["Goblin Gladiador",4,2,"Explosivo","Goblin"],12:["Anão Furioso",9,4,"","Cultista"],13:["Elfa Berserker",8,3,"","Cultista"],14:["Sentinela de Bronze",20,6,"","Sentinela de Aço"],
+  15:["O Matador Mascarado",20,9,"","Necromante"],16:["Ogro Gladiador",22,7,"","Ogro Maldito"],17:["Ogro Gladiador",22,7,"","Ogro Maldito"],18:["Ogro Gladiador",22,7,"","Ogro Maldito"]};
+
+/* ---------- geometria dos hexágonos ---------- */
+const HDIR = [[1,-1],[1,0],[0,1],[-1,1],[-1,0],[0,-1]];
+const HDIRN = ["a nordeste","a leste","a sudeste","a sudoeste","a oeste","a noroeste"];
+const HEXW = 56, HEXH = 32;
+const hk = (q, r) => `${q},${r}`;
+const hq = k => k.split(",").map(Number);
+function hexNb(k){ const [q,r] = hq(k); return HDIR.map(([a,b])=>hk(q+a, r+b)); }
+function hexDist(a, b){ const [q1,r1] = hq(a), [q2,r2] = hq(b), dq = q1-q2, dr = r1-r2; return (Math.abs(dq)+Math.abs(dr)+Math.abs(dq+dr))/2; }
+function hexPx(k){ const [q,r] = hq(k); return {x:q*HEXW + r*HEXW/2, y:r*HEXH}; }
+function pxHex(x, y){
+  const r0 = Math.round(y/HEXH); let best = null, bd = 1e9;
+  for(let r=r0-1;r<=r0+1;r++){ const q0 = Math.round((x - r*HEXW/2)/HEXW); for(let q=q0-1;q<=q0+1;q++){ const cx = q*HEXW + r*HEXW/2, cy = r*HEXH, dd = (x-cx)**2 + (y-cy)**2; if(dd < bd){ bd = dd; best = hk(q,r); } } }
+  return best;
+}
+
+/* ---------- estado do mundo ---------- */
+function WD(){ return state && state.world; }
+function wHere(){ const w = WD(); return w ? w.hex[w.pos] : null; }
+function raceIs(n, h){ h = h || state.hero; return !!h && [R(h.race), R(h.race2)].some(r=>r && r.n === n); }
+function wLog(m){ const w = WD(); if(!w) return; w.log.unshift(m); if(w.log.length > 40) w.log.length = 40; }
+function locLabel(loc){
+  if(!loc) return "";
+  if(loc.k === "city") return `Cidade ${loc.race}`;
+  if(loc.k === "fort") return `Fortaleza ${loc.race}`;
+  return {ruins:"Ruínas", volcano:"Vulcão", portal:"Portal", oasis:"Oásis", corals:"Corais", rocks:"Rochas"}[loc.k] || "";
+}
+function isTown(loc){ return !!loc && (loc.k === "city" || loc.k === "fort"); }
+/* cidade onde o aventureiro está e pode entrar (ou null) */
+function worldCityHere(){
+  const w = WD(); if(!w) return null;
+  const hx = w.hex[w.pos];
+  return hx && isTown(hx.loc) && canEnterCity(hx.loc) && !hx.banned ? hx.loc : null;
+}
+function worldStartSpec(h){
+  const id = String(h.race), n = R(h.race) ? R(h.race).n : "";
+  if(id[0] === "e") return {t:"ag", loc:null, water:true};                       /* Raças Exóticas: no mar, num barco */
+  if(id[0] === "m") return n === "Goblin" ? {t:"fl", loc:{k:"city", race:"Goblin"}} : {t:"mo", loc:{k:"city", race:"Orc"}};
+  return {t:"pl", loc:{k:"city", race:"Humana"}};
+}
+function worldGen(t){
+  const nt = TERR_HOT[t][d6()-1];
+  let loc = null;
+  if(d6() === 6){ const [k, race] = LOC_HOT[nt][d6()-1]; if(k !== "nothing") loc = race ? {k, race} : {k}; }
+  return {t:nt, loc};
+}
+function worldReveal(k){
+  const w = WD(), hx = w.hex[k];
+  hexNb(k).forEach(n=>{ if(!w.hex[n]) w.hex[n] = worldGen(hx.t); });
+}
+function worldInit(){
+  const h = state.hero, sp = worldStartSpec(h);
+  const w = state.world = {v:1, hex:{}, pos:"0,0", trips:0, days:0, boat:false, recs:{}, log:[], sel:null, ev:null};
+  w.hex["0,0"] = {t:sp.t, loc:sp.loc, start:true};
+  if(sp.water){ hexNb("0,0").forEach(k=>w.hex[k] = {t:"ag", loc:null}); w.boat = true; }
+  worldReveal("0,0");
+  h.provisions = Math.max(20, h.provisions||0);
+  if(h.provisions > 20) h.provisions = 20;
+  const d = state.dungeon;
+  if(d && !d.inside){
+    const k = !d.complete && hexNb("0,0").find(n=>w.hex[n].t !== "ag" && !w.hex[n].loc);
+    if(k){ d.uid = d.uid || Date.now().toString(36); d.hex = k; w.hex[k].dg = {uid:d.uid, type:d.type, name:d.name, dice:d.dice}; }
+    else state.dungeon = null;
+  }
+  wLog(sp.water ? "Sua jornada começa num barco, no meio do mar." : `Sua jornada pelo mundo começa na ${locLabel(sp.loc)}.`);
+}
+/* novo aventureiro num mundo que já existe: começa na cidade mais próxima onde pode entrar */
+function worldPlaceNew(h){
+  const w = WD(); if(!w) return;
+  h.provisions = 20; w.boat = false; w.ev = null; w.sel = null;
+  const towns = Object.keys(w.hex).filter(k=>isTown(w.hex[k].loc) && canEnterCity(w.hex[k].loc, h) && !w.hex[k].banned);
+  towns.sort((a,b)=>hexDist(a,"0,0")-hexDist(b,"0,0"));
+  w.pos = towns[0] || "0,0";
+  if(!w.hex[w.pos]) w.hex[w.pos] = {t:"pl", loc:null};
+  worldReveal(w.pos);
+  wLog(`${h.name} começa a jornada ${towns[0] ? "na " + locLabel(w.hex[w.pos].loc) : "aqui"}.`);
+  wcenterOn = true;
+}
+function canSwim(h){ return raceIs("Patovsky", h) || raceIs("Sharkin", h) || raceIs("Homem-Boto", h) || hasAlly("Golfinho", h); }
+function ignoresEvents(h){ return raceIs("Corvino", h) || raceIs("Patovsky", h) || raceIs("Levent", h) || hasAlly("Rastreador Elfo", h); }
+/* provisões gastas para entrar no hexágono */
+function travelCost(k){
+  const h = state.hero, w = WD(), t = w.hex[k].t;
+  const mercs = mercCount() * TERR[t].cost;               /* cada mercenário gasta as próprias provisões */
+  if(raceIs("Steambot")) return mercs;
+  let c = TERR[t].cost;
+  if(t === "de" && (raceIs("Tri-kri-kri") || hasAlly("Camelo"))) c = 1;
+  if(t === "mo" && (raceIs("Meio-Cabra") || hasAlly("Llama") || hasAlly("Bode"))) c = Math.min(c, raceIs("Meio-Cabra") ? 1 : 2);
+  if(t === "fl" && (wearing(/^Botas Élficas/) || hasAlly("Coruja") || hasAlly("Lobo Gigante"))) c = 1;
+  if(t === "pa" && hasAlly("Raptor")) c = 1;
+  if(hasAlly("Grifo")) c = 1;
+  if(t === "pl" && hasAlly("Cavalo") && w.horse) c = 0;
+  if(raceIs("Pandakhan")) c *= 2;
+  if(raceIs("Centauro")) c = Math.ceil(c/2);
+  return c + mercs;
+}
+function canTravel(k){
+  const w = WD(), hx = w.hex[k];
+  if(!hx) return {ok:false, why:"Ainda não se sabe o que há lá."};
+  if(w.ev) return {ok:false, why:"Resolva o encontro antes de seguir viagem."};
+  if(!hexNb(w.pos).includes(k)) return {ok:false, why:`Fica a ${hexDist(w.pos,k)} hexágonos daqui. Viaje um hexágono por vez.`};
+  if(hx.loc && hx.loc.k === "rocks") return {ok:false, why:"Rochas: não é possível passar por aqui."};
+  if(hx.t === "ag" && !w.boat && !canSwim()) return {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
+  return {ok:true};
+}
+function dgRec(m){ const w = WD(), d = state.dungeon; return d && d.uid === m.uid ? d : (w.recs[m.uid] || null); }
+function wAddItem(it){
+  const h = state.hero;
+  if(h.bag.length < bagMax()){ h.bag.push(fixWearable(it)); return true; }
+  const hx = wHere(); hx.ground = (hx.ground||[]).concat(it);
+  wLog(`Mochila cheia: ${it.n.split(" (")[0]} ficou no chão aqui.`);
+  return false;
+}
+function wBegin(){ busy = true; rollLog = []; const t = $("#etray"); if(t) t.innerHTML = ""; lockButtons(); }
+function wEnd(){ busy = false; persist(); render(); }
+
+/* ---------- viagem ---------- */
+async function doTravel(k, how){
+  const w = WD(), h = state.hero, hx = w.hex[k];
+  if(busy || !canTravel(k).ok) return;
+  wBegin();
+  const fly = how === "fly";
+  if(fly){ const s = h.spells["Voar"]; if(!s || s.left <= 0){ wEnd(); return; } s.left--; H().magic++; }
+  const cost = fly ? 0 : travelCost(k);
+  const have = h.provisions||0, use = Math.min(have, cost), miss = cost - use;
+  h.provisions = have - use; H().provSpent += use;
+  w.trips++; w.days += fly ? 1 : TERR[hx.t].cost;
+  const prev = w.pos;
+  if(hx.t === "pl" && hasAlly("Cavalo") && !fly) w.horse = !w.horse;
+  w.pos = k; w.sel = null; wcenterOn = true;
+  if(w.boat && hx.t !== "ag"){ w.boat = false; wLog("Você deixa o barco na costa."); }
+  if(hx.t === "ag" && w.boat) H().boat++;
+  if(hx.t === "fl") H().forests++;
+  if(hx.t === "de") H().deserts++;
+  if(isTown(hx.loc)){ const x = H(); if(!x.cities.includes(k)) x.cities.push(k); }
+  worldReveal(k);
+  if(hasAlly("Águia")){ const di = hexNb(prev).indexOf(k), k2 = di >= 0 ? hexNb(k)[di] : null; if(k2 && w.hex[k2]) worldReveal(k2); }
+  wLog(`${fly ? "Você voou" : "Você viajou"} até ${hx.loc ? "a " + locLabel(hx.loc) : TERR[hx.t].a + " " + TERR[hx.t].n}${cost ? ` (${cost} provis${cost>1?"ões":"ão"})` : ""}.`);
+  if(miss > 0){
+    h.pv = Math.max(0, h.pv - miss);
+    wLog(`Sem provisões: você perde ${miss} PV de fome (${h.pv}/${h.pvMax}).`);
+    if(h.pv <= 0 && !samambro()){ busy = false; killHero("Morreu de fome na estrada"); persist(); render(); return; }
+  }
+  await arriveHex(k, fly);
+  if(state.hero) wEnd(); else { busy = false; persist(); render(); }
+}
+async function arriveHex(k, fly){
+  const w = WD(), h = state.hero, hx = w.hex[k], loc = hx.loc;
+  if(loc && loc.k === "oasis"){
+    if(hx.oasis === undefined){ const [v] = await roll("Oásis", 1); hx.oasis = v >= 5; rollNote(hx.oasis ? "É de verdade!" : "Miragem"); }
+    if(hx.oasis){ h.pv = h.pvMax; wLog("Você achou um Oásis e recuperou todos os PV."); } else wLog("Era só uma miragem.");
+    return;
+  }
+  if(loc && loc.k === "corals"){
+    const [v] = await roll("Corais", 1);
+    if(v === 1){ h.provisions = Math.max(0, (h.provisions||0)-1); rollNote("Encalhou"); wLog("Seu barco encalhou nos corais: você perde 1 provisão."); }
+    else if(v >= 3){ rollNote("Caverna"); hx.cave = true; wLog("Você avistou uma Caverna Subaquática entre os corais."); }
+    else { rollNote("Nada"); wLog("Você passa pelos corais sem problemas."); }
+    return;
+  }
+  if(loc) return;
+  if(fly) return;
+  const v = await roll("Evento na viagem", 2), s = v[0] + v[1];
+  if(s >= 7){ rollNote("Nada acontece"); return; }
+  const ev = EVENTS_HOT[hx.t][s === 2 ? 0 : s <= 4 ? 1 : 2];
+  rollNote(ev.n);
+  if(ev.k === "clima"){
+    if(raceIs("Aesir")){ wLog(`${ev.n}: como Aesir, você é imune ao clima.`); return; }
+    if(ignoresEvents(h)){ wLog(`${ev.n}: você ignora o evento.`); return; }
+    if(camoOk(hx.t)){ w.ev = {...ev}; return; }
+    await applyClimate(ev);
+    return;
+  }
+  let q = +ev.q || 1;
+  if(ev.q === "1d6"){ const [n] = await roll(ev.pl, 1); q = n; }
+  w.ev = {...ev, qty:q};
+  wLog(`Encontro: ${q > 1 ? q + " " + ev.pl : ev.n}!`);
+}
+function camoOk(t){ const s = state.hero.spells["Camuflagem"]; return (t === "fl" || t === "pa") && s && s.left > 0; }
+async function applyClimate(ev){
+  const w = WD(), h = state.hero;
+  if(ev.eff === "prov"){ const lost = Math.min(h.provisions||0, ev.v); h.provisions = (h.provisions||0) - lost; wLog(`${ev.n}: ${lost ? `você perde ${lost} provis${lost>1?"ões":"ão"}` : "não há provisões para estragar"}.`); }
+  if(ev.eff === "pv"){ wLog(`${ev.n}!`); if(!hurt(ev.v, `Soterrado por uma ${ev.n.toLowerCase()}`)) return; }
+  if(ev.eff === "drift"){
+    const n = hexNb(w.pos)[d6()-1], nx = w.hex[n];
+    if(nx.loc && nx.loc.k === "rocks"){ wLog(`${ev.n}: o barco é jogado contra as rochas, mas aguenta.`); return; }
+    w.pos = n; wcenterOn = true;
+    if(nx.t !== "ag" && w.boat){ w.boat = false; wLog("A tempestade te joga na costa. Você perde o barco."); }
+    worldReveal(n);
+    wLog(`${ev.n}: você foi arrastado para ${nx.loc ? "a " + locLabel(nx.loc) : TERR[nx.t].a + " " + TERR[nx.t].n}.`);
+  }
+}
+
+/* ---------- combate fora da masmorra (eventos e arena) ---------- */
+function startWorldCombat(spec, qty, opts){
+  opts = opts || {};
+  const units = [];
+  for(let i=0;i<qty;i++) units.push({key:spec.key, name:spec.n, pv:spec.pv, max:spec.pv, dano:spec.dano, tr:spec.tr||"", boss:false, g:0});
+  const hx = wHere();
+  state.combat = {world:true, arena:!!opts.arena, terr:hx ? hx.t : "pl", units, sel:0, phase:"hero", round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
+  state.combat.allies = buildAllies(true, !!opts.arena);
+  if(units.some(u=>has(u,"Morto-Vivo"))) H().undead++;
+  fxPops = []; monHit = {}; monAtk = {}; monDie = {}; heroAtk = null; heroDieAt = 0;
+  cLog(opts.arena ? `A multidão grita! ${spec.n} entra na arena. Você ataca primeiro.` : "O combate começa. Você ataca primeiro.");
+  go("combat");
+}
+async function winWorldCombat(){
+  const c = C(), h = state.hero, w = WD();
+  const dead = c.units.filter(u=>u.counted);
+  if(c.absorb && dead.length){ h.pv = Math.min(h.pvMax, h.pv + 5*dead.length); wLog(`Absorver Alma: +${5*dead.length} PV.`); }
+  if(c.deadFire && dead.length){ h.torches = Math.min(10, h.torches + 2*dead.length); wLog(`Fogo dos Mortos: +${2*dead.length} tochas.`); }
+  let coins = 0;
+  dead.filter(u=>has(u,"Espólios")).forEach(()=>{ coins += Math.max(0, d6()-1); });
+  if(coins){ h.coins += coins; wLog(`Espólios: ${coins} moeda${coins>1?"s":""}.`); }
+  if(hasClass("Cozinheiro")){ const p = dead.filter(u=>!has(u,"Morto-Vivo")).length; if(p){ h.provisions = Math.min(provMax(), (h.provisions||0) + p); wLog(`Como Cozinheiro, você preparou ${p} provisões.`); } }
+  if(c.arena){ h.coins += 20; wLog("Você venceu na arena e recebeu 20 moedas!"); state.ui.cityMsg = "Você venceu na arena e recebeu 20 moedas!"; }
+  else wLog("Você venceu o combate.");
+  const arena = c.arena;
+  state.combat = null; w.ev = null; busy = false;
+  go(arena ? "city" : "world");
+}
+function fleeWorldCombat(){
+  const c = C(), w = WD(), arena = c && c.arena;
+  state.combat = null; busy = false; w.ev = null;
+  wLog(arena ? "Você sumiu da arena. A multidão vaia." : "Você escapou do combate.");
+  go(arena ? "city" : "world");
+}
+/* cenário ao ar livre da arena de combate */
+const WGROUND = {pl:["#3e8a3a","#4ea444","#62b852"], fl:["#2a6a32","#347a3a","#448c48"], mo:["#6a6460","#827a74","#9a928a"], pa:["#3e5a3a","#4a6a44","#5a7a50"], de:["#c8a050","#d8b464","#e8c878"], ag:["#5a3a1e","#6a4424","#7a5030"], arena:["#b89a64","#c8aa74","#d8ba84"]};
+function drawOutdoor(ctx, W, H, c){
+  const k = c.arena ? "arena" : (c.terr || "pl"), G = WGROUND[k];
+  if(c.arena){
+    ctx.fillStyle = "#3a3444"; ctx.fillRect(0,0,W,40);
+    for(let x=0;x<W;x+=8) for(let y=4;y<36;y+=6){ ctx.fillStyle = zh(x,y) < .5 ? "#8a6a5a" : zh(y,x) < .5 ? "#6a5a7a" : "#9a7a4a"; ctx.fillRect(x + (y%12?0:4), y, 3, 3); }
+    ctx.fillStyle = "#6a6070"; ctx.fillRect(0,36,W,6);
+  } else {
+    for(let y=0;y<40;y++){ const k2 = y/40; ctx.fillStyle = `rgb(${Math.round(70+60*k2)},${Math.round(110+70*k2)},${Math.round(190+40*k2)})`; ctx.fillRect(0,y,W,1); }
+    if(k === "mo" || k === "de"){ ctx.fillStyle = k === "mo" ? "#4a4650" : "#c09048"; for(let x=0;x<W;x++){ const hgt = 10 + Math.abs(((x*0.7) % 40) - 20) * (k==="mo"?.9:.3); ctx.fillRect(x, 40-hgt, 1, hgt); } }
+    if(k === "fl"){ for(let x=0;x<W;x+=10){ ctx.fillStyle = "#1e4a24"; ctx.fillRect(x, 22 + (x%20?4:0), 9, 18); ctx.fillStyle = "#2a5a2e"; ctx.fillRect(x+2, 18 + (x%20?4:0), 5, 6); } }
+    if(k === "ag"){ ctx.fillStyle = "#2a5ab0"; ctx.fillRect(0, 30, W, 10); }
+  }
+  for(let y=40;y<H;y++) for(let x=0;x<W;x+=2){ const n = zh(x,y); ctx.fillStyle = n < .15 ? G[0] : n > .85 ? G[2] : G[1]; ctx.fillRect(x,y,2,1); }
+  if(k === "ag"){ ctx.fillStyle = "#3a2410"; for(let y=48;y<H;y+=10) ctx.fillRect(0,y,W,1); }
+}
+
+/* ---------- desenho do mapa ---------- */
+let wcam = {x:0, y:0, z:2}, wcenterOn = true;
+function clampWZ(z){ return Math.max(.8, Math.min(4, z)); }
+/* hexágono de ponta para cima: 48 de largura, 56 de altura, mais 6 de borda (a "terra" embaixo) */
+const TW = 56, TH = 48, TD = 6, TCX = 28, TCY = 24, TSQ = 1.25;
+const sx = v => v*TW/48, sy = v => v*TH/56;
+function hexMask(){
+  if(hexMask.m) return hexMask.m;
+  const N = [[56,0],[-56,0],[28,-40],[-28,-40],[28,40],[-28,40]], m = new Uint8Array(TW*TH);
+  for(let y=0;y<TH;y++) for(let x=0;x<TW;x++){
+    const X = x-TCX+.5, Y = (y-TCY+.5)*TSQ, d0 = X*X+Y*Y;
+    if(N.every(([a,b])=>d0 < (X-a)**2 + (Y-b)**2)) m[y*TW+x] = 1;
+  }
+  for(let y=0;y<TH;y++) for(let x=0;x<TW;x++){
+    if(!m[y*TW+x]) continue;
+    const inn = (a,b)=> a>=0 && a<TW && b>=0 && b<TH && m[b*TW+a];
+    if(!inn(x-1,y) || !inn(x+1,y) || !inn(x,y-1) || !inn(x,y+1)) m[y*TW+x] = 2;
+  }
+  return hexMask.m = m;
+}
+/* cor da borda (lateral) de cada terreno: [clara, escura] */
+const WSIDE = {pl:["#6a4424","#4a2e18"], fl:["#6a4424","#4a2e18"], mo:["#4a4652","#302c38"], pa:["#4a3a24","#30261a"], de:["#b07a3a","#86582a"], ag:["#1a3a7a","#10265a"]};
+const wTiles = {};
+function wTile(t, v, f){
+  const key = t + v + "_" + (f||0);
+  if(wTiles[key]) return wTiles[key];
+  const cv = document.createElement("canvas"); cv.width = TW; cv.height = TH + TD + 1;
+  const g = cv.getContext("2d"), M = hexMask();
+  const P = (x,y,c)=>{ x = Math.round(x); y = Math.round(y); if(x<0||x>=TW||y<0||y>=TH||!M[y*TW+x]) return; g.fillStyle = c; g.fillRect(x,y,1,1); };
+  const R = i => zh(v*13.7 + i*7.31, i*3.17 + v*1.9);
+  const noise = (x,y,s) => zh(x*1.01 + v*31 + (s||0), y*1.03 + v*17);
+  const blob = (x,y,s) => zh(Math.floor(x/s) + v*7, Math.floor(y/s) + v*3);
+  const pick3 = (n, c) => n < .33 ? c[0] : n < .7 ? c[1] : c[2];
+  const fill = fn => { for(let y=0;y<TH;y++) for(let x=0;x<TW;x++) if(M[y*TW+x]) P(x,y,fn(x,y)); };
+  const disc = (cx, cy, r, fn) => { for(let y=Math.floor(cy-r);y<=cy+r;y++) for(let x=Math.floor(cx-r);x<=cx+r;x++){ const dx = x-cx, dy = y-cy, d = Math.hypot(dx,dy); if(d <= r) fn(x,y,dx,dy,d); } };
+  const line = (x0,y0,x1,y1,c) => { const n = Math.max(Math.abs(x1-x0), Math.abs(y1-y0)) || 1; for(let i=0;i<=n;i++) P(x0+(x1-x0)*i/n, y0+(y1-y0)*i/n, c); };
+
+  if(t === "pl"){
+    fill((x,y)=>{ const b = (blob(x,y,6)+blob(x+3,y+2,6)+blob(x+1,y+4,4))/3, n = noise(x,y); const C = y < sy(18) ? ["#64b444","#70c04c","#7ccc56"] : ["#58a63c","#64b444","#70c04c"]; return b < .3 && n < .7 ? C[0] : b > .7 && n > .3 ? C[2] : pick3(n*.5+.25, C); });
+    for(let i=0;i<24;i++){ const x = 4 + R(i)*(TW-8), y = 6 + R(i+40)*(TH-10); P(x,y,"#3e8a2e"); P(x-1,y-1,"#4a9a34"); P(x+1,y-1,"#4a9a34"); P(x,y-1,"#3e8a2e"); P(x,y-2,"#9ae06a"); }
+    for(let i=0;i<7;i++){ const x = 5 + R(i+80)*(TW-10), y = 8 + R(i+90)*(TH-14), c = i%2 ? ["#f8e040","#c89020"] : ["#b080f0","#6a40b0"]; P(x,y,c[0]); P(x+1,y,c[0]); P(x,y-1,c[0]); P(x+1,y+1,c[1]); P(x,y+1,"#3e8a2e"); }
+    for(let i=0;i<3;i++){ const x = 8 + R(i+120)*(TW-18), y = 10 + R(i+130)*(TH-20); P(x,y,"#c8c8c0"); P(x+1,y,"#b0b0a8"); P(x+2,y,"#9a9a90"); P(x,y+1,"#9a9a90"); P(x+1,y+1,"#8a8a80"); P(x+2,y+1,"#6a6a64"); P(x+3,y+1,"#4a7a2e"); }
+  }
+  if(t === "fl"){
+    fill((x,y)=>pick3(noise(x,y)*.7 + blob(x,y,4)*.3, ["#2e6a28","#3a7a2e","#448a34"]));
+    for(let i=0;i<10;i++){ const x = 4 + R(i)*(TW-8), y = 8 + R(i+20)*(TH-10); P(x,y,"#5aa040"); P(x,y-1,"#6ab84a"); }
+    const trees = [];
+    for(let row=0; row<5; row++) for(let col=0; col<6; col++){
+      const x = 4 + col*10 + (row%2 ? 5 : 0) + (R(row*7+col)-.5)*4, y = 9 + row*8 + (R(row*5+col+50)-.5)*3;
+      if(R(row*11+col+90) < .12) continue;
+      trees.push({x, y, r:4.2 + R(row*3+col+130)*2.2, k:Math.floor(R(row+col*9+170)*4)});
+    }
+    const TREE = [["#1e4a1e","#2e6a2a","#4a9a3a","#7ac850"],["#1a4426","#2a5e30","#3e8442","#68b05a"],["#24481a","#3a6e24","#5a9a34","#9ad060"],["#1a3e22","#245a2e","#2e7038","#4a9a4a"]];
+    trees.sort((a,b)=>a.y-b.y).forEach(tr=>{
+      const C = TREE[tr.k], cy = tr.y - tr.r*.6;
+      for(let k=0;k<4;k++){ P(tr.x, tr.y+k, k<3 ? "#6a4424" : "#4a2e18"); P(tr.x+1, tr.y+k, "#4a2e18"); }
+      P(tr.x-1, tr.y+3, "#4a2e18");
+      disc(tr.x, cy, tr.r+.6, (x,y,dx,dy,d)=>{ if(d > tr.r - zh(x*3.1,y*2.7)*.9) { P(x,y,C[0]); return; }
+        const s = dx*.7 + dy;
+        P(x,y, s < -tr.r*.55 ? C[3] : s < -tr.r*.05 ? C[2] : s < tr.r*.55 ? C[1] : C[0]); });
+      P(tr.x - tr.r*.35, cy - tr.r*.45, "#c8f080");
+    });
+  }
+  if(t === "mo"){
+    fill((x,y)=>{ const k = y/14; return k < 1 ? (noise(x,y) < .5 ? `rgb(${Math.round(110+70*k)},${Math.round(170+50*k)},${Math.round(225+20*k)})` : `rgb(${Math.round(116+70*k)},${Math.round(176+50*k)},${Math.round(230+18*k)})`) : pick3(noise(x,y), ["#3a3640","#4a4652","#5a5664"]); });
+    const peaks = [[2,22,10],[54,22,10],[14,30,25],[40,28,24],[27,38,24],[5,44,16],[50,44,17],[18,49,14],[38,49,14],[28,52,10]].map(([x,b,h],i)=>[x + (R(i)-.5)*4, b, h + (R(i+9)-.5)*3]);
+    peaks.forEach(([cx, base, hgt], pi)=>{
+      const top = base - hgt;
+      for(let y=Math.ceil(top); y<=base; y++){
+        const half = (y-top)*.78;
+        for(let x=Math.floor(cx-half); x<=cx+half; x++){
+          const rel = x - cx + (zh(y*.7, pi)-.5)*1.5, depth = (y-top)/hgt;
+          const snow = depth < .34 + (zh(x*2.3,pi*3)-.5)*.14;
+          const edge = Math.abs(Math.abs(x-cx) - half) < 1;
+          let c;
+          if(edge) c = "#24202c";
+          else if(snow) c = rel < 0 ? (noise(x,y) < .8 ? "#f4f8ff" : "#dce8f8") : (noise(x,y) < .7 ? "#b8cce4" : "#a0b4d0");
+          else c = rel < 0 ? pick3(noise(x,y,pi), ["#7a7682","#8a8692","#9a96a2"]) : pick3(noise(x,y,pi), ["#3e3a46","#4a4652","#55515e"]);
+          P(x,y,c);
+        }
+        if(y > top+3 && zh(y*.9,pi) < .25) P(cx + (y-top)*.25, y, "#2e2a36");
+      }
+    });
+    for(let i=0;i<8;i++){ const x = 4 + R(i+60)*(TW-8), y = 36 + R(i+70)*10; P(x,y,"#3a5a2a"); P(x+1,y,"#4a7034"); P(x,y-1,"#4a7034"); }
+  }
+  if(t === "ag"){
+    fill((x,y)=>{ const n = zh(Math.floor((x + (f||0)*3)/6) + v*5, y*1.1 + v); const deep = y > sy(34) ? 0 : 1; return n < .3 ? (deep ? "#2458b0" : "#1e4c9e") : n > .82 ? (deep ? "#3a74cc" : "#3268bc") : (deep ? "#2a62ba" : "#2456a8"); });
+    for(let i=0;i<9;i++){ const x = 3 + R(i)*(TW-10) + (f ? 2 : 0), y = 5 + R(i+20)*sy(30), L = 3 + Math.round(R(i+40)*3); for(let a=0;a<L;a++) P(x+a, y, a===0||a===L-1 ? "#8ac0f0" : "#e0f0ff"); }
+    [[10,50,9],[30,52,11],[22,58,8],[44,52,9]].forEach(([cx,cy,r],i)=>{ disc(sx(cx) + (f?1:0), sy(cy), r, (x,y,dx,dy,d)=>{ if(d > r-1.2 && dy < 0) P(x,y, zh(x,y*i) < .7 ? "#e8f4ff" : "#9ac8f0"); }); });
+  }
+  if(t === "de"){
+    fill((x,y)=>pick3(noise(x,y)*.5 + blob(x,y,3)*.5, ["#d4a454","#deb062","#e6bc6e"]));
+    for(let d=0; d<4; d++){
+      const y0 = 8 + d*sy(12) + R(d)*3, A = 3 + R(d+10)*2, k = 7 + R(d+20)*4, ph = R(d+30)*20;
+      for(let x=0;x<TW;x++){
+        const yc = y0 + Math.sin((x+ph)/k)*A;
+        for(let s=0;s<4;s++) P(x, yc - s, s===0 ? "#f8dc94" : s===1 ? "#f0d088" : (noise(x,yc-s) < .5 ? "#eac67c" : "#e6bc6e"));
+        for(let s=1;s<5;s++) P(x, yc + s, s < 3 ? "#b88440" : (noise(x,yc+s) < .5 ? "#c8964c" : "#d4a454"));
+      }
+    }
+    for(let i=0;i<20;i++) P(4 + R(i+60)*(TW-8), 4 + R(i+70)*(TH-8), "#c08a40");
+    for(let i=0;i<3;i++){ const x = 8 + R(i+90)*(TW-16), y = 14 + R(i+95)*(TH-22); P(x,y,"#4a5a2a"); P(x-1,y-1,"#6a7a3a"); P(x+1,y-1,"#6a7a3a"); P(x,y-2,"#6a7a3a"); P(x-2,y-2,"#8a9a4a"); P(x+2,y-2,"#8a9a4a"); P(x+1,y+1,"#a87a3a"); }
+  }
+  if(t === "pa"){
+    fill((x,y)=>{ const b = (blob(x,y,6)+blob(x+3,y+2,5)+blob(x+1,y+4,4))/3; return b < .3 ? "#2e3a22" : b > .75 ? "#4a5a32" : pick3(noise(x,y), ["#38462a","#3e4c2e","#445432"]); });
+    for(let i=0;i<4;i++){ const cx = 6 + R(i)*(TW-12), cy = 9 + R(i+5)*(TH-16), rx = 4 + R(i+9)*4;
+      for(let y=Math.floor(cy-2);y<=cy+2;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){ const e = ((x-cx)/rx)**2 + ((y-cy)/2.5)**2; if(e <= 1) P(x,y, e > .7 ? "#3a5040" : zh(x,y) < .2 ? "#4a6a5a" : "#24342c"); } }
+    for(let i=0;i<5;i++){ const x = 6 + R(i+20)*(TW-12), y = 9 + R(i+25)*(TH-16); P(x,y,"#5a9a3a"); P(x+1,y,"#6aac44"); P(x,y+1,"#4a8a30"); P(x+1,y+1,"#5a9a3a"); P(x+2,y,"#5a9a3a"); }
+    for(let i=0;i<7;i++){ const x = 4 + R(i+40)*(TW-8), y = 12 + R(i+45)*(TH-16); for(let k=0;k<5;k++) P(x, y-k, "#5a7a3a"); P(x, y-5, "#7a3a1a"); P(x, y-6, "#8a4a22"); P(x, y-7, "#7a3a1a"); P(x+1, y-2, "#6a8a44"); }
+    for(let i=0;i<8;i++){ const x = 4 + R(i+60)*(TW-8), y = 6 + R(i+65)*(TH-10); P(x,y,"#7a9a4a"); P(x+1,y,"#6a8a40"); }
+    const dead = (x0, y0, s) => {
+      const C = ["#2a1e14","#3a2a1e","#4a3626"];
+      line(x0, y0, x0+1, y0-10*s, C[1]); line(x0+1, y0, x0+2, y0-9*s, C[0]);
+      line(x0+1, y0-6*s, x0-4*s, y0-11*s, C[1]); line(x0-4*s, y0-11*s, x0-6*s, y0-10*s, C[2]); line(x0-4*s, y0-11*s, x0-4*s, y0-14*s, C[1]);
+      line(x0+1, y0-8*s, x0+6*s, y0-13*s, C[1]); line(x0+6*s, y0-13*s, x0+8*s, y0-12*s, C[2]); line(x0+4*s, y0-11*s, x0+5*s, y0-15*s, C[1]);
+      P(x0-1, y0, C[0]); P(x0+3, y0, C[0]); P(x0-2, y0+1, C[1]); P(x0+4, y0+1, C[1]);
+    };
+    dead(10 + R(80)*6, 26 + R(81)*3, 1.4); if(R(82) < .7) dead(36 + R(83)*6, 42 + R(84)*3, 1.1);
+  }
+  /* contorno escuro e borda de terra embaixo */
+  for(let y=0;y<TH;y++) for(let x=0;x<TW;x++) if(M[y*TW+x] === 2){ g.fillStyle = "#1a1410"; g.fillRect(x,y,1,1); }
+  const S = WSIDE[t];
+  for(let x=0;x<TW;x++){
+    let yb = -1; for(let y=TH-1;y>=0;y--) if(M[y*TW+x]){ yb = y; break; }
+    if(yb < 0) continue;
+    for(let k=1;k<=TD;k++){ g.fillStyle = k === 1 && (t === "pl" || t === "fl") ? "#3e8a2e" : k < TD/2+1 ? S[0] : S[1]; if(zh(x, k+v) < .12) g.fillStyle = S[1]; g.fillRect(x, yb+k, 1, 1); }
+    g.fillStyle = "#1a1410"; g.fillRect(x, yb+TD+1, 1, 1);
+  }
+  for(let y=0;y<TH+TD;y++){ /* laterais da borda */
+    [0, TW-1].forEach(x=>{ let yb = -1; for(let yy=TH-1;yy>=0;yy--) if(M[yy*TW+x]){ yb = yy; break; } if(yb >= 0 && y > yb && y <= yb+TD){ g.fillStyle = "#1a1410"; g.fillRect(x,y,1,1); } });
+  }
+  return wTiles[key] = cv;
+}
+function wSpr(ctx, rows, pal, x, y, alpha){
+  if(alpha !== undefined){ ctx.save(); ctx.globalAlpha = alpha; }
+  rows.forEach((row,j)=>{ for(let i=0;i<row.length;i++){ const c = pal[row[i]]; if(!c) continue; ctx.fillStyle = c; ctx.fillRect(x+i, y+j, 1, 1); } });
+  if(alpha !== undefined) ctx.restore();
+}
+const RACE_ROOF = {"Humana":"#c84a3a","Anã":"#5a6a8a","Élfica":"#3a9a5a","Gnoma":"#8a4ab8","Goblin":"#8a6a2a","Orc":"#7a1e1e"};
+const WS = {
+  city:[".....t.......","..r.ttt...r..",".rrrttdt.rrr.","rrrrrtttrrrrr","wwwwwtttwwwww","wdwwwtttwwdww","wdwwwtdtwwdww","kkkkkkkkkkkkk"],
+  fort:["...f.......f...","...ff......ff..","...k.......k...","s.s.s.....s.s.s","sssss.s.s.sssss","sDsSsssssssSsDs","sssssSSSSSsssss","sssssSSDSSsssss","sssssSDDDSsssss","kkkkkkkkkkkkkkk"],
+  ruins:["ss.......ss..",".s.......s...",".s...ss..s...",".s...s...s...",".s...s...s.s.","sss.sss.sss.s"],
+  volcano:[".....o.o.....","....o.o......",".....rRr.....","....bRRRb....","...bbrRrbb...","..bbbbbbbbb..",".bbbbbbbbbbb.","bbbbbbbbbbbbb"],
+  portal:["..ppppp..",".pP...Pp.","pP.....Pp","p...m...p","p..m.m..p","p...m...p","pP.....Pp",".pP...Pp.","..ppppp.."],
+  oasis:["..ggg.ggg..",".g..gtg..g.",".....t.....",".....t.....","....t......","..bbbbbbb..",".bBBBBBBBb.","..bbbbbbb.."],
+  corals:[".p...o..p..",".pp.oo.pp..","..p.o..p.o.","..pppoppoo.","...ppppp..."],
+  rocks:["...kk......","..kKKk..k..",".kKKKKkkKk.","kKKKKKKKKKk"],
+  dungeon:["..sssssss..",".sskkkkkss.",".skkkkkkks.",".skkkkkkks.",".skkkkkkks.","sssssssssss"],
+  grave:[".w.","www",".w.",".w."],
+  boat:["k.........k","bbbbbbbbbbb",".bBBBBBBBb.","..bbbbbbb.."]
+};
+const WSP = {
+  city:r=>({r:RACE_ROOF[r]||"#c84a3a", t:"#b8b0a0", w:"#e8dcc0", d:"#3a2a1a", k:"#2a2420"}),
+  fort:r=>({f:RACE_ROOF[r]||"#c84a3a", s:"#9a96a0", S:"#7a7682", D:"#2a2030", k:"#3a3640"}),
+  ruins:{s:"#b0aaa0"}, volcano:{o:"#9a9a9a", r:"#f84020", R:"#ffd040", b:"#4a3a34"},
+  portal:{p:"#8a3ad8", P:"#c88aff", m:"#e8c8ff"}, oasis:{g:"#3a9a3a", t:"#8a5a2a", b:"#2a68c0", B:"#5aa0e8"},
+  corals:{p:"#f07aa0", o:"#f8a050"}, rocks:{k:"#3a3640", K:"#7a7682"}, dungeon:{s:"#a8a090", k:"#120e16"},
+  grave:{w:"#f0ecd8"}, boat:{k:"#3a2410", b:"#6a4424", B:"#8c5a30"}
+};
+/* ---------- cidades e fortalezas (desenho por raça, com contorno automático) ---------- */
+const TOWN_STYLE = {
+  "Humana":{wall:["#f0e4c8","#d8c8a4","#b8a47c"], roof:["#e0684a","#c04a34","#8a2e22"], stone:["#b8b4ac","#9a968e","#76726c"], flag:"#3a6ad8", wood:"#7a4e2a"},
+  "Anã":{wall:["#a8a4a0","#8a8682","#6a6662"], roof:["#6a7a9a","#4e5c7a","#36405a"], stone:["#8a8690","#6e6a76","#4e4a56"], flag:"#d8a030", wood:"#5a3a22"},
+  "Élfica":{wall:["#f4f4ec","#dcdcd0","#b8b8a8"], roof:["#5ac070","#3a9a54","#26703c"], stone:["#e8e8e0","#c8c8bc","#a0a094"], flag:"#e8e070", wood:"#8a6a3a"},
+  "Gnoma":{wall:["#f4ecd8","#e0d4b8","#c0b090"], roof:["#b860e0","#8a40b8","#5e2a88"], stone:["#c0b8c8","#a098aa","#7a7286"], flag:"#40c8e0", wood:"#8a5a2a"},
+  "Goblin":{wall:["#a07a4a","#86643a","#664a2a"], roof:["#c8a44a","#a8843a","#7a5e2a"], stone:["#8a7a5a","#6e6046","#504430"], flag:"#7ad040", wood:"#6a4a2a"},
+  "Orc":{wall:["#6a5a50","#54463e","#3e322c"], roof:["#9a3a2a","#7a2a1e","#561c14"], stone:["#5e5660","#48424c","#34303a"], flag:"#d02a1a", wood:"#4a3020"}
+};
+const townCache = {};
+function townSprite(kind, race){
+  const key = kind + race; if(townCache[key]) return townCache[key];
+  const W = kind === "fort" ? 50 : 42, H = kind === "fort" ? 52 : 38;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d"), S = TOWN_STYLE[race] || TOWN_STYLE["Humana"];
+  const P = (x,y,c)=>{ x = Math.round(x); y = Math.round(y); if(x<0||y<0||x>=W||y>=H) return; g.fillStyle = c; g.fillRect(x,y,1,1); };
+  const rect = (x,y,w,h,c)=>{ for(let j=0;j<h;j++) for(let i=0;i<w;i++) P(x+i,y+j, typeof c === "function" ? c(i,j) : c); };
+  const n = (x,y)=>zh(x*1.3+W, y*1.7+H);
+  /* parede com luz da esquerda */
+  const walls = (x,y,w,h,C) => rect(x,y,w,h,(i,j)=> i===0 ? C[0] : i===w-1 ? C[2] : (n(x+i,y+j) < .15 ? C[2] : C[1]));
+  /* telhado de duas águas, com beiral */
+  const gable = (x,base,w,h,C) => { for(let j=0;j<h;j++){ const half = Math.round((w/2+1) * (j+1)/h); const cx = x + w/2; for(let i=-half;i<half;i++) P(cx+i, base-h+j, j===h-1 ? C[2] : i < -half+2 ? C[0] : i < 0 ? (n(cx+i,j)<.3?C[0]:C[1]) : (n(cx+i,j)<.3?C[2]:C[1])); } };
+  const door = (x,y,h) => { rect(x,y,2,h,"#3a2416"); P(x,y,"#24160c"); };
+  const win = (x,y,c) => { P(x,y,c||"#f8d870"); P(x+1,y,c||"#f8d870"); P(x,y+1,"#2a1e14"); P(x+1,y+1,"#2a1e14"); };
+  const house = (x,base,w,h,rh,o) => { o = o||{}; walls(x, base-h, w, h, S.wall); gable(x, base-h, w, rh, o.roof || S.roof); door(x + Math.floor(w/2) - 1 + (o.dx||0), base-4, 4); if(w >= 7){ win(x+1, base-h+2); win(x+w-3, base-h+2); } if(o.chimney) rect(x+w-3, base-h-rh+1, 2, 3, S.stone[2]); };
+  const cone = (cx, base, r, h, C) => { for(let j=0;j<h;j++){ const half = Math.round(r*(j+1)/h); for(let i=-half;i<half;i++) P(cx+i, base-h+j, i < -half/3 ? C[0] : i < half/3 ? C[1] : C[2]); } };
+  const tower = (cx, base, w, h, C, roof, flag) => { walls(cx - w/2, base-h, w, h, C); for(let k=2;k<h-2;k+=5) win(cx - 1, base-h+k, "#1e1820"); if(roof) cone(cx, base-h, w/2+1, Math.round(w*0.9), roof); else for(let i=0;i<w;i+=2) P(cx - w/2 + i, base-h-1, C[0]);
+    if(flag){ const top = base - h - (roof ? Math.round(w*0.9) : 1); rect(cx, top-5, 1, 5, "#2a2420"); rect(cx+1, top-5, 3, 2, flag); P(cx+4, top-4, flag); } };
+  const crenel = (x,y,w,C) => { for(let i=0;i<w;i++) if(i%3 !== 2) { P(x+i,y-1,C[0]); P(x+i,y-2,C[1]); } };
+  const tree = (cx, base, r, C) => { rect(cx-1, base-4, 2, 4, "#6a4424"); for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++){ const d = Math.hypot(x,y); if(d<=r) P(cx+x, base-4-r+y, x+y < -r*.5 ? C[0] : x+y > r*.4 ? C[2] : C[1]); } };
+  const spikes = (x,base,w,c) => { for(let i=0;i<w;i+=2){ rect(x+i, base-5, 1, 5, c); P(x+i, base-6, "#d8d0b8"); } };
+  const mushroom = (cx, base, r, C) => { rect(cx-2, base-5, 5, 5, (i)=> i===0 ? "#f8f0e0" : i===4 ? "#c8b898" : "#e8dcc4"); door(cx, base-3, 3); for(let y=-r;y<=0;y++) for(let x=-r-1;x<=r+1;x++){ if(Math.hypot(x, y*1.4) <= r+.5) P(cx+x, base-5+y, x < -r/3 ? C[0] : x < r/3 ? C[1] : C[2]); } P(cx-2, base-5-r+2, "#fff"); P(cx+2, base-5-r+3, "#fff"); P(cx, base-6, "#fff"); };
+
+  const B = H - 3;
+  if(kind === "city"){
+    if(race === "Humana"){ tower(21, B-4, 6, 13, S.stone, S.roof, null); house(5, B-1, 11, 7, 6, {chimney:true}); house(26, B, 10, 6, 5); house(15, B+1, 8, 5, 4, {dx:1}); rect(3, B+1, 36, 1, S.wood); for(let i=3;i<39;i+=3) rect(i, B-1, 1, 3, S.wood); }
+    else if(race === "Anã"){ /* salão na rocha */ for(let j=0;j<16;j++){ const half = Math.round(18*(j+4)/20); for(let i=-half;i<half;i++) P(21+i, B-16+j, i < -half/2 ? S.stone[0] : i < half/3 ? S.stone[1] : S.stone[2]); }
+      rect(17, B-8, 8, 8, "#1a1418"); for(let i=0;i<8;i++){ P(17+i, B-9, S.stone[0]); } P(16, B-8, S.stone[0]); P(25, B-8, S.stone[2]); rect(20, B-12, 2, 2, "#d8a030"); house(3, B, 9, 5, 4, {roof:S.roof}); house(31, B, 9, 5, 4, {roof:S.roof}); }
+    else if(race === "Élfica"){ tree(21, B-2, 9, ["#8ad870","#4aa050","#2a7038"]); house(4, B, 10, 6, 5); house(29, B, 9, 6, 5); P(21, B-8, "#f8e870"); P(17, B-12, "#f8e870"); P(25, B-14, "#f8e870"); }
+    else if(race === "Gnoma"){ mushroom(10, B, 6, ["#e070f0","#b048d0","#7a2a98"]); mushroom(31, B, 5, ["#f07a60","#d04a3a","#982a22"]); mushroom(21, B-6, 7, S.roof); }
+    else if(race === "Goblin"){ house(4, B, 10, 6, 6, {}); house(26, B+1, 11, 6, 5, {dx:-2}); house(16, B-5, 9, 5, 5, {}); spikes(2, B+2, 38, S.wood); P(20, B-14, "#7ad040"); }
+    else { /* Orc */ house(5, B, 11, 6, 6, {}); house(26, B, 11, 6, 6, {}); tower(21, B-4, 5, 12, S.stone, null, S.flag); spikes(2, B+2, 38, "#3a2418"); P(21, B-1, "#e8e0c8"); P(20, B, "#e8e0c8"); P(22, B, "#e8e0c8"); }
+  } else {
+    const C = S.stone, wood = race === "Goblin";
+    /* torre de menagem ao fundo */
+    { const kw = 16, kh = 13, kx = 25 - kw/2, ky = B-10-kh, flat = race === "Orc" || wood;
+      walls(kx, ky, kw, kh, C);
+      [[4,3],[10,3],[4,8],[10,8]].forEach(([dx,dy])=>win(kx+dx, ky+dy, "#1e1820"));
+      if(flat){ crenel(kx, ky, kw, C); rect(25, ky-8, 1, 6, "#2a2420"); rect(26, ky-8, 3, 2, S.flag); P(29, ky-7, S.flag); }
+      else { cone(25, ky, kw/2+2, 9, S.roof); rect(25, ky-14, 1, 5, "#2a2420"); rect(26, ky-14, 3, 2, S.flag); P(29, ky-13, S.flag); } }
+    /* muralha da frente */
+    if(wood){ for(let i=4;i<46;i++){ const h = 12 + (i%2); rect(i, B-h, 1, h, i%2 ? "#86643a" : "#a07a4a"); P(i, B-h-1, "#c8b088"); } }
+    else { walls(4, B-11, 42, 11, C); crenel(4, B-11, 42, C); for(let i=6;i<44;i+=6) P(i, B-6, C[2]); }
+    /* portão */
+    rect(21, B-8, 8, 8, "#1a1214"); for(let i=0;i<8;i++) P(21+i, B-9, C[0]); for(let i=22;i<29;i+=2) rect(i, B-8, 1, 8, "#5a5a62");
+    /* torres dos lados */
+    tower(5, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
+    tower(45, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
+    if(race === "Orc"){ spikes(10, B-11, 8, "#3a2418"); spikes(32, B-11, 8, "#3a2418"); }
+    if(race === "Élfica"){ tree(14, B-11, 4, ["#8ad870","#4aa050","#2a7038"]); tree(37, B-11, 4, ["#8ad870","#4aa050","#2a7038"]); }
+  }
+  /* contorno automático */
+  const img = g.getImageData(0,0,W,H), a = (x,y)=> x>=0&&y>=0&&x<W&&y<H && img.data[(y*W+x)*4+3] > 0;
+  const out = [];
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(!a(x,y) && (a(x-1,y)||a(x+1,y)||a(x,y-1)||a(x,y+1))) out.push([x,y]);
+  g.fillStyle = "#1a1410"; out.forEach(([x,y])=>g.fillRect(x,y,1,1));
+  return townCache[key] = cv;
+}
+/* chão batido embaixo da construção */
+const CLEARING = {pl:["#b08a54","#9a7646"], fl:["#a08050","#86683e"], mo:["#8a8478","#6e6a62"], pa:["#6a5a3a","#54482e"], de:["#e8c47a","#c8a05a"], ag:["#b08a54","#9a7646"]};
+function drawTown(ctx, loc, t, cx, cy){
+  const sp = townSprite(loc.k, loc.race), C = CLEARING[t] || CLEARING.pl;
+  const rx = loc.k === "fort" ? 22 : 18, ry = loc.k === "fort" ? 9 : 7, by = cy + 3;
+  for(let y=-ry;y<=ry;y++) for(let x=-rx;x<=rx;x++){ const e = (x/rx)**2 + (y/ry)**2; if(e <= 1){ ctx.fillStyle = e > .75 ? C[1] : C[0]; if(zh(x+cx,y+cy) < .18) ctx.fillStyle = C[1]; ctx.fillRect(cx+x, by+y, 1, 1); } }
+  ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - sp.height));
+}
+
+/* ---------- outras localidades e entradas de masmorra ---------- */
+function pixCanvas(W, H, draw, noOutline){
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const P = (x,y,c)=>{ x = Math.round(x); y = Math.round(y); if(x<0||y<0||x>=W||y>=H||!c) return; g.fillStyle = c; g.fillRect(x,y,1,1); };
+  const rect = (x,y,w,h,c)=>{ for(let j=0;j<h;j++) for(let i=0;i<w;i++) P(x+i,y+j, typeof c === "function" ? c(i,j) : c); };
+  const n = (x,y)=>zh(x*1.3+W*.7, y*1.7+H*.3);
+  const shade = (C, i, w, x, y) => i===0 ? C[0] : i===w-1 ? C[2] : (n(x,y) < .15 ? C[2] : n(x,y) > .9 ? C[0] : C[1]);
+  const walls = (x,y,w,h,C) => rect(x,y,w,h,(i,j)=>shade(C,i,w,x+i,y+j));
+  const tri = (cx, top, half, h, C) => { for(let j=0;j<h;j++){ const hw = Math.round(half*(j+1)/h); for(let i=-hw;i<hw;i++) P(cx+i, top+j, i < -hw+2 ? C[0] : i < 0 ? C[1] : C[2]); } };
+  const disc = (cx, cy, rx, ry, fn) => { for(let y=Math.floor(cy-ry);y<=cy+ry;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){ const e = ((x-cx)/rx)**2 + ((y-cy)/ry)**2; if(e <= 1) fn(x,y,e,x-cx,y-cy); } };
+  const line = (x0,y0,x1,y1,c) => { const k = Math.max(Math.abs(x1-x0), Math.abs(y1-y0)) || 1; for(let i=0;i<=k;i++) P(x0+(x1-x0)*i/k, y0+(y1-y0)*i/k, c); };
+  draw({g, P, rect, n, walls, tri, disc, line, W, H, B:H-3});
+  if(!noOutline){
+    const img = g.getImageData(0,0,W,H), a = (x,y)=> x>=0&&y>=0&&x<W&&y<H && img.data[(y*W+x)*4+3] > 200;
+    const out = [];
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(!a(x,y) && (a(x-1,y)||a(x+1,y)||a(x,y-1)||a(x,y+1))) out.push([x,y]);
+    g.fillStyle = "#1a1410"; out.forEach(([x,y])=>g.fillRect(x,y,1,1));
+  }
+  return cv;
+}
+const STONE_L = ["#e4dcc8","#c8bea6","#9a9078"], STONE_G = ["#b0aca4","#8e8a82","#66625c"], STONE_D = ["#7a7682","#5e5a66","#403c48"];
+const DOOR = "#1a1218";
+const locCache = {};
+function locSprite(key, f){
+  const ck = key + "_" + (f||0); if(locCache[ck]) return locCache[ck];
+  let cv = null;
+  /* entradas das masmorras (descrições das páginas 12 a 22) */
+  if(key === "dg1") cv = pixCanvas(40, 34, ({P,rect,walls,tri,B})=>{   /* Palácio: grande construção, porta poderosa */
+    walls(5, B-14, 30, 14, STONE_L); tri(20, B-22, 17, 8, ["#8a9ab8","#6a7a98","#4a5a78"]);
+    for(let x=7;x<34;x+=5){ if(x > 13 && x < 25) continue; rect(x, B-13, 3, 12, (i)=> i===0 ? "#fffaf0" : i===1 ? "#d8ccb0" : "#8a7e66"); rect(x-1, B-14, 5, 1, "#8a7e66"); }
+    rect(16, B-10, 8, 10, DOOR); rect(16, B-11, 8, 1, "#c8a040"); rect(19, B-9, 2, 9, "#2a1e24");
+    rect(3, B, 34, 2, STONE_L[1]); rect(5, B-1, 30, 1, STONE_L[2]); P(20, B-19, "#e8c050"); });
+  if(key === "dg2") cv = pixCanvas(38, 30, ({P,rect,walls,tri,line,B})=>{   /* Cripta: pequeno mausoléu com teias */
+    walls(12, B-10, 14, 10, STONE_G); tri(19, B-16, 9, 6, STONE_G); rect(16, B-7, 6, 7, DOOR); rect(17, B-8, 4, 1, STONE_G[0]);
+    line(12, B-10, 15, B-7, "#e8e8e8"); line(13, B-7, 15, B-10, "#c8c8c8");
+    [[4,B-5],[31,B-4],[7,B+1]].forEach(([x,y])=>{ rect(x, y, 4, 5, (i)=> i===0 ? STONE_G[0] : STONE_G[1]); P(x+1, y-1, STONE_G[1]); P(x+2, y-1, STONE_G[1]); P(x+1, y+1, STONE_G[2]); P(x+2, y+2, STONE_G[2]); }); });
+  if(key === "dg3") cv = pixCanvas(42, 34, ({P,rect,walls,tri,B})=>{   /* Tumba: estrutura de pedra imponente com pilares e estátuas */
+    const TS = ["#d8c49c","#b8a47c","#8a7a58"];
+    walls(4, B-6, 34, 6, TS); walls(8, B-12, 26, 6, TS); walls(12, B-18, 18, 6, TS); tri(21, B-23, 10, 5, TS);
+    rect(17, B-12, 8, 12, DOOR); rect(16, B-13, 10, 1, TS[0]); for(let x=6;x<36;x+=4) P(x, B-3, TS[2]); for(let x=10;x<32;x+=4) P(x, B-9, TS[2]);
+    [[9,B-6],[31,B-6]].forEach(([x,y])=>{ rect(x, y-7, 3, 7, (i)=> i===0 ? "#e8dcc0" : "#a89a78"); rect(x-1, y-9, 5, 2, "#c8b890"); P(x+1, y-10, "#c8b890"); }); });
+  if(key === "dg4") cv = pixCanvas(40, 34, ({P,rect,walls,tri,B})=>{   /* Santuário: capela pequena guardada por anjos */
+    walls(13, B-11, 14, 11, ["#f0e8dc","#d8ccbc","#b0a490"]); tri(20, B-18, 9, 7, ["#c86a4a","#a04a34","#7a3424"]);
+    rect(19, B-24, 2, 6, STONE_L[1]); rect(17, B-22, 6, 2, STONE_L[1]);
+    rect(18, B-7, 4, 7, "#6a4424"); P(20, B-7, "#4a2e18"); P(20, B-6, "#4a2e18"); rect(15, B-9, 2, 2, "#5a8ad8"); rect(23, B-9, 2, 2, "#5a8ad8");
+    [[5,B],[33,B]].forEach(([x,b])=>{ rect(x, b-8, 3, 8, (i)=> i ? "#c8c4bc" : "#eae6de"); P(x+1, b-10, "#eae6de"); P(x+1, b-9, "#c8c4bc"); rect(x-2, b-8, 2, 3, "#f4f4f0"); rect(x+3, b-8, 2, 3, "#d8d8d4"); P(x+1, b-11, "#f8e070"); rect(x-1, b, 5, 1, STONE_G[1]); }); });
+  if(key === "dg5") cv = pixCanvas(42, 34, ({P,rect,walls,tri,n,B})=>{   /* Templo: estrutura bela em meio às plantas */
+    walls(5, B-5, 32, 5, ["#c8b890","#a89870","#806e4e"]); walls(9, B-11, 24, 6, ["#c8b890","#a89870","#806e4e"]); walls(13, B-17, 16, 6, ["#c8b890","#a89870","#806e4e"]);
+    rect(17, B-22, 8, 5, (i)=> i===0 ? "#c8b890" : "#a89870"); rect(18, B-21, 2, 2, DOOR); rect(22, B-21, 2, 2, DOOR);
+    rect(18, B-8, 6, 8, DOOR); for(let x=9;x<33;x+=4) P(x, B-9, "#e8d8a8");
+    for(let i=0;i<30;i++){ const x = 6 + n(i,3)*30, y = B-20 + n(3,i)*20; P(x,y,"#3a8a3a"); P(x,y+1,"#2a6a2a"); }
+    [[3,B],[38,B]].forEach(([x,b])=>{ rect(x, b-6, 1, 6, "#3a7a2a"); P(x-1,b-7,"#4aa040"); P(x+1,b-7,"#4aa040"); P(x,b-8,"#4aa040"); P(x-2,b-6,"#3a8a3a"); P(x+2,b-6,"#3a8a3a"); }); });
+  if(key === "dg6") cv = pixCanvas(42, 32, ({P,rect,walls,n,B})=>{   /* Calabouço: ruínas de castelo e um alçapão */
+    walls(4, B-14, 8, 14, STONE_G); for(let x=4;x<12;x+=3) rect(x, B-16, 2, 2, STONE_G[1]);
+    walls(30, B-9, 8, 9, STONE_G); rect(30, B-11, 3, 2, STONE_G[1]); rect(12, B-6, 6, 6, STONE_G[1]); rect(24, B-4, 6, 4, STONE_G[1]);
+    for(let i=0;i<14;i++){ const x = 12 + n(i,1)*18, y = B-2 + n(1,i)*3; P(x,y,STONE_G[n(x,y)<.5?0:2]); }
+    rect(16, B-3, 10, 4, (i,j)=> j===0 ? "#8a5a2a" : (i%3===0 ? "#4a2e18" : "#6a4424")); rect(20, B-2, 2, 1, "#c8a040"); });
+  /* ruínas */
+  if(key === "ruins") cv = pixCanvas(40, 30, ({P,rect,walls,n,B})=>{
+    [[6,14],[14,8],[25,17],[33,6]].forEach(([x,h])=>{ walls(x, B-h, 4, h, STONE_L); for(let k=0;k<3;k++) P(x+n(x,k)*3, B-h-1, STONE_L[1]); rect(x-1, B, 6, 1, STONE_L[2]); });
+    rect(20, B-21, 10, 3, (i)=> i===0 ? STONE_L[0] : STONE_L[1]); P(19, B-20, STONE_L[2]);
+    rect(9, B-2, 7, 2, STONE_L[2]); rect(29, B-1, 5, 2, STONE_L[1]);
+    for(let i=0;i<10;i++){ const x = 4 + n(i,2)*32; P(x, B-1-n(2,i)*2, "#3a8a3a"); P(x+1, B-2-n(2,i)*2, "#4aa040"); } });
+  /* vulcão: lava e fumaça (2 quadros) */
+  if(key === "volcano") cv = pixCanvas(46, 40, ({P,disc,n,B})=>{
+    for(let j=0;j<22;j++){ const hw = Math.round(5 + j*0.95); for(let i=-hw;i<=hw;i++){ const x = 23+i, y = B-22+j, edge = Math.abs(i) >= hw, r = zh(x*1.7, y*1.3);
+      P(x, y, edge ? "#1a1410" : i < -hw/3 ? (r < .2 ? "#8a7060" : "#6a5448") : i < hw/3 ? (r < .2 ? "#5e4a40" : "#4e3e36") : (r < .2 ? "#2a201c" : "#362a26")); }
+      if(j > 3 && j % 5 === 0) for(let i=-hw+2;i<hw-2;i+=3) P(23+i, B-22+j, "#2a201c"); }
+    for(let j=0;j<4;j++) for(let i=-4+j;i<=4-j;i++) P(23+i, B-22+j, j===0 ? "#ffd040" : "#f86a20");
+    [[22,B-18],[21,B-14],[23,B-11],[25,B-8],[24,B-5]].forEach(([x,y],k)=>{ P(x,y,"#f84020"); P(x,y+1,"#d03018"); if(k%2) P(x+1,y,"#ffa030"); });
+    const sm = f ? 2 : 0;
+    [[23+sm,B-27,4],[20+sm,B-32,5],[25-sm,B-36,4]].forEach(([cx,cy,r])=>disc(cx,cy,r,r*.8,(x,y,e,dx,dy)=>P(x,y, dx+dy < -1 ? "#d0ccd0" : e > .7 ? "#7a767e" : "#a8a4ac")));
+  }, true);
+  /* portal: arco de pedra com redemoinho (3 quadros) */
+  if(key === "portal") cv = pixCanvas(34, 38, ({P,disc,rect,B})=>{
+    const cx = 17, cy = B-15;
+    disc(cx, cy, 12, 15, (x,y,e)=>{ if(e > .62) P(x,y, x < cx ? (e > .9 ? "#6a6474" : "#9a94a4") : "#5a5464"); });
+    const ph = (f||0) * 2.1;
+    disc(cx, cy, 9.4, 12, (x,y,e,dx,dy)=>{ if(e > .62*1.1 && e <= 1){} const a = Math.atan2(dy/1.25, dx) + Math.sqrt(e)*6 - ph, s = (Math.sin(a*2)+1)/2; P(x,y, e < .08 ? "#ffffff" : s > .75 ? "#e0b8ff" : s > .4 ? "#a060f0" : "#5a2aa8"); });
+    rect(cx-13, B-2, 26, 3, (i)=> i===0 ? "#9a94a4" : "#6a6474");
+  });
+  /* oásis e miragem */
+  if(key === "oasis" || key === "mirage") cv = pixCanvas(44, 32, ({P,disc,line,B})=>{
+    disc(22, B-4, 15, 5, (x,y,e)=>P(x,y, e > .8 ? "#e8d8a0" : e > .55 ? "#5aa0e8" : "#2a68c0"));
+    for(let i=0;i<4;i++){ P(14+i*5, B-5, "#a8d8ff"); }
+    const palm = (x0, h, dir) => { for(let k=0;k<h;k++) P(x0 + Math.round(dir*k*k/(h*3)), B-6-k, k%3 ? "#8a5a2a" : "#6a4424");
+      const tx = x0 + Math.round(dir*h/3), ty = B-6-h;
+      [[-7,2],[-5,4],[7,2],[5,4],[-3,-2],[3,-2]].forEach(([dx,dy])=>line(tx, ty, tx+dx, ty+dy, "#3a9a3a")); line(tx, ty, tx-6, ty+1, "#5ac050"); line(tx, ty, tx+6, ty+1, "#2a7a2a");
+      P(tx-1, ty+1, "#8a5a2a"); P(tx+1, ty+1, "#6a4424"); };
+    palm(12, 14, 1); palm(31, 11, -1); palm(23, 8, 1);
+  });
+  /* corais */
+  if(key === "corals") cv = pixCanvas(40, 22, ({P,line,B})=>{
+    const coral = (x0, h, C) => { line(x0, B, x0, B-h, C[1]); line(x0, B-h*.5, x0-3, B-h*.8, C[1]); line(x0, B-h*.6, x0+3, B-h, C[1]); line(x0-3, B-h*.8, x0-4, B-h, C[0]); P(x0, B-h-1, C[0]); P(x0+3, B-h-1, C[0]); line(x0+1, B, x0+1, B-h+2, C[2]); };
+    coral(8, 10, ["#ffa8c0","#f07aa0","#c04a78"]); coral(19, 14, ["#ffc070","#f8a050","#c87028"]); coral(30, 9, ["#ffa8c0","#f07aa0","#c04a78"]);
+    for(let x=4;x<36;x++) if((x*7)%5 < 2) P(x, B+1, "#e8f4ff");
+  });
+  if(key === "cave") cv = pixCanvas(44, 26, ({rect,disc,P,B})=>{
+    disc(22, B-6, 16, 9, (x,y,e,dx)=>{ if(y <= B) P(x,y, e < .45 ? DOOR : dx < -4 ? "#8a8692" : dx < 4 ? "#6a6672" : "#4a4652"); });
+    rect(6, B+1, 32, 1, "#e8f4ff");
+  });
+  /* rochas no mar */
+  if(key === "rocks") cv = pixCanvas(44, 30, ({disc,P,B})=>{
+    [[14,B-7,8,10],[28,B-5,9,8],[36,B-2,5,5],[7,B-2,4,4]].forEach(([cx,cy,rx,ry])=>disc(cx, cy, rx, ry, (x,y,e,dx,dy)=>{ if(y <= B) P(x,y, dx+dy < -rx*.5 ? "#a8a4b0" : dx+dy < rx*.3 ? "#7a7682" : "#4e4a56"); }));
+    for(let x=2;x<42;x++) if(zh(x,3) < .6) P(x, B+1, zh(x,1) < .5 ? "#e8f4ff" : "#a8d0f8");
+  });
+  return locCache[ck] = cv;
+}
+function drawGround(ctx, t, cx, cy, rx, ry){
+  const C = CLEARING[t] || CLEARING.pl;
+  for(let y=-ry;y<=ry;y++) for(let x=-rx;x<=rx;x++){ const e = (x/rx)**2 + (y/ry)**2; if(e <= 1){ ctx.fillStyle = e > .75 ? C[1] : C[0]; if(zh(x+cx,y+cy) < .18) ctx.fillStyle = C[1]; ctx.fillRect(cx+x, cy+y, 1, 1); } }
+}
+function drawLoc(ctx, hx, cx, cy){
+  const loc = hx.loc, by = cy + 3;
+  const put = (sp, alpha) => { if(alpha !== undefined){ ctx.save(); ctx.globalAlpha = alpha; } ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - sp.height)); if(alpha !== undefined) ctx.restore(); };
+  if(loc){
+    const k = loc.k, wf = Math.floor(frame/4);
+    if(k === "ruins"){ drawGround(ctx, hx.t, cx, by, 17, 6); put(locSprite("ruins")); }
+    else if(k === "volcano") put(locSprite("volcano", wf % 2));
+    else if(k === "portal"){ drawGround(ctx, hx.t, cx, by, 13, 5); put(locSprite("portal", wf % 3)); }
+    else if(k === "oasis"){ drawGround(ctx, hx.t, cx, by, 19, 6); put(locSprite("oasis"), hx.oasis === false ? .35 : undefined); }
+    else if(k === "corals") put(locSprite(hx.cave ? "cave" : "corals"));
+    else if(k === "rocks") put(locSprite("rocks"));
+  }
+  if(hx.dg){
+    const r = dgRec(hx.dg), done = r && r.complete;
+    drawGround(ctx, hx.t, cx, by, 17, 6);
+    put(locSprite("dg" + hx.dg.type), done ? .5 : undefined);
+    if(done){ const fx = cx+13, fy = by-16;
+      ctx.fillStyle = "#1a1410"; ctx.fillRect(fx-1, fy-1, 8, 6); ctx.fillRect(fx-1, fy, 3, 15);
+      ctx.fillStyle = "#6a4424"; ctx.fillRect(fx, fy, 1, 14);
+      ctx.fillStyle = "#f8f4e8"; ctx.fillRect(fx+1, fy, 5, 4);
+      ctx.fillStyle = "#3aa040"; ctx.fillRect(fx+2, fy+2, 1, 1); ctx.fillRect(fx+3, fy+3, 1, 1); ctx.fillRect(fx+4, fy+2, 1, 1); ctx.fillRect(fx+5, fy+1, 1, 1); }
+  }
+}
+
+const HERO_WS = .6;
+function drawWorld(cv){
+  const w = WD(); if(!w) return;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const bw = Math.round(cv.clientWidth*dpr), bh = Math.round(cv.clientHeight*dpr);
+  if(!bw || !bh) return;
+  if(cv.width !== bw || cv.height !== bh){ cv.width = bw; cv.height = bh; }
+  if(wcenterOn){ const p = hexPx(w.pos); wcam.x = p.x; wcam.y = p.y; wcenterOn = false; }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = "#0c0a12"; ctx.fillRect(0,0,bw,bh);
+  const z = wcam.z*dpr;
+  ctx.setTransform(z,0,0,z, Math.round(bw/2 - wcam.x*z), Math.round(bh/2 - wcam.y*z));
+  ctx.imageSmoothingEnabled = false;
+  const keys = Object.keys(w.hex), wf = Math.floor(frame/6) % 2;
+  const vx = bw/(2*z) + 40, vy = bh/(2*z) + 40;
+  const vis = keys.filter(k=>{ const p = hexPx(k); return Math.abs(p.x - wcam.x) < vx && Math.abs(p.y - wcam.y) < vy; }).sort((a,b)=>hexPx(a).y - hexPx(b).y);
+  vis.forEach(k=>{ const hx = w.hex[k], p = hexPx(k), v = Math.floor(zh(p.x*.37, p.y*.53)*3); ctx.drawImage(wTile(hx.t, v, hx.t === "ag" ? wf : 0), p.x-TCX, p.y-TCY); });
+  vis.sort((a,b)=>hexPx(a).y - hexPx(b).y).forEach(k=>{
+    const hx = w.hex[k], p0 = hexPx(k), loc = hx.loc, p = p0;
+    if(isTown(loc)) drawTown(ctx, loc, hx.t, p0.x, p0.y);
+    else drawLoc(ctx, hx, p0.x, p0.y);
+    if((hx.corpses||[]).length) wSpr(ctx, WS.grave, WSP.grave, p0.x + 16, p0.y + 8);
+  });
+  /* seleção pisca */
+  const sel = w.sel && w.hex[w.sel] ? w.sel : null;
+  if(sel && frame % 4 < 2){
+    const p = hexPx(sel), M = hexMask(); ctx.fillStyle = "#f8e048";
+    for(let y=0;y<TH;y++) for(let x=0;x<TW;x++) if(M[y*TW+x] === 2) ctx.fillRect(p.x-TCX+x, p.y-TCY+y, 1, 1);
+  }
+  /* vizinhos alcançáveis: pontinhos */
+  if(!w.ev) hexNb(w.pos).forEach(k=>{ if(!canTravel(k).ok) return; const p = hexPx(k); ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.fillRect(p.x-1, p.y+18, 3, 3); ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(p.x-1, p.y+21, 3, 1); });
+  /* aventureiro */
+  const p = hexPx(w.pos), here = w.hex[w.pos], busyHex = here && (here.loc || here.dg);
+  const hx0 = p.x, hy0 = p.y + (busyHex ? 20 : 9);
+  ctx.save(); ctx.translate(hx0, hy0); ctx.scale(HERO_WS, HERO_WS);
+  if(w.boat) wSpr(ctx, WS.boat, WSP.boat, -5, -1);
+  drawHero(ctx, 0, 0, frame/8, "idle");
+  ctx.restore();
+}
+function wmapTap(wx, wy){
+  if(busy) return;
+  const w = WD(), k = pxHex(wx, wy);
+  if(!w.hex[k]) return;
+  w.sel = w.sel === k || k === w.pos ? null : k;
+  render();
+}
+
+/* ---------- telas ---------- */
+function hexDesc(k){
+  const w = WD(), hx = w.hex[k]; if(!hx) return "";
+  const parts = [];
+  if(hx.loc) parts.push(hx.loc.k === "oasis" && hx.oasis === false ? "Miragem" : hx.loc.k === "oasis" && hx.oasis === undefined ? "Oásis (será?)" : locLabel(hx.loc));
+  parts.push(TERR[hx.t].n);
+  return parts.join(" · ");
+}
+function soonNote(txt){ return `<p class="small">${txt} <span class="soon">Em breve</span></p>`; }
+function hexExtrasHTML(k, here){
+  const w = WD(), hx = w.hex[k], loc = hx.loc, out = [];
+  if(hx.dg){ const r = dgRec(hx.dg); out.push(`<p><b>${esc(hx.dg.name)}</b>${r && r.complete ? " · completada" : ""}</p>`);
+    if(r && r.corpses && r.corpses.length) out.push(`<p class="note">Há ${r.corpses.length===1?"um cadáver":r.corpses.length+" cadáveres"} de aventureiros seus lá dentro.</p>`); }
+  if(isTown(loc)){
+    if(hx.banned) out.push(`<p class="small">Você foi expulso desta cidade e não pode mais entrar.</p>`);
+    else if(!canEnterCity(loc)) out.push(`<p class="small">Gente da sua raça não é bem-vinda aqui (Afinidade entre Raças).</p>`);
+  }
+  if(loc && loc.k === "ruins") out.push(soonNote("Ruínas que podem ser exploradas como masmorra."));
+  if(loc && loc.k === "volcano") out.push(soonNote("Há uma Caverna Vulcânica aqui."));
+  if(loc && loc.k === "portal") out.push(soonNote("Um portal para lugares desconhecidos."));
+  if(loc && loc.k === "corals" && hx.cave) out.push(soonNote("Há uma Caverna Subaquática entre os corais."));
+  if(loc && loc.k === "oasis" && hx.oasis) out.push(`<p class="small">Um oásis de verdade: entrar aqui recupera todos os PV.</p>`);
+  if(here && (hx.corpses||[]).length) hx.corpses.forEach((c,i)=>out.push(`<div class="spell"><div class="txt"><b>Corpo de ${esc(c.name)}</b><span class="small">${c.coins} moedas e ${c.bag.length} itens.</span></div><button class="use" data-act="wCorpse" data-i="${i}">Revistar</button></div>`));
+  else if((hx.corpses||[]).length) out.push(`<p class="small">O corpo de ${esc(hx.corpses.map(c=>c.name).join(", "))} está aqui.</p>`);
+  if(here && (hx.ground||[]).length) hx.ground.forEach((it,i)=>out.push(`<div class="spell"><div class="txt">${esc(itemName(it))}</div><button class="use" data-act="wPick" data-i="${i}" ${state.hero.bag.length>=bagMax()?"disabled":""}>Pegar</button></div>`));
+  return out.join("");
+}
+function viewWorld(){
+  const h = state.hero, w = WD();
+  if(!h || !w) return viewSheet();
+  const here = w.hex[w.pos], sel = w.sel && w.hex[w.sel] && w.sel !== w.pos ? w.sel : null;
+  let evHTML = "";
+  if(w.ev){
+    const e = w.ev, camo = camoOk(here.t);
+    if(e.k === "mon") evHTML = `<div class="sheet"><h3>Encontro!</h3>
+      <div class="mon"><canvas class="monpic" width="48" height="40" data-mon="${esc(e.key)}" data-boss="0"></canvas>
+      <span class="who">${e.qty>1 ? N(e.qty)+" "+esc(e.pl) : esc(e.n)}</span>
+      <div class="stats"><span class="chip solid">${N(e.pv)} PV${e.qty>1?" cada":""}</span><span class="chip">Dano ${N(e.dano)}</span></div>
+      ${e.tr ? `<div class="traits">${e.tr.split(", ").map(t=>`<span class="chip">${t}</span>`).join("")}</div>` : ""}</div>
+      <div class="stack"><button class="btn" data-act="wFight">Lutar</button>
+      ${ignoresEvents(h) ? `<button class="btn ghost" data-act="wIgnore">Ignorar o encontro <small>(vantagem da raça)</small></button>` : ""}
+      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(${h.spells["Camuflagem"].left} uso${h.spells["Camuflagem"].left>1?"s":""})</small></button>` : ""}</div></div>`;
+    else evHTML = `<div class="sheet"><h3>${esc(e.n)}</h3><p>${esc(e.txt)}</p><div class="stack">
+      <button class="btn" data-act="wClimate">Seguir em frente</button>
+      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(ignora o evento)</small></button>` : ""}</div></div>`;
+  }
+  let selHTML = "";
+  if(sel){
+    const ct = canTravel(sel), cost = travelCost(sel), hx = w.hex[sel], voar = h.spells["Voar"];
+    const water = hx.t === "ag" && !w.boat && canSwim();
+    selHTML = `<div class="sheet"><h3>${esc(hexDesc(sel))}</h3>${hexExtrasHTML(sel, false)}
+      ${ct.ok ? `<p class="small">Viagem: ${N(TERR[hx.t].cost)} dia${TERR[hx.t].cost>1?"s":""}, gasta ${N(cost)} provis${cost===1?"ão":"ões"}. Você tem ${N(h.provisions||0)}.${(h.provisions||0) < cost ? " Faltando provisões, cada uma vira 1 PV perdido." : ""}${water ? " Você atravessa a água a nado." : ""}</p>
+        <button class="btn" data-act="wTravel" data-k="${sel}">Viajar para cá</button>
+        ${voar && voar.left > 0 ? `<button class="btn ghost" data-act="wTravel" data-k="${sel}" data-how="fly">Voar até lá <small>(sem provisões e sem eventos)</small></button>` : ""}`
+      : `<p class="small muted">${esc(ct.why)}</p>`}</div>`;
+  }
+  const hereLoc = here.loc, town = isTown(hereLoc) && canEnterCity(hereLoc) && !here.banned;
+  const r = here.dg && dgRec(here.dg);
+  const acts = [];
+  if(town) acts.push(`<button class="btn" data-act="go" data-to="city">Entrar na ${esc(locLabel(hereLoc))}</button>`);
+  if(here.dg && !(r && r.complete)) acts.push(`<button class="btn" data-act="wEnterDg" ${w.ev?"disabled":""}>${r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra"}</button>`);
+  const retire = mustRetire(h) ? `<div class="banner"><b>Fim da jornada de ${esc(h.name)}</b><p class="small">Os ferimentos são irreparáveis. Encontre uma cidade para passar o legado adiante, ou registre o fim na ficha.</p></div>` : "";
+  return `
+  ${bar("Mundo","sheet")}
+  ${retire}
+  <div class="mapbox">
+    <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Provisões<b class="${lvc(h.provisions||0,provMax())}">${h.provisions||0}</b></span><span>Moedas<b>${h.coins}</b></span><span>Dia<b>${w.days+1}</b></span></div>
+    <canvas id="wmap" data-anim="wmap" aria-label="Mapa do mundo em hexágonos"></canvas>
+    <div class="mapctl"><button data-act="wZoom" data-z="1.3" aria-label="Aproximar">+</button><button data-act="wZoom" data-z="0.77" aria-label="Afastar">−</button><button data-act="wCenter" aria-label="Centralizar no aventureiro">◎</button><button data-act="go" data-to="sheet" aria-label="Ficha do personagem"><canvas width="13" height="13" data-clip></canvas></button></div>
+  </div>
+  <p class="muted small" style="margin:0">Toque num hexágono vizinho para ver o terreno e viajar. Arraste para mover e pince para dar zoom.</p>
+  <div class="etray" id="etray"></div>
+  ${evHTML}
+  ${selHTML}
+  <div class="sheet"><h3>${esc(hexDesc(w.pos))}${w.boat ? " · de barco" : ""}</h3>
+    ${hexExtrasHTML(w.pos, true)}
+    ${acts.length ? `<div class="stack">${acts.join("")}</div>` : ""}
+  </div>
+  ${tameHTML()}
+  <div class="sheet"><h3>Diário de viagem</h3><div class="log">${w.log.slice(0,8).map(l=>`<p>${esc(l)}</p>`).join("")}</div></div>`;
+}
+/* partes extras da cidade quando o mundo está ativo */
+function worldCityTop(){
+  const w = WD(), h = state.hero, hx = wHere(), loc = hx.loc, fort = loc.k === "fort";
+  const coast = hexNb(w.pos).some(k=>w.hex[k] && w.hex[k].t === "ag");
+  const near = hexNb(w.pos).filter(k=>w.hex[k] && w.hex[k].dg).map(k=>({k, m:w.hex[k].dg, dir:HDIRN[hexNb(w.pos).indexOf(k)]}));
+  const need = provMax() - (h.provisions||0), afford = Math.min(need, h.coins);
+  const row = (title, txt, btn) => `<div class="spell"><div class="txt"><b>${title}</b><span class="small">${txt}</span></div>${btn}</div>`;
+  return `
+  <div class="sheet">
+    <h3>Provisões e barco</h3>
+    ${row("Provisões", `Você tem ${N(h.provisions||0)} de ${provMax()}${mercCount() ? " (20 por pessoa do grupo)" : ""}. Cada dia de viagem gasta 1${mercCount() ? " por pessoa" : ""}. Custam 1 moeda cada.`, `<button class="use" data-act="wBuyProv" data-n="1" ${h.coins<1||need<=0?"disabled":""}>+1</button>`)}
+    ${afford >= 2 ? `<button class="btn ghost" data-act="wBuyProv" data-n="${afford}">Comprar ${afford} provisões <small>(${afford} moedas)</small></button>` : ""}
+    ${coast ? row("Barco", w.boat ? "Seu barco espera no porto. Ao pisar em terra, você deixa o barco." : "Com um barco você anda pela água. Ao pisar em terra, você deixa o barco. 1 moeda.", w.boat ? `<span class="chip">Contratado</span>` : `<button class="use" data-act="wBoat" ${h.coins<1?"disabled":""}>Contratar</button>`) : ""}
+  </div>
+  <div class="sheet">
+    <h3>Rumores de masmorras</h3>
+    ${near.length ? near.map(n=>{ const r = dgRec(n.m); return `<p class="small"><b>${esc(n.m.name)}</b> fica ${n.dir}${r && r.complete ? " (completada)" : ""}.</p>`; }).join("") : `<p class="muted small">Ninguém comentou de masmorras por perto ainda.</p>`}
+    ${near.some(n=>{ const r = dgRec(n.m); return !(r && r.complete); }) ? "" : `<button class="btn" data-act="wAsk">Perguntar na taverna</button>`}
+    ${fort ? `<p class="muted small">Toda fortaleza tem esgotos embaixo. <span class="soon">Em breve</span></p>` : ""}
+  </div>`;
+}
+function worldCityBottom(){
+  const h = state.hero, hx = wHere(), loc = hx.loc, fort = loc.k === "fort", cul = CULTURE[loc.race];
+  const row = (title, txt, btn) => `<div class="spell"><div class="txt"><b>${title}</b><span class="small">${txt}</span></div>${btn}</div>`;
+  const bagFull = h.bag.length >= bagMax();
+  const culTxt = {curse:"Nenhum item amaldiçoado com você.", lamp:"Com a lamparina você usa as duas mãos em combate.", boots:"Botas (2 PV). Com elas você gasta só 1 provisão para andar em florestas.", spell:"Os gnomos te ensinam uma Magia Básica aleatória (1d6).", verdosa:"Ao beber, role um dado: 3 ou mais recupera todos os PV. Menos que isso, coceira por um dia inteiro.", gladio:"Arma de Dano 1d6+1."}[cul.k];
+  return `
+  <div class="sheet">
+    <h3>Cultura ${esc(loc.race === "Humana" ? "humana" : loc.race === "Anã" ? "anã" : loc.race === "Élfica" ? "élfica" : loc.race === "Gnoma" ? "gnoma" : loc.race === "Goblin" ? "goblin" : "orc")}</h3>
+    ${row(`${cul.t} <span class="n">${cul.price}</span> moedas`, culTxt, cul.k === "curse" ? "" : `<button class="use" data-act="wCulture" ${h.coins < cul.price || (cul.item && bagFull) ? "disabled" : ""}>${cul.k === "spell" ? "Aprender" : "Comprar"}</button>`)}
+  </div>
+  <div class="sheet">
+    <h3>Conseguindo dinheiro</h3>
+    ${row("Trabalho Árduo", "Anos de trabalho pesado: perde 1 PV máximo para sempre e ganha 1d6+1 moedas.", `<button class="use" data-act="wWork">Trabalhar</button>`)}
+    ${row("Jogo de Azar", h.coins >= 1 ? "Aposte 1 moeda e role um dado. Se cair 6, ganha 5 moedas." : "Sem dinheiro, você aposta a vida. Se cair 6, ganha 5 moedas. Se não, morre.", `<button class="use" data-act="wGamble">${h.coins >= 1 ? "Apostar" : "Apostar a vida"}</button>`)}
+    ${row("Vida Bandida", `Roube viajantes: role ${fort ? "3d6" : "2d6"}. Pode render moedas ou tesouros, mas também a cadeia ou a morte.`, `<button class="use" data-act="wRob">Roubar</button>`)}
+    ${fort ? row("Arena", "Você não sabe quem será o oponente. Se vencer, ganha 20 moedas. Se perder, morre.", `<button class="use" data-act="wArena">Lutar</button>`) : ""}
+  </div>
+  ${fort ? `<div class="sheet"><h3>Castelo do Rei</h3>${H().king ? `<p class="small">Você já falou com o Rei desta terra.</p>` : row("Audiência", "Falar com o Rei de uma Fortaleza é requisito da classe Nobre.", `<button class="use" data-act="wKing">Pedir</button>`)}</div>` : ""}`;
+}
+/* ---------- ações ---------- */
+const actionsWorld = {
+  worldAsk(){ state.ui.worldAsk = true; render(); },
+  worldCancel(){ state.ui.worldAsk = false; render(); },
+  worldStart(){
+    if(COOP.on() || !state.hero) return;
+    worldInit(); state.ui = {}; wcenterOn = true; go("world");
+  },
+  wZoom(b){ wcam.z = clampWZ(wcam.z * +b.dataset.z); },
+  wCenter(){ wcenterOn = true; },
+  wTravel(b){ doTravel(b.dataset.k, b.dataset.how); },
+  wFight(){
+    const w = WD(), e = w.ev; if(!e || e.k !== "mon") return;
+    startWorldCombat(e, e.qty || 1);
+  },
+  wIgnore(){ const w = WD(); if(!w.ev || !ignoresEvents()) return; wLog(`Você evita o encontro com ${w.ev.qty>1 ? w.ev.pl : w.ev.n}.`); w.ev = null; persist(); render(); },
+  wCamo(){
+    const w = WD(), h = state.hero, s = h.spells["Camuflagem"]; if(!w.ev || !s || s.left <= 0) return;
+    s.left--; H().magic++; wLog(`Camuflagem: você passa despercebido (${w.ev.k === "mon" ? (w.ev.qty>1 ? w.ev.pl : w.ev.n) : w.ev.n}).`); w.ev = null; persist(); render();
+  },
+  async wClimate(){ const w = WD(), e = w.ev; if(!e || e.k !== "clima") return; w.ev = null; wBegin(); await applyClimate(e); if(state.hero) wEnd(); else { busy = false; persist(); render(); } },
+  wEnterDg(){
+    const w = WD(), hx = wHere(), m = hx && hx.dg; if(!m || w.ev) return;
+    let d = state.dungeon;
+    if(!d || d.uid !== m.uid){
+      if(d && !d.inside && d.hex) w.recs[d.uid] = d;
+      d = w.recs[m.uid] || Object.assign(newDungeonRecord(m.type, m.name, m.dice), {uid:m.uid, hex:w.pos});
+      delete w.recs[m.uid];
+      state.dungeon = d;
+    }
+    if(d.complete) return;
+    actions.enter();
+  },
+  wCorpse(b){
+    const hx = wHere(), i = +b.dataset.i, c = hx.corpses && hx.corpses[i], h = state.hero; if(!c) return;
+    h.coins += c.coins; c.bag.forEach(it=>wAddItem(it));
+    if(c.name !== h.name) H(h).avenged++;
+    wLog(`Você revistou o corpo de ${c.name}: ${c.coins} moedas e ${c.bag.length} itens.`);
+    hx.corpses.splice(i,1); persist(); render();
+  },
+  wPick(b){ const hx = wHere(), i = +b.dataset.i, it = hx.ground && hx.ground[i], h = state.hero; if(!it || h.bag.length >= bagMax()) return; h.bag.push(it); hx.ground.splice(i,1); persist(); render(); },
+  wBuyProv(b){
+    const h = state.hero, n = Math.min(+b.dataset.n, provMax() - (h.provisions||0), h.coins); if(n <= 0) return;
+    h.coins -= n; h.provisions = (h.provisions||0) + n;
+    state.ui.cityMsg = `Você comprou ${n} provis${n>1?"ões":"ão"}.`; persist(); render();
+  },
+  wBoat(){ const h = state.hero, w = WD(); if(h.coins < 1 || w.boat) return; h.coins--; w.boat = true; state.ui.cityMsg = "Você contratou um barco. Ele espera no porto."; persist(); render(); },
+  async wAsk(){
+    const w = WD(), nb = hexNb(w.pos);
+    if(nb.some(k=>{ const m = w.hex[k].dg; if(!m) return false; const r = dgRec(m); return !(r && r.complete); })) return;
+    wBegin();
+    const [side] = await roll("Lado", 1);
+    let k = null;
+    for(let i=0;i<6;i++){ const n = nb[(side-1+i)%6], hx = w.hex[n]; if(hx.t !== "ag" && !hx.loc && !hx.dg){ k = n; break; } }
+    if(!k){ rollNote("Nada"); state.ui.cityMsg = "Ninguém na taverna sabe de masmorras por perto."; wEnd(); return; }
+    rollNote(HDIRN[nb.indexOf(k)]);
+    const t = w.hex[k].t;
+    let type = null;
+    for(let g=0; g<12 && !type; g++){
+      const [v] = await roll("Tipo", 1), nm = DG_TYPE[t][v-1];
+      if(DG_ID[nm]){ type = DG_ID[nm]; rollNote(nm); } else rollNote(`${nm}: em breve, rola de novo`);
+    }
+    if(!type) type = 1;
+    const parts = [];
+    for(const lb of ["Nome (parte 2)","Nome (parte 3)","Nome (parte 4)"]){ const v = await roll(lb, 3); parts.push(v[0]+v[1]+v[2]); }
+    const name = worldDungeonName(type, parts[0], parts[1], parts[2]);
+    w.hex[k].dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type, name, dice:parts};
+    state.ui.cityMsg = `Na taverna, falam d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}, ${HDIRN[nb.indexOf(k)]} da cidade.`;
+    wLog(state.ui.cityMsg);
+    wEnd();
+  },
+  async wCulture(){
+    const h = state.hero, loc = wHere().loc, cul = CULTURE[loc.race];
+    if(!cul || cul.k === "curse" || h.coins < cul.price) return;
+    if(cul.item){ if(h.bag.length >= bagMax()) return; h.coins -= cul.price; h.bag.push(fixWearable(cul.item())); state.ui.cityMsg = `Você comprou: ${cul.item().n.split(" (")[0]}.`; persist(); render(); return; }
+    if(cul.k === "spell"){
+      wBegin(); h.coins -= cul.price;
+      const [v] = await roll("Magia Básica", 1), n = SPELLS[v].n; rollNote(n);
+      const sp = h.spells[n] || {max:0,left:0}; sp.max++; sp.left++; h.spells[n] = sp;
+      state.ui.cityMsg = `Os gnomos te ensinaram ${n}.`; wEnd();
+    }
+  },
+  async wWork(){
+    const h = state.hero; wBegin();
+    const [v] = await roll("Trabalho", 1);
+    h.pvMax--; h.pv = Math.min(h.pv, h.pvMax); h.coins += v+1;
+    state.ui.cityMsg = `Anos de trabalho duro: ${v+1} moedas, e 1 PV máximo a menos (${h.pvMax}).`;
+    if(h.pvMax <= 0){ busy = false; killHero("Trabalhou até morrer"); persist(); render(); return; }
+    wEnd();
+  },
+  async wGamble(){
+    const h = state.hero, life = h.coins < 1; wBegin();
+    if(!life) h.coins--;
+    const [v] = await roll(life ? "A sua vida" : "Aposta", 1);
+    if(v === 6){ h.coins += 5; rollNote("Ganhou!"); state.ui.cityMsg = "Você ganhou 5 moedas!"; }
+    else if(life){ rollNote("Perdeu"); busy = false; killHero("Apostou a vida num jogo de azar e perdeu"); persist(); render(); return; }
+    else { rollNote("Perdeu"); state.ui.cityMsg = "Você perdeu a moeda."; }
+    wEnd();
+  },
+  async wRob(){
+    const h = state.hero, hx = wHere(), fort = hx.loc.k === "fort"; wBegin();
+    const v = await roll("Roubo", fort ? 3 : 2), s = v.reduce((a,b)=>a+b,0);
+    if(s <= 4){ rollNote("Pego por um aventureiro"); busy = false; killHero("Tentou roubar um aventureiro e foi morto na hora"); persist(); render(); return; }
+    if(s <= 7){
+      rollNote("Cadeia");
+      const [d] = await roll("Fuga", 1);
+      h.pv = Math.max(0, h.pv - d);
+      if(h.pv <= 0 && !samambro()){ busy = false; killHero("Morreu tentando fugir da cadeia"); persist(); render(); return; }
+      hx.banned = true; wLog(`Você fugiu da cadeia (${d} de dano) e não pode mais entrar nesta cidade.`);
+      state.ui = {}; busy = false; go("world"); return;
+    }
+    const gain = {8:2, 9:5, 10:7, 11:10, 12:10, 13:20, 14:20}[s];
+    if(gain){ h.coins += gain; rollNote(`${gain} moedas`); state.ui.cityMsg = `Você roubou ${gain} moedas.`; }
+    else { const type = s === 15 ? 2 : s === 16 ? 4 : 1, it = rollTreasure(DUNGEONS[type]); rollNote(`Tesouro de ${DUNGEONS[type].n}`); wAddItem(it); state.ui.cityMsg = `Você roubou um tesouro: ${it.n.split(" (")[0]}.`; }
+    wEnd();
+  },
+  async wArena(){
+    const h = state.hero; wBegin();
+    const v = await roll("Campeão da Arena", 3), s = v[0]+v[1]+v[2], [n, pv, dano, tr, key] = ARENA[s];
+    rollNote(n); H().arena++;
+    await new Promise(r=>setTimeout(r, reduced ? 0 : 600));
+    busy = false;
+    startWorldCombat({n, pv, dano, tr, key}, 1, {arena:true});
+  },
+  wKing(){ H().king++; state.ui.cityMsg = "O Rei te recebeu no salão do trono. Agora você conhece a nobreza desta terra."; persist(); render(); }
+};
+
+/* ---------- desenhos dos animais, montarias e invocações (de lado, olhando para a direita) ---------- */
+const MERC_GEAR = {"Capanga":{Braceletes:"Braceletes"}, "Bufão":{Elmo:"Chapéu do Bobo"}, "Guarda Costas":{Elmo:"Elmo", Peitoral:"Peitoral"}, "Veterano de Guerra":{Elmo:"Elmo", Peitoral:"Peitoral", Ombreiras:"Ombreiras"},
+  "Rastreador Elfo":{Botas:"Botas"}, "Soldado Élfico":{Peitoral:"Peitoral Élfico", Elmo:"Elmo Élfico"}, "Minerador Anão":{Elmo:"Elmo"}, "Soldado Anão":{Elmo:"Elmo", Peitoral:"Peitoral", Braceletes:"Braceletes"},
+  "Soldado Orc":{Ombreiras:"Ombreiras", Peitoral:"Peitoral"}};
+function mercDoll(n, wn){
+  const m = MERCS[n] || {}, g = MERC_GEAR[n] || {};
+  return {name:n, race:m.race || 7, race2:null, arms:2, weapon:wn ? {n:wn} : {n:"Mãos nuas", unarmed:true}, off:n === "Veterano de Guerra" ? [{n:"Escudo de Ferro", shield:true}] : [],
+    armor:Object.fromEntries(Object.entries(g).map(([sl,nm])=>[sl,{n:nm, slot:sl}])), bag:[], noTorch:n !== "Segurador de Tocha"};
+}
+/* ---------- acessórios dos mercenários: chapéu de mago, alaúde e a mochila do Ogro ---------- */
+const MERC_ACC = {};
+function accSprite(k){
+  if(MERC_ACC[k]) return MERC_ACC[k];
+  if(k === "hat") MERC_ACC[k] = pixCanvas(14, 13, ({P})=>{
+    const rows = ["......b.......",".....bb.......",".....bbb......","....bbyb......","....bbbbb.....","...bybbbb.....","...bbbbbyb....","..bbbbbbbbb...","..bybbbbbbbb..","BBBBBBBBBBBBBB","BBBBBBBBBBBBBB"];
+    const pal = {b:"#3a5ad8", B:"#2a3a98", y:"#f8e040"};
+    rows.forEach((r,j)=>{ for(let i=0;i<r.length;i++) if(pal[r[i]]) P(i, j+1, i < 6 && r[i] === "b" ? "#4a6ae8" : pal[r[i]]); });
+  });
+  if(k === "lute") MERC_ACC[k] = pixCanvas(14, 16, ({P, disc, line})=>{
+    line(9, 6, 12, 1, "#5a3418"); line(10, 6, 13, 1, "#7a4a24"); P(12, 0, "#3a2010"); P(13, 0, "#3a2010"); P(13, 2, "#e8e0c8"); P(11, 1, "#e8e0c8");
+    disc(6, 10, 5, 4.5, (x,y,e,dx,dy)=>P(x,y, dx+dy < -2 ? "#e0a050" : dx+dy > 3 ? "#9a5a24" : "#c8823a"));
+    disc(7, 9, 1.4, 1.4, (x,y)=>P(x,y,"#2a1608"));
+    line(4, 13, 10, 5, "#f0e4c8"); P(3, 13, "#5a3418"); P(4, 14, "#5a3418");
+  });
+  if(k === "pack") MERC_ACC[k] = pixCanvas(18, 20, ({P, disc, rect})=>{
+    disc(9, 11, 8, 8.5, (x,y,e,dx,dy)=>P(x,y, dx+dy < -4 ? "#c89a5a" : dx+dy > 5 ? "#7a5228" : "#a87a40"));
+    rect(3, 3, 12, 3, (i)=> i===0 ? "#d8b070" : "#b88a48");
+    for(let y=4;y<19;y++){ P(5, y, "#5a3418"); P(12, y, "#5a3418"); }
+    rect(7, 9, 4, 3, (i,j)=> j===0 ? "#d8b070" : "#c89a5a"); P(9, 12, "#c8a040");
+    P(2, 1, "#8a6a3a"); P(3, 2, "#8a6a3a"); rect(1, 0, 2, 1, "#6a4a2a"); P(15, 2, "#9a9aa4"); P(16, 1, "#9a9aa4"); P(16, 0, "#c8c8d0");
+  });
+  return MERC_ACC[k];
+}
+/* desenha um mercenário (boneco da raça + acessórios). fx, fy = pés */
+function drawMerc(ctx, n, wn, fx, fy, t, pose, back){
+  const big = n === "Ogro de Carga";
+  const doll = mercDoll(n, wn);
+  ctx.save(); ctx.translate(Math.round(fx), Math.round(fy)); if(big) ctx.scale(1.5, 1.5);
+  const head = -(20 + DOLL_OY + 1) + DOLL_OY;           /* topo do quadro do boneco, sem a folga de cima */
+  if(big && !back){ const pk = accSprite("pack"); ctx.drawImage(pk, -9, head - 2); }
+  const pf = drawHero(ctx, 0, 0, t, pose, back, undefined, doll);
+  if(big && back){ const pk = accSprite("pack"); ctx.drawImage(pk, -9, head + 1); }
+  if(n === "Mago de Aluguel"){ const h = accSprite("hat"); ctx.drawImage(h, -7, head - 11); }
+  if(n === "Menestrel"){ const l = accSprite("lute"); if(back) ctx.drawImage(l, -8, head + 3); else ctx.drawImage(l, -6, head + 5); }
+  ctx.restore();
+  return pf ? [Math.round(fx + pf[0]*(big ? 1.5 : 1)), Math.round(fy + pf[1]*(big ? 1.5 : 1))] : null;
+}
+
+const beastCache = {};
+function beastSprite(key, f){
+  const ck = key + "_" + (f||0); if(beastCache[ck]) return beastCache[ck];
+  const spec = BEASTS[key]; if(!spec) return null;
+  return beastCache[ck] = pixCanvas(spec.w, spec.h, o=>spec.draw(o, f||0));
+}
+/* quadrúpede genérico (de lado): pernas do fundo, cauda, corpo, quadril, pernas da frente, pescoço e cabeça */
+function quad(o, f, q){
+  const {P, disc, line, B} = o, C = q.c, sw = f ? 1 : 0;
+  const bx = q.x, by = B - q.leg - Math.round(q.ry*.4);
+  const legTop = by + Math.round(q.ry*.2), wl = q.legW || 2;
+  const leg = (x, far, swing) => { const len = B - legTop;
+    for(let y=legTop; y<=B; y++){ const k = (y-legTop)/len, w = k < .45 ? wl + 1 : wl, dx = k > .5 ? swing : 0;
+      for(let i=0;i<w;i++) P(x + i + dx, y, y === B ? (q.hoof || C[2]) : far ? C[2] : (i === 0 ? C[0] : C[1])); } };
+  leg(bx - q.rx + 2, true, -sw); leg(bx + q.rx - 4, true, sw);
+  if(q.tail) q.tail(o, bx - q.rx, by - Math.round(q.ry*.3), f);
+  disc(bx, by, q.rx, q.ry, (x,y,e,dx,dy)=>P(x,y, dy < -q.ry*.35 ? C[0] : dy > q.ry*.4 ? (q.belly || C[2]) : C[1]));
+  disc(bx - q.rx + 3, by + 1, Math.max(2, q.rx*.32), q.ry*.95, (x,y,e,dx,dy)=>P(x,y, dy < -q.ry*.3 ? C[0] : dx > 1 ? C[2] : C[1]));
+  if(q.marks) q.marks(o, bx, by, f);
+  leg(bx - q.rx + 3, false, sw); leg(bx + q.rx - 3, false, -sw);
+  /* pescoço */
+  const nx = bx + q.rx - 2, ny = by - Math.round(q.ry*.35), hx = nx + q.hdx, hy = ny + q.hdy;
+  const steps = Math.max(2, Math.round(Math.hypot(q.hdx, q.hdy)));
+  for(let k=0;k<=steps;k++){ const t = k/steps, r = q.ry*.6*(1-t) + q.hr*.55*t; disc(nx + q.hdx*t, ny + q.hdy*t, r, r, (x,y,e,dx,dy)=>P(x,y, dx < -r*.3 ? C[0] : C[1])); }
+  if(q.mane) q.mane(o, nx, ny, hx, hy);
+  /* cabeça e focinho */
+  disc(hx, hy, q.hr, q.hr*.85, (x,y,e,dx,dy)=>P(x,y, dy < -q.hr*.3 ? C[0] : C[1]));
+  if(q.snout){ const [sl, sh, mc] = q.snout; disc(hx + q.hr*.6 + sl/2, hy + q.hr*.3, sl/2 + .5, sh/2 + .3, (x,y,e,dx,dy)=>P(x,y, dy > 0 ? (mc || C[1]) : C[1])); P(Math.round(hx + q.hr*.6 + sl), Math.round(hy + q.hr*.3 - sh/2 + .5), q.nose || "#1a1410"); }
+  P(Math.round(hx + q.hr*.35), Math.round(hy - q.hr*.25), q.eye || "#1a1410");
+  if(q.ears) q.ears(o, hx, hy, q.hr);
+  if(q.extra) q.extra(o, hx, hy, bx, by, f);
+}
+const tailLine = (len, up, c) => (o, x, y, f) => { for(let k=0;k<len;k++) o.P(x - k, y - Math.round(up*k/len) + (f && k > len/2 ? 1 : 0), c); };
+const earTri = (h, c) => (o, hx, hy, r) => { for(let j=0;j<h;j++){ o.P(hx - 1 - j*0, hy - r - j, c); o.P(hx - 2, hy - r - j + 1, c); } o.P(hx + 1, hy - r, c); o.P(hx + 1, hy - r - 1, c); };
+const saddle = (o, bx, by) => { for(let i=-3;i<=3;i++){ o.P(bx+i, by-6, i===-3||i===3 ? "#4a2e18" : "#8a3a2a"); o.P(bx+i, by-5, "#6a2a1e"); } o.P(bx, by-4, "#c8a040"); o.P(bx, by-3, "#c8a040"); };
+const BEASTS = {
+  "Gato":{w:18, h:14, draw:(o,f)=>quad(o,f,{x:8, rx:5, ry:2.5, leg:4, legW:1, hr:2.6, hdx:1, hdy:-3, c:["#f0a858","#d8863a","#a8602a"], belly:"#f4d4a8", snout:[1,1.5,"#f4d4a8"], hoof:"#a8602a",
+    tail:(o,x,y,f)=>{ for(let k=0;k<5;k++) o.P(x-1, y-k+(f && k>2?1:0), "#d8863a"); o.P(x, y-5, "#a8602a"); },
+    ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r-1, "#a8602a"); o.P(hx-1, hy-r, "#d8863a"); o.P(hx+1, hy-r-1, "#a8602a"); o.P(hx+1, hy-r, "#d8863a"); },
+    marks:(o,bx,by)=>{ o.P(bx-2, by-2, "#a8602a"); o.P(bx, by-2, "#a8602a"); o.P(bx+2, by-2, "#a8602a"); }, eye:"#3ac040"})},
+  "Cachorro":{w:22, h:16, draw:(o,f)=>quad(o,f,{x:10, rx:6, ry:3, leg:5, legW:1, hr:3, hdx:2, hdy:-4, c:["#c89058","#9a6a3a","#6a4424"], belly:"#e8d0a8", snout:[3,2,"#e8d0a8"], hoof:"#3a2418",
+    tail:(o,x,y,f)=>{ for(let k=0;k<4;k++) o.P(x-k*.6, y-k-(f?1:0)*(k>1?1:0), "#9a6a3a"); },
+    ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r+1, "#6a4424"); o.P(hx-3, hy-r+2, "#6a4424"); o.P(hx-3, hy-r+3, "#6a4424"); o.P(hx-2, hy-r+2, "#6a4424"); }})},
+  "Lobo":{w:26, h:18, draw:(o,f)=>quad(o,f,{x:12, rx:7, ry:3.5, leg:6, legW:1, hr:3.3, hdx:2, hdy:-4, c:["#b4b4c0","#8a8a98","#5a5a66"], belly:"#d8d8e0", snout:[4,2,"#d8d8e0"], hoof:"#3a3a44",
+    tail:(o,x,y,f)=>{ for(let k=0;k<6;k++){ o.P(x-k, y+Math.round(k*.6)+(f?1:0), "#8a8a98"); o.P(x-k, y+1+Math.round(k*.6)+(f?1:0), "#5a5a66"); } },
+    ears:(o,hx,hy,r)=>{ o.P(hx-1, hy-r-1, "#5a5a66"); o.P(hx-1, hy-r-2, "#5a5a66"); o.P(hx-2, hy-r-1, "#8a8a98"); o.P(hx+1, hy-r-1, "#5a5a66"); }, eye:"#f8d040",
+    mane:(o,nx,ny)=>{ for(let k=0;k<4;k++) o.P(nx-1+k, ny-3, "#5a5a66"); }})},
+  "Tigre":{w:30, h:18, draw:(o,f)=>quad(o,f,{x:14, rx:9, ry:3.8, leg:5, legW:2, hr:3.8, hdx:1, hdy:-3, c:["#f8a848","#e0862a","#a85a1a"], belly:"#f8e8d0", snout:[2,2,"#f8e8d0"], hoof:"#f8e8d0",
+    tail:(o,x,y,f)=>{ for(let k=0;k<7;k++) o.P(x-k, y - (k>4 ? k-4 : 0) + (f?1:0), k%2 ? "#1a1410" : "#e0862a"); },
+    marks:(o,bx,by)=>{ for(let i=-7;i<=6;i+=3){ o.P(bx+i, by-3, "#1a1410"); o.P(bx+i, by-2, "#1a1410"); o.P(bx+i+1, by-1, "#1a1410"); } },
+    ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r, "#a85a1a"); o.P(hx+1, hy-r, "#a85a1a"); }, eye:"#3ac040",
+    extra:(o,hx,hy)=>{ o.P(hx-1, hy-2, "#1a1410"); o.P(hx+1, hy-2, "#1a1410"); }})},
+  "Bode":{w:22, h:20, draw:(o,f)=>quad(o,f,{x:9, rx:6, ry:3.5, leg:6, legW:1, hr:2.8, hdx:2, hdy:-5, c:["#f8f4ec","#dcd4c4","#a8a090"], snout:[2,2,"#dcd4c4"], hoof:"#3a3028",
+    tail:(o,x,y)=>{ o.P(x, y-2, "#dcd4c4"); o.P(x-1, y-3, "#dcd4c4"); },
+    ears:(o,hx,hy,r)=>{ o.line(hx-1, hy-r, hx-4, hy-r-2, "#7a6a4a"); o.line(hx, hy-r, hx-3, hy-r-3, "#a89a70"); o.P(hx-2, hy, "#a8a090"); o.P(hx-3, hy+1, "#a8a090"); },
+    extra:(o,hx,hy)=>{ o.P(hx+3, hy+3, "#c8c0b0"); o.P(hx+3, hy+4, "#c8c0b0"); o.P(hx+2, hy+4, "#c8c0b0"); }})},
+  "Macaco":{w:16, h:18, draw:(o,f)=>{ const {P, disc, line, B} = o;
+    for(let k=0;k<8;k++) P(3 + Math.round(Math.sin(k/2)*2), B - 2 - k, "#6a4424"); P(5, B-10, "#6a4424");
+    disc(8, B-5, 4, 5, (x,y,e,dx,dy)=>P(x,y, dy < -2 ? "#a8743a" : dy > 2 ? "#6a4424" : "#8a5a2a"));
+    disc(8, B-4, 2, 3, (x,y)=>P(x,y,"#e8c8a0"));
+    disc(9, B-12, 3.5, 3.2, (x,y,e,dx,dy)=>P(x,y, dy < -1 ? "#a8743a" : "#8a5a2a")); disc(10, B-11, 2.2, 1.8, (x,y)=>P(x,y,"#e8c8a0")); P(9, B-12, "#1a1410"); P(11, B-12, "#1a1410");
+    P(5, B-13, "#e8c8a0"); P(13, B-13, "#e8c8a0");
+    line(11, B-7, 13 + (f?1:0), B-10, "#8a5a2a"); line(5, B-7, 4, B-3, "#8a5a2a"); P(6, B, "#6a4424"); P(10, B, "#6a4424"); }},
+  "Cobra":{w:20, h:10, draw:(o,f)=>{ const {P, B} = o;
+    for(let x=1;x<17;x++){ const y = B - 2 - Math.round(Math.sin((x + (f?1.5:0))/2.2)*1.5); P(x, y, "#4a9a3a"); P(x, y+1, "#2a6a2a"); if(x%3===0) P(x, y, "#e8e070"); }
+    for(let j=0;j<3;j++){ P(17, B-4-j, "#4a9a3a"); P(18, B-4-j, "#2a6a2a"); } P(19, B-7, "#4a9a3a"); P(18, B-7, "#4a9a3a"); P(19, B-6, "#2a6a2a"); P(19, B-7, "#1a1410"); P(20, B-6, "#e02828"); }},
+  "Corvo":{w:16, h:14, draw:(o,f)=>bird(o, f, ["#4a4a5a","#2a2a34","#14141c"], "#e8c040", "#d8a020")},
+  "Águia":{w:18, h:16, draw:(o,f)=>bird(o, f, ["#a8743a","#8a5a2a","#5a3a1a"], "#f8d040", "#f0c020", "#f8f8f0")},
+  "Coruja":{w:16, h:16, draw:(o,f)=>{ const {P, disc, B} = o;
+    disc(8, B-6, 5, 6, (x,y,e,dx,dy)=>P(x,y, dy < -2 ? "#c8a46a" : dx > 2 ? "#6a5434" : "#a8885a"));
+    disc(8, B-4, 3, 3, (x,y)=>P(x,y, (x+y)%2 ? "#e8d8b0" : "#d8c494"));
+    [[6,B-9],[10,B-9]].forEach(([x,y])=>{ P(x,y,"#f8f0d0"); P(x+1,y,"#f8f0d0"); P(x,y+1,"#f8f0d0"); P(x+1,y+1,"#1a1410"); }); P(8, B-8, "#e0a020");
+    P(4, B-13, "#6a5434"); P(12, B-13, "#6a5434"); P(4, B-12, "#a8885a"); P(12, B-12, "#a8885a");
+    if(f){ P(3, B-6, "#6a5434"); P(13, B-6, "#6a5434"); } P(7, B, "#e0a020"); P(9, B, "#e0a020"); }},
+  "Cavalo":{w:32, h:28, draw:(o,f)=>quad(o,f,{x:14, rx:9, ry:4.5, leg:9, legW:2, hr:3, hdx:4, hdy:-8, c:["#b07444","#86522e","#5a341c"], snout:[4,2.4,"#86522e"], hoof:"#2a1a10",
+    tail:(o,x,y,f)=>{ for(let k=0;k<9;k++){ o.P(x - (k<3?k:2) - (f&&k>4?1:0), y + k - 1, "#2a1a10"); o.P(x - (k<3?k:2) + 1, y + k, "#3a2418"); } },
+    ears:(o,hx,hy,r)=>{ o.P(hx-1, hy-r-1, "#5a341c"); o.P(hx-1, hy-r-2, "#5a341c"); },
+    mane:(o,nx,ny,hx,hy)=>{ for(let k=0;k<=8;k++){ const t = k/8; o.P(Math.round(nx - 2 + (hx-nx-1)*t), Math.round(ny - 3 + (hy-ny)*t), "#2a1a10"); o.P(Math.round(nx - 3 + (hx-nx-1)*t), Math.round(ny - 2 + (hy-ny)*t), "#3a2418"); } },
+    marks:(o,bx,by)=>saddle(o,bx,by)})},
+  "Camelo":{w:32, h:30, draw:(o,f)=>quad(o,f,{x:13, rx:9, ry:4.5, leg:10, legW:2, hr:2.6, hdx:6, hdy:-6, c:["#e8c482","#c8a060","#9a7a40"], snout:[3,2,"#c8a060"], hoof:"#6a5030",
+    tail:(o,x,y)=>{ for(let k=0;k<4;k++) o.P(x, y+k, "#9a7a40"); },
+    ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r, "#9a7a40"); },
+    marks:(o,bx,by)=>{ o.disc(bx-1, by-4, 5, 4, (x,y,e,dx,dy)=>{ if(dy < 1) o.P(x,y, dy < -2 ? "#f4d494" : "#d8b070"); }); for(let i=-3;i<=3;i++) o.P(bx-1+i, by-1, i%2 ? "#8a3a2a" : "#c8a040"); }})},
+  "Llama":{w:24, h:30, draw:(o,f)=>quad(o,f,{x:9, rx:7, ry:4, leg:9, legW:2, hr:2.8, hdx:2, hdy:-12, c:["#fcf8f0","#e8e0d0","#c0b4a0"], snout:[2,2,"#e8e0d0"], hoof:"#4a4038",
+    tail:(o,x,y)=>{ o.P(x, y-1, "#e8e0d0"); o.P(x-1, y-1, "#e8e0d0"); o.P(x-1, y, "#c0b4a0"); },
+    ears:(o,hx,hy,r)=>{ o.P(hx-1, hy-r-1, "#c0b4a0"); o.P(hx-1, hy-r-2, "#c0b4a0"); o.P(hx+1, hy-r-1, "#c0b4a0"); o.P(hx+1, hy-r-2, "#c0b4a0"); },
+    marks:(o,bx,by)=>{ for(let i=-4;i<=4;i++){ o.P(bx+i, by-4, i%2 ? "#d04a3a" : "#3a6ad8"); o.P(bx+i, by-3, i%2 ? "#f8d040" : "#d04a3a"); } }})},
+  "Lobo Gigante":{w:34, h:24, draw:(o,f)=>quad(o,f,{x:15, rx:10, ry:4.6, leg:8, legW:2, hr:4.4, hdx:2, hdy:-5, c:["#7e7e8c","#5a5a68","#3a3a44"], belly:"#a8a8b4", snout:[5,3,"#a8a8b4"], hoof:"#24242a",
+    tail:(o,x,y,f)=>{ for(let k=0;k<8;k++){ o.P(x-k, y+Math.round(k*.5)+(f?1:0), "#5a5a68"); o.P(x-k, y+1+Math.round(k*.5)+(f?1:0), "#3a3a44"); } },
+    ears:(o,hx,hy,r)=>{ o.P(hx-1, hy-r-1, "#3a3a44"); o.P(hx-1, hy-r-2, "#3a3a44"); o.P(hx-2, hy-r-1, "#5a5a68"); o.P(hx+1, hy-r-1, "#3a3a44"); o.P(hx+1, hy-r-2, "#3a3a44"); }, eye:"#f8d040",
+    mane:(o,nx,ny)=>{ for(let k=0;k<6;k++){ o.P(nx-2+k, ny-4, "#3a3a44"); o.P(nx-1+k, ny-5, "#3a3a44"); } },
+    marks:(o,bx,by)=>saddle(o,bx,by)})},
+  "Raptor":{w:30, h:24, draw:(o,f)=>{ const {P, disc, line, B} = o, C = ["#8ac050","#5a9a3a","#3a6a2a"];
+    for(let k=0;k<12;k++) { P(9 - k, B - 10 + Math.round(k*.4) + (f&&k>6?1:0), C[1]); P(9 - k, B - 9 + Math.round(k*.4), C[2]); }
+    line(12, B-7, 10 + (f?1:0), B, C[2]); line(13, B-7, 11 + (f?1:0), B, C[2]); P(9+(f?1:0), B, "#1a1410"); P(12, B, "#1a1410");
+    disc(14, B-10, 6, 4, (x,y,e,dx,dy)=>P(x,y, dy < -1 ? C[0] : dy > 2 ? "#e8e0a0" : C[1]));
+    line(15, B-7, 17 - (f?1:0), B, C[1]); line(16, B-7, 18 - (f?1:0), B, C[1]); P(18-(f?1:0), B, "#1a1410");
+    line(19, B-12, 23, B-17, C[1]); line(20, B-12, 24, B-16, C[0]);
+    disc(25, B-17, 3, 2.4, (x,y,e,dx,dy)=>P(x,y, dy < 0 ? C[0] : C[1])); for(let i=0;i<4;i++) P(26+i, B-17 + (i>1?1:0), C[1]); P(29, B-16, C[2]); P(26, B-18, "#1a1410");
+    line(21, B-10, 23, B-8, C[2]); for(let i=0;i<4;i++) P(15 + i*2, B-14, "#c84a2a"); }},
+  "Golfinho":{w:22, h:30, draw:(o,f)=>{ const {P, disc, line, B} = o, sw = f ? 1 : 0;
+    const sp = [[9,B-20,4],[8,B-16,4.6],[8,B-12,4.6],[8,B-8,4],[9,B-4,3],[11,B-1,2.2],[14,B,1.7],[16,B-1,1.3]];
+    for(let i=0;i<sp.length-1;i++){ const [x0,y0,r0] = sp[i], [x1,y1,r1] = sp[i+1]; for(let t=0;t<=1;t+=.25){ const cx = x0+(x1-x0)*t, cy = y0+(y1-y0)*t, r = r0+(r1-r0)*t;
+      disc(cx, cy, r, r, (x,y,e,dx,dy)=>P(x,y, dx > r*.25 && cy < B-3 ? (dx > r*.6 ? "#cfe4fa" : "#e8f4ff") : dx < -r*.4 ? "#2e5aa8" : "#4a7ad0")); } }
+    disc(9, B-22, 3.6, 3.2, (x,y,e,dx,dy)=>P(x,y, dx > 1 ? "#e8f4ff" : dx < -1.5 ? "#2e5aa8" : "#4a7ad0"));
+    for(let i=0;i<4;i++){ P(12+i, B-22, "#4a7ad0"); P(12+i, B-21, "#cfe4fa"); } P(16, B-21, "#2e5aa8");
+    P(10, B-23, "#1a1410"); P(11, B-24, "#ffffff");
+    line(4, B-14, 1, B-18, "#2e5aa8"); line(4, B-13, 2, B-17, "#2e5aa8"); line(5, B-12, 3, B-15, "#4a7ad0");
+    line(12, B-14, 15, B-11 - sw*2, "#4a7ad0"); line(12, B-13, 15, B-10 - sw*2, "#2e5aa8");
+    line(16, B-1, 19, B-4 - sw, "#2e5aa8"); line(17, B-1, 20, B-3 - sw, "#4a7ad0"); line(16, B, 19, B+1, "#2e5aa8"); P(20, B+1, "#2e5aa8");
+  }},
+  "Grifo":{w:34, h:30, draw:(o,f)=>quad(o,f,{x:14, rx:9, ry:4.5, leg:8, legW:2, hr:3.6, hdx:2, hdy:-7, c:["#f4d478","#c8a040","#8a6a20"], belly:"#f8e8b0", hoof:"#5a4010",
+    tail:(o,x,y,f)=>{ for(let k=0;k<6;k++) o.P(x-k, y+k*.3+(f?1:0), "#c8a040"); o.P(x-6, y+2, "#6a4a18"); o.P(x-7, y+2, "#6a4a18"); o.P(x-7, y+3, "#6a4a18"); },
+    extra:(o,hx,hy,bx,by,f)=>{
+      o.disc(hx, hy, 3.8, 3.4, (x,y,e,dx,dy)=>o.P(x,y, dy < -1 ? "#ffffff" : "#dcdce4")); o.P(hx+4, hy, "#f0b020"); o.P(hx+5, hy+1, "#f0b020"); o.P(hx+4, hy+1, "#c88010"); o.P(hx+1, hy-1, "#1a1410");
+      const wy = f ? 2 : 0;
+      for(let k=0;k<9;k++){ const len = 11 - k; for(let i=0;i<len;i++) o.P(bx - 5 + i + Math.round(k*.3), by - 4 - k + Math.round(wy*k/9), k > 6 ? "#f8f8f0" : i < 2 ? "#8a5a2a" : (i+k)%3 ? "#c8945a" : "#a8743a"); } }})},
+  "Elemental":{w:20, h:22, draw:(o,f)=>{ const {P, disc, B} = o;
+    disc(10, B-6, 6, 6, (x,y,e,dx,dy)=>P(x,y, e > .75 ? "#4a4038" : dx+dy < -2 ? "#9a8a78" : "#6e6254"));
+    [[8,B-8],[11,B-5],[9,B-4],[12,B-8]].forEach(([x,y])=>P(x,y,"#ffd040"));
+    for(let k=0;k<8;k++){ const w2 = Math.max(0, 4 - Math.floor(k/2)); for(let i=-w2;i<=w2;i++) P(10 + i + (f && k > 3 ? (k%2?1:-1) : 0), B-12-k, k < 2 ? "#f86a20" : k < 5 ? "#f8a030" : "#ffe070"); }
+    P(8, B-7, "#1a1410"); P(12, B-7, "#1a1410"); }}
+};
+function bird(o, f, C, beak, foot, head){
+  const {P, disc, line, B} = o;
+  disc(8, B-6, 5, 3.6, (x,y,e,dx,dy)=>P(x,y, dy < -1 ? C[0] : C[1]));
+  disc(13, B-9, 2.6, 2.4, (x,y)=>P(x,y, head || C[0]));
+  P(16, B-9, beak); P(17, B-8, beak); P(16, B-8, foot); P(13, B-10, "#1a1410");
+  line(3, B-6, 0, B-4, C[2]); line(3, B-5, 1, B-3, C[2]);
+  if(f){ for(let k=0;k<6;k++) line(7, B-8, 2 + k, B-14 - (k%2), C[2]); }
+  else { for(let k=0;k<5;k++) line(5, B-7 + k*.4, 11, B-6 + k*.4, k < 2 ? C[1] : C[2]); }
+  P(7, B-1, foot); P(7, B, foot); P(10, B-1, foot); P(10, B, foot);
+}
+
+/* =========================================================
+   MUNDO EXPANDIDO: MERCENÁRIOS, ANIMAIS, MONTARIAS E INVOCAÇÕES (páginas 40, 41 e 44)
+   Os companheiros nunca aparecem no mapa: só na tela de combate, com as ações deles separadas das do jogador.
+   ========================================================= */
+const MERCS = {
+  "Segurador de Tocha":{cost:10, pv:10, w:null, extra:"Nenhum e não sabe lutar.", nofight:true, race:7},
+  "Capanga":{cost:30, pv:14, w:["Porrete","1d6-2"], extra:"Nenhum.", race:7},
+  "Bufão":{cost:30, pv:17, w:null, extra:"Pode fazer palhaçadas.", joke:true, race:7},
+  "Arrombador":{cost:40, pv:14, w:["Adaga","1d6-1"], extra:"Abre fechaduras sem gastar tochas.", race:7},
+  "Guarda Costas":{cost:60, pv:16, w:["Espada Curta","1d6"], extra:"Nenhum.", race:7},
+  "Menestrel":{cost:60, pv:16, w:null, extra:"Toca música no combate: +2 no seu dano.", music:true, race:7, inst:"Bandolim"},
+  "Mago de Aluguel":{cost:80, pv:14, w:["Cajado","1d6-1"], extra:"Conjura 4 Magias Básicas aleatórias.", spells:4, race:7},
+  "Veterano de Guerra":{cost:100, pv:20, w:["Espada Longa","1d6+1"], extra:"Nenhum.", race:7},
+  "Rastreador Elfo":{cost:30, pv:11, w:["Sabre","1d6"], extra:"Ignora eventos de viagem.", race:6},
+  "Soldado Élfico":{cost:60, pv:13, w:["Cajado","1d6-2"], extra:"Conjura 3 Magias Básicas aleatórias.", spells:3, race:6},
+  "Minerador Anão":{cost:40, pv:15, w:["Picareta","1d6-1"], extra:"Para Achar Passagens Secretas, role dois dados e fique com o maior.", race:8},
+  "Soldado Anão":{cost:50, pv:16, w:["Machado","1d6+1"], extra:"+1 de dano contra Orcs e Goblins.", race:8},
+  "Ajudante Gnomo":{cost:30, pv:7, w:null, extra:"Conjura 4 Magias Básicas aleatórias.", spells:4, race:5},
+  "Goblin Ajudante":{cost:10, pv:1, w:null, extra:"Pode explodir quando quiser, causando 5 de dano em todos os monstros.", explode:true, race:"m1"},
+  "Soldado Orc":{cost:50, pv:17, w:["Gládio","1d6"], extra:"Nenhum.", race:"m2"},
+  "Ogro de Carga":{cost:80, pv:40, w:null, extra:"Carrega 40 itens e te devolve no final. Não pode usar nada.", cargo:40, noGear:true, nofight:true, race:"m5"}
+};
+function mercsFor(loc){
+  if(!loc) return ["Segurador de Tocha","Capanga"];                      /* cidade do jogo básico */
+  const r = loc.race, fort = loc.k === "fort", out = [];
+  if(r === "Humana"){ out.push("Segurador de Tocha","Capanga"); if(fort) out.push("Bufão","Arrombador","Guarda Costas","Menestrel","Mago de Aluguel","Veterano de Guerra"); }
+  if(r === "Élfica") out.push("Rastreador Elfo","Soldado Élfico");
+  if(r === "Anã") out.push("Minerador Anão","Soldado Anão");
+  if(r === "Gnoma") out.push("Ajudante Gnomo");
+  if(r === "Orc" || r === "Goblin") out.push("Goblin Ajudante","Soldado Orc","Ogro de Carga");
+  return out;
+}
+/* Tabela: Animais Domesticáveis. t = terrenos ("*" = qualquer) */
+const ANIMALS = {
+  "Gato":{dif:3, t:["pl","fl"], pv:2, d:"1", sp:"Nenhum.", key:"Gato"},
+  "Cachorro":{dif:2, t:["pl"], pv:3, d:"2", sp:"Na masmorra, não deixa você Mover em Silêncio.", key:"Cachorro"},
+  "Cobra":{dif:4, t:["*"], pv:2, d:"1", sp:"Ataque de Veneno.", key:"Cobra"},
+  "Corvo":{dif:4, t:["pa"], pv:2, d:"1", sp:"Se você morrer, role um dado: 4 ou mais, você volta.", key:"Corvo"},
+  "Águia":{dif:5, t:["mo"], pv:3, d:"2", sp:"Revela um hexágono a mais a cada viagem.", key:"Águia"},
+  "Coruja":{dif:4, t:["fl"], pv:2, d:"2", sp:"Gasta só 1 provisão para atravessar Florestas.", key:"Coruja"},
+  "Macaco":{dif:5, t:["fl"], pv:2, d:"1", sp:"Carrega um item a mais na mochila.", key:"Macaco"},
+  "Bode":{dif:4, t:["mo"], pv:4, d:"3", sp:"Gasta só 2 provisões para atravessar Montanhas.", key:"Bode"},
+  "Lobo":{dif:5, t:["fl"], pv:5, d:"3", sp:"Nenhum.", key:"Lobo"},
+  "Tigre":{dif:6, t:["fl"], pv:8, d:"4", sp:"Não pode entrar em masmorras.", noDg:true, key:"Tigre"}
+};
+/* Tabela: Montarias. Não entram em masmorras */
+const MOUNTS = {
+  "Cavalo":{dif:3, t:"pl", pv:10, d:"1", sp:"Com 1 provisão anda por 2 Planícies.", cost:50, key:"Cavalo"},
+  "Camelo":{dif:2, t:"de", pv:8, d:"1", sp:"Gasta só 1 provisão nos Desertos.", cost:30, key:"Camelo"},
+  "Llama":{dif:3, t:"mo", pv:6, d:"1", sp:"Gasta só 2 provisões nas Montanhas.", cost:70, key:"Llama"},
+  "Lobo Gigante":{dif:5, t:"fl", pv:6, d:"2", sp:"Gasta só 1 provisão nas Florestas.", cost:80, key:"Lobo Gigante"},
+  "Raptor":{dif:5, t:"pa", pv:6, d:"3", sp:"Gasta só 1 provisão nos Pântanos.", cost:100, key:"Raptor"},
+  "Golfinho":{dif:5, t:"ag", pv:4, d:"1", sp:"Leva você pela água, sem barco.", cost:50, key:"Golfinho"},
+  "Grifo":{dif:6, t:"mo", pv:12, d:"4", sp:"Gasta só 1 provisão em qualquer terreno.", cost:2000, key:"Grifo"}
+};
+function party(h){ h = h || state.hero; if(!h) return []; if(!h.party) h.party = []; return h.party; }
+function partyOf(kind, h){ return party(h).filter(p=>p.kind === kind); }
+function hasAlly(n, h){ return party(h).some(p=>p.n === n && p.pv > 0); }
+function mercCount(h){ return partyOf("merc", h).length; }
+function provMax(h){ return 20 * (1 + mercCount(h)); }
+function partyCargo(h){ return party(h).reduce((a,p)=>a + (p.kind === "merc" && MERCS[p.n] && MERCS[p.n].cargo ? MERCS[p.n].cargo : 0) + (p.n === "Macaco" ? 1 : 0), 0); }
+function torchHolder(h){ return party(h).find(p=>p.kind === "merc" && !(MERCS[p.n] && MERCS[p.n].noGear)); }
+function freeLock(){ return hasClass("Chaveiro") || hasClass("Ladrão") || hasAlly("Arrombador"); }
+function newPid(){ return Math.random().toString(36).slice(2,9); }
+function mercWeapon(m){ return m.w ? m.w : null; }
+
+/* ---------- aliados no combate ---------- */
+function buildAllies(world, arena){
+  const h = state.hero, inDg = !!(state.dungeon && state.dungeon.inside);
+  if(arena || (typeof COOP !== "undefined" && COOP.on())) return [];
+  return party(h).filter(p=>{
+    if(p.pv <= 0) return false;
+    if(p.kind === "merc") return !(MERCS[p.n] && MERCS[p.n].nofight);
+    if(p.kind === "animal") return !(inDg && ANIMALS[p.n] && ANIMALS[p.n].noDg);
+    if(p.kind === "mount") return !!world;
+    if(p.kind === "summon") return inDg;
+    return false;
+  }).map(p=>({pid:p.id, n:p.n, kind:p.kind, pv:p.pv, max:p.max, d:p.w ? p.w.d : p.d || null, wn:p.w ? p.w.n : null, tr:p.tr||"", key:p.key||p.n, race:p.race, acted:false}));
+}
+function alliesIn(){ const c = C(); return c && c.allies ? c.allies.filter(a=>a.pv > 0) : []; }
+function allyCanAct(a){ const m = MERCS[a.n]; if(m && m.music) return false; return !!(a.d || allySpells(a).length || (m && (m.explode || m.joke))); }
+function allySpells(a){ const p = party().find(x=>x.id === a.pid); if(!p || !p.spells) return []; return Object.entries(p.spells).filter(([n,s])=>s.left > 0 && ["Cura","Luz","Raio de Gelo","Relâmpago","Bola de Fogo"].includes(n)); }
+function syncAllies(){
+  const c = C(), h = state.hero; if(!c || !c.allies || !h) return;
+  c.allies.forEach(a=>{
+    if(!a.pid) return;
+    const p = party(h).find(x=>x.id === a.pid); if(!p) return;
+    p.pv = a.pv;
+  });
+  const gone = party(h).filter(p=>p.pv <= 0);
+  gone.forEach(p=>log(`${p.n} morreu em combate.`));
+  h.party = party(h).filter(p=>p.pv > 0);
+}
+function allyDamage(expr){ const m = String(expr).match(/^(\d*)d6([+-]\d+)?$/); return m ? null : +expr; }
+async function allyAttack(i){
+  const c = C(), a = c.allies[i], u = c.units[c.sel];
+  if(!a || a.acted || a.pv <= 0 || !a.d || !u || u.pv <= 0) return;
+  const fixed = allyDamage(a.d);
+  let die = 0, dmg;
+  if(fixed === null){ [die] = await roll(a.n, 1); const mod = +((a.d.match(/([+-]\d+)$/)||[])[1] || 0); dmg = Math.max(0, die + mod); }
+  else dmg = fixed;
+  if(a.n === "Soldado Anão" && /Orc|Goblin/.test(u.name)){ dmg += 1; }
+  cLog(`${a.n} ataca${a.wn ? " com " + a.wn : ""}: ${dmg} de dano.`);
+  await hitMonster(c.sel, dmg, {die, w:{n:""}, ally:true});
+  a.acted = true;
+}
+async function allyCast(i, sp){
+  const c = C(), a = c.allies[i], p = party().find(x=>x.id === a.pid), h = state.hero;
+  if(!a || a.acted || !p || !p.spells[sp] || p.spells[sp].left <= 0) return;
+  p.spells[sp].left--;
+  const u = c.units[c.sel];
+  if(sp === "Cura"){ h.pv = Math.min(h.pvMax, h.pv + 5); cLog(`${a.n} conjura Cura em você: +5 PV.`); }
+  if(sp === "Luz"){ h.torches = Math.min(10, h.torches + 1); cLog(`${a.n} conjura Luz: vale como uma tocha.`); }
+  if(sp === "Relâmpago" && u){ cLog(`${a.n} lança Relâmpago em ${u.name}!`); await hitMonster(c.sel, 6, {spell:true, w:{n:""}, ally:true}); }
+  if(sp === "Raio de Gelo" && u){ cLog(`${a.n} lança Raio de Gelo em ${u.name}!`); await hitMonster(c.sel, 4, {spell:true, w:{n:""}, ally:true}); u.frozen = Math.max(u.frozen||0, 1); }
+  if(sp === "Bola de Fogo"){ cLog(`${a.n} lança Bola de Fogo!`); for(let k=0;k<c.units.length;k++) if(c.units[k].pv > 0) await hitMonster(k, 5, {spell:true, w:{n:""}, ally:true}); }
+  a.acted = true;
+}
+async function allyAfter(){
+  const c = C();
+  if(!alive().length){ c.phase = "won"; cLog("Todos os monstros foram derrotados!"); busy = false; persist(); render(); return; }
+  pickNextTarget();
+  if(alliesIn().filter(allyCanAct).every(a=>a.acted)){ await runMonsterTurn(); return; }
+  busy = false; persist(); render();
+}
+async function toAllies(){
+  const c = C();
+  const ready = alliesIn().filter(allyCanAct);
+  if(!ready.length){ await runMonsterTurn(); return; }
+  c.allies.forEach(a=>a.acted = false);
+  c.phase = "ally"; busy = false; persist(); render();
+}
+/* divisão do dano entre o aventureiro e os aliados (página 44) */
+function splitInfo(){
+  const c = C(), p = c.pending, al = alliesIn(), need = p.total + p.poison, members = al.length + 1;
+  const minEach = need >= members ? 1 : 0;
+  const allySum = al.reduce((s,a)=>s + (c.split[a.pid || a.n + c.allies.indexOf(a)] || 0), 0);
+  return {need, minEach, allySum, hero:need - allySum, al};
+}
+function splitKey(a){ const c = C(); return a.pid || a.n + c.allies.indexOf(a); }
+async function applySplit(){
+  const c = C(), h = state.hero, s = splitInfo();
+  if(s.hero < s.minEach || s.al.some(a=>(c.split[splitKey(a)]||0) < s.minEach)) return;
+  s.al.forEach(a=>{ const d = c.split[splitKey(a)] || 0; if(!d) return; a.pv = Math.max(0, a.pv - d); cLog(`${a.n} recebe ${d} de dano${a.pv ? ` (${a.pv}/${a.max})` : " e cai"}.`); });
+  const heroPoison = Math.max(0, c.pending.poison - s.allySum), heroNormal = s.hero - heroPoison;
+  c.split = {};
+  const absorb = ARMOR_SLOTS.filter(sl=>h.armor[sl] && armorCur(h.armor[sl]) > 0);
+  if(heroNormal > 0 && absorb.length){ c.pending = {total:heroNormal, poison:heroPoison}; c.alloc = {}; c.phase = "alloc"; busy = false; persist(); render(); return; }
+  c.pending = null;
+  applyHeroDamage({}, heroNormal, heroPoison);
+}
+/* invocações */
+function summonAlly(n, pv, d, tr, key){ const c = C(); c.allies = c.allies || []; c.allies.push({pid:null, n, kind:"summon", pv, max:pv, d, tr:tr||"", key:key||n, acted:true}); }
+function summonSkeleton(){
+  const h = state.hero, p = {id:newPid(), kind:"summon", n:"Esqueleto", pv:4, max:4, d:"1", tr:"Morto-Vivo", key:"Esqueleto", untilDg:true};
+  party(h).push(p);
+  const c = C(); if(c && !c.world){ c.allies = c.allies || []; c.allies.push({pid:p.id, n:p.n, kind:"summon", pv:4, max:4, d:"1", tr:"Morto-Vivo", key:"Esqueleto", acted:true}); }
+}
+/* contratos: valem para uma masmorra (pode sair e voltar) */
+function partyEnterDungeon(d){
+  const h = state.hero; if(!h) return;
+  const left = [];
+  partyOf("merc", h).forEach(m=>{ if(!m.dg) m.dg = d.uid; else if(m.dg !== d.uid) left.push(m); });
+  if(left.length){ h.party = party(h).filter(p=>!left.includes(p)); log(`${left.map(m=>m.n).join(", ")} foi contratado para outra masmorra e foi embora.`); }
+}
+function partyLeaveDungeon(d){
+  const h = state.hero; if(!h) return;
+  const sum = partyOf("summon", h).filter(p=>p.untilDg);
+  if(sum.length) log("Os esqueletos invocados desmoronam ao sair da masmorra.");
+  let done = [];
+  if(d.complete) done = partyOf("merc", h).filter(m=>m.dg === d.uid);
+  if(done.length) log(`${done.map(m=>m.n).join(", ")} cumpriu o contrato e foi embora.`);
+  h.party = party(h).filter(p=>!sum.includes(p) && !done.includes(p));
+}
+/* adestramento: terreno vazio com pelo menos 2 vizinhos do mesmo tipo */
+function tameSpot(k){
+  const w = WD(), hx = w.hex[k]; if(!hx || hx.loc || hx.dg) return false;
+  return hexNb(k).filter(n=>w.hex[n] && w.hex[n].t === hx.t).length >= 2;
+}
+function animalSlots(h){ return 3 - partyOf("animal", h).length - partyOf("mount", h).length; }
+
+/* ---------- telas: cidade, ficha e combate ---------- */
+function mercCityHTML(){
+  const h = state.hero, loc = worldCityHere(), list = mercsFor(loc);
+  const row = (n) => { const m = MERCS[n];
+    return `<div class="spell"><div class="txt"><b>${n}</b><span class="small"><b>${N(m.cost)} moedas</b> · ${N(m.pv)} PV · ${m.w ? `${m.w[0]} (${m.w[1]})` : m.inst ? `${m.inst} (Duas Mãos)` : "sem arma"}</span><span class="small">${esc(m.extra)}</span></div>
+      <button class="use" data-act="hireMerc" data-n="${esc(n)}" ${h.coins < m.cost || COOP.on() ? "disabled" : ""}>Contratar</button></div>`; };
+  return `<div class="sheet"><h3>Mercenários</h3>
+    <p class="muted small">O contrato vale para uma masmorra: eles te acompanham até ela ser completada, mesmo que você saia e volte. Na viagem, cada mercenário gasta as próprias provisões, que você paga. Eles só aparecem nos combates.</p>
+    ${COOP.on() ? `<p class="muted small">Mercenários ainda não funcionam no jogo em dupla.</p>` : ""}
+    ${list.map(row).join("")}</div>`;
+}
+function mountCityHTML(){
+  const w = WD(); if(!w) return "";
+  const hx = wHere(), h = state.hero;
+  const same = hexNb(w.pos).filter(n=>w.hex[n] && w.hex[n].t === hx.t).length >= 2;
+  const list = Object.entries(MOUNTS).filter(([n,m])=>m.t === hx.t);
+  if(!same || !list.length) return "";
+  const has = partyOf("mount").length;
+  return `<div class="sheet"><h3>Montarias à venda</h3>
+    ${list.map(([n,m])=>`<div class="spell"><div class="txt"><b>${n}</b><span class="small"><b>${N(m.cost)} moedas</b> · ${N(m.pv)} PV · Dano ${N(m.d)}</span><span class="small">${esc(m.sp)} Não entra em masmorras.</span></div>
+      <button class="use" data-act="buyMount" data-n="${esc(n)}" ${h.coins < m.cost || has || animalSlots() <= 0 ? "disabled" : ""}>Comprar</button></div>`).join("")}
+    ${has ? `<p class="muted small">Você já tem uma montaria.</p>` : animalSlots() <= 0 ? `<p class="muted small">Você já tem 3 animais.</p>` : ""}</div>`;
+}
+function tameHTML(){
+  const w = WD(), h = state.hero; if(!w || w.ev || !tameSpot(w.pos)) return "";
+  const t = w.hex[w.pos].t;
+  const an = Object.entries(ANIMALS).filter(([n,a])=>a.t.includes("*") || a.t.includes(t));
+  const mo = Object.entries(MOUNTS).filter(([n,m])=>m.t === t);
+  if(!an.length && !mo.length) return "";
+  const full = animalSlots() <= 0, prov = h.provisions||0;
+  return `<div class="sheet"><h3>Adestrar animais</h3>
+    <p class="muted small">Gaste provisões e role um dado: se cair igual ou maior que a dificuldade, o animal te segue. Máximo de 3 animais, só um deles montaria.</p>
+    ${an.map(([n,a])=>`<div class="spell"><div class="txt"><b>${n}</b><span class="small">Dif ${N(a.dif)} · ${N(a.pv)} PV · Dano ${N(a.d)}</span><span class="small">${esc(a.sp)}</span></div>
+      <button class="use" data-act="tame" data-n="${esc(n)}" ${full || prov < 4 ? "disabled" : ""}>Adestrar <small>(4 prov.)</small></button></div>`).join("")}
+    ${mo.map(([n,m])=>`<div class="spell"><div class="txt"><b>${n}</b> <span class="small">(montaria)</span><span class="small">Dif ${N(m.dif)} · ${N(m.pv)} PV · Dano ${N(m.d)}</span><span class="small">${esc(m.sp)} Não entra em masmorras.</span></div>
+      <button class="use" data-act="tame" data-n="${esc(n)}" data-m="1" ${full || partyOf("mount").length || prov < 8 ? "disabled" : ""}>Adestrar <small>(8 prov.)</small></button></div>`).join("")}
+    ${full ? `<p class="muted small">Você já tem 3 animais.</p>` : ""}</div>`;
+}
+function partySheetHTML(){
+  const h = state.hero, ps = party(h); if(!ps.length) return "";
+  const kindL = {merc:"Mercenário", animal:"Animal", mount:"Montaria", summon:"Invocação"};
+  const d = state.dungeon;
+  return `<div class="sheet"><h3>Companheiros</h3>
+    <p class="muted small">Eles não aparecem no mapa, só nos combates.</p>
+    ${ps.map(p=>{ const m = MERCS[p.n], a = ANIMALS[p.n] || MOUNTS[p.n];
+      const info = p.kind === "merc" ? `${p.w ? `${esc(p.w.n)} (${p.w.d})` : "sem arma"}${p.spells && Object.keys(p.spells).length ? ` · Magias: ${Object.entries(p.spells).map(([n,s])=>`${n} ${s.left}/${s.max}`).join(", ")}` : ""}` : `Dano ${p.d}`;
+      const contract = p.kind === "merc" ? (p.dg ? (d && d.uid === p.dg ? ` · contratado para ${esc(d.name)}` : " · contratado para outra masmorra") : " · ainda sem masmorra") : "";
+      return `<div class="spell"><div class="txt"><b>${esc(p.n)}</b><span class="small">${kindL[p.kind]} · <span class="${lvc(p.pv,p.max)}">${p.pv}/${p.max} PV</span>${contract}</span><span class="small">${info}</span>${m ? `<span class="small muted">${esc(m.extra)}</span>` : a ? `<span class="small muted">${esc(a.sp)}</span>` : ""}</div>
+        ${p.kind === "summon" ? "" : `<button class="use" data-act="dismiss" data-id="${p.id}">Dispensar</button>`}</div>`; }).join("")}
+  </div>`;
+}
+function allyStripHTML(){
+  const c = C(); if(!c || !c.allies || !c.allies.length) return "";
+  return `<div class="allies">${c.allies.map(a=>`<span class="chip ${a.pv>0?"":"dead"}">${esc(a.n)} <b class="${lvc(a.pv,a.max)}">${a.pv}/${a.max}</b></span>`).join("")}${alliesIn().some(a=>MERCS[a.n] && MERCS[a.n].music) ? `<span class="chip">Música: +2 no seu dano</span>` : ""}</div>`;
+}
+function allyPanelHTML(){
+  const c = C(), sel = c.units[c.sel];
+  const blocks = c.allies.map((a,i)=>{
+    if(a.pv <= 0 || !allyCanAct(a)) return "";
+    const m = MERCS[a.n], sp = allySpells(a);
+    if(a.acted) return `<div class="allyb done"><b>${esc(a.n)}</b><span class="small muted">Já agiu neste turno.</span></div>`;
+    return `<div class="allyb"><b>${esc(a.n)}</b> <span class="small">${a.pv}/${a.max} PV</span>
+      <div class="dlist">
+        ${a.d ? `<button class="dbtn" data-act="allyAtk" data-i="${i}">Atacar${a.wn ? " com " + esc(a.wn) : ""} <small>(${a.d})</small></button>` : ""}
+        ${sp.map(([n,s])=>`<button class="dbtn" data-act="allyCast" data-i="${i}" data-n="${esc(n)}">${n} ×${s.left}</button>`).join("")}
+        ${m && m.explode ? `<button class="dbtn" data-act="allyBoom" data-i="${i}">Explodir <small>(5 em todos)</small></button>` : ""}
+        ${m && m.joke ? `<button class="dbtn" data-act="allyJoke" data-i="${i}">Fazer palhaçadas</button>` : ""}
+        <button class="dbtn" data-act="allyWait" data-i="${i}">Esperar</button>
+      </div></div>`;
+  }).join("");
+  const many = alliesIn().filter(a=>allyCanAct(a) && !a.acted && a.d).length > 1;
+  return `<div class="stack"><p class="small">Turno dos companheiros. Alvo: <b>${esc(sel ? sel.name : "")}</b>. Toque em outro monstro para trocar.</p>
+    ${blocks}
+    ${many ? `<button class="btn ghost" data-act="allyAll">Todos atacam o alvo</button>` : ""}</div>`;
+}
+function splitPanelHTML(){
+  const c = C(), h = state.hero, s = splitInfo(), p = c.pending;
+  const ok = s.hero >= s.minEach && s.al.every(a=>(c.split[splitKey(a)]||0) >= s.minEach) && s.hero >= 0;
+  return `<div class="stack">
+    <p><b>Os monstros causam ${N(s.need)} de dano.</b> Divida entre você e os companheiros${s.minEach ? ": cada um recebe pelo menos 1" : ""}.${p.poison ? ` ${N(p.poison)} é veneno.` : ""}</p>
+    ${s.al.map(a=>{ const k = splitKey(a), v = c.split[k]||0;
+      return `<div class="alloc"><div class="txt"><b>${esc(a.n)}</b><span class="small">${N(Math.max(0,a.pv - v))}/${N(a.max)} PV depois do golpe</span></div>
+        <button class="mini" data-act="splitD" data-k="${esc(k)}" data-d="-1" ${v<=0?"disabled":""} aria-label="Menos dano em ${esc(a.n)}">−</button>
+        <span class="n big2">${v}</span>
+        <button class="mini" data-act="splitD" data-k="${esc(k)}" data-d="1" ${s.hero - 1 < s.minEach ? "disabled" : ""} aria-label="Mais dano em ${esc(a.n)}">+</button></div>`; }).join("")}
+    <div class="alloc"><div class="txt"><b>Você</b><span class="small">A sua parte ainda pode ir para a armadura.</span></div><span class="n big2">${s.hero}</span></div>
+    <button class="btn" data-act="splitOk" ${ok ? "" : "disabled"}>Receber o golpe</button>
+    ${!ok ? `<p class="muted small">Cada um precisa receber pelo menos 1.</p>` : ""}</div>`;
+}
+/* aliados desenhados na arena, ao lado do aventureiro */
+function drawAllies(ctx, W, H, t){
+  const c = C(); if(!c || !c.allies) return;
+  const al = c.allies.filter(a=>a.pv > 0);
+  const slots = [[-34,0],[34,0],[-62,-6],[62,-6],[-88,-10],[88,-10]];
+  al.slice(0,6).forEach((a,i)=>{
+    const [dx, dy] = slots[i], x = Math.round(W/2 + dx), y = H - 6 + dy;
+    if(a.kind === "merc"){
+      drawMerc(ctx, a.n, a.wn, x, y, t, frame % 12 >= 6 ? "breath" : "idle", true);
+    } else if(BEASTS[a.key]){
+      const bs = beastSprite(a.key, Math.floor(frame/6) % 2);
+      ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(Math.round(x - bs.width/2 + 2), y, bs.width - 4, 2);
+      ctx.drawImage(bs, Math.round(x - bs.width/2), y - bs.height + 1);
+    } else {
+      const d = sprDef(a.key), w = d && d.rows ? Math.max(...d.rows.map(r=>r.length)) : 16, k = w > 22 ? Math.max(.45, 18/w) : 1;
+      if(k < 1){ ctx.save(); ctx.translate(x, y); ctx.scale(k, k); drawMonsterSprite(ctx, a.key, 0, 0, t, frame, {}); ctx.restore(); }
+      else drawMonsterSprite(ctx, a.key, x, y, t, frame, {});
+    }
+    const f = a.pv / a.max, bw = 16;
+    ctx.fillStyle = "#0c0a12"; ctx.fillRect(x-bw/2-1, y+1, bw+2, 4);
+    ctx.fillStyle = f > .5 ? "#6ac04a" : f > .25 ? "#e0b038" : "#d83a2a"; ctx.fillRect(x-bw/2, y+2, Math.max(1, Math.round(bw*f)), 2);
+  });
+}
+
+const actionsParty = {
+  async hireMerc(b){
+    const h = state.hero, n = b.dataset.n, m = MERCS[n];
+    if(!m || h.coins < m.cost || COOP.on() || !mercsFor(worldCityHere()).includes(n)) return;
+    busy = true; lockButtons();
+    h.coins -= m.cost;
+    const p = {id:newPid(), kind:"merc", n, pv:m.pv, max:m.pv, w:m.w ? {n:m.w[0], d:m.w[1]} : null, race:m.race, dg:null};
+    if(m.spells){ p.spells = {}; for(let i=0;i<m.spells;i++){ const [v] = await roll(`Magia de ${n}`, 1); const s = SPELLS[v].n; rollNote(s); p.spells[s] = p.spells[s] ? {max:p.spells[s].max+1, left:p.spells[s].left+1} : {max:1, left:1}; } }
+    party(h).push(p);
+    state.ui.cityMsg = `${n} foi contratado por ${m.cost} moedas.${p.spells ? ` Magias: ${Object.entries(p.spells).map(([s,v])=>v.max>1?`${s} ×${v.max}`:s).join(", ")}.` : ""}`;
+    busy = false; persist(); render();
+  },
+  dismiss(b){
+    const h = state.hero, i = party(h).findIndex(p=>p.id === b.dataset.id); if(i < 0) return;
+    const p = party(h)[i];
+    if(state.ui.dismiss !== p.id){ state.ui.dismiss = p.id; state.ui.armsMsg = `Toque de novo em Dispensar para confirmar: ${p.n} vai embora e não volta${p.kind === "merc" ? " (o pagamento não é devolvido)" : ""}.`; render(); return; }
+    party(h).splice(i,1); state.ui.dismiss = null; state.ui.armsMsg = `${p.n} foi embora.`; persist(); render();
+  },
+  async buyMount(b){
+    const h = state.hero, n = b.dataset.n, m = MOUNTS[n];
+    if(!m || h.coins < m.cost || partyOf("mount").length || animalSlots() <= 0) return;
+    h.coins -= m.cost; party(h).push({id:newPid(), kind:"mount", n, pv:m.pv, max:m.pv, d:m.d, key:m.key});
+    state.ui.cityMsg = `Você comprou ${n === "Llama" ? "uma Llama" : "um " + n}.`; persist(); render();
+  },
+  async tame(b){
+    const h = state.hero, n = b.dataset.n, mount = !!b.dataset.m, a = mount ? MOUNTS[n] : ANIMALS[n], cost = mount ? 8 : 4;
+    if(!a || animalSlots() <= 0 || (h.provisions||0) < cost || (mount && partyOf("mount").length) || !tameSpot(WD().pos)) return;
+    wBegin();
+    h.provisions -= cost;
+    const [v] = await roll(`Adestrar ${n}`, 1);
+    if(v >= a.dif){ rollNote("Conseguiu!"); party(h).push({id:newPid(), kind:mount ? "mount" : "animal", n, pv:a.pv, max:a.pv, d:a.d, key:a.key}); wLog(`Você adestrou ${n === "Águia" || n === "Coruja" || n === "Cobra" || n === "Llama" ? "uma " : "um "}${n}!`); }
+    else { rollNote("Fugiu"); wLog(`O animal fugiu. Você gastou ${cost} provisões tentando adestrá-lo.`); }
+    wEnd();
+  },
+  giveMerc(b){
+    const h = state.hero, it = h.bag[+b.dataset.i], p = party(h).find(x=>x.id === b.dataset.id);
+    if(!it || !p || p.kind !== "merc" || (MERCS[p.n] && MERCS[p.n].noGear)) return;
+    if(it.weapon){ p.w = {n:it.n.split(" (")[0], d:it.d}; state.ui.armsMsg = `${p.n} agora luta com ${p.w.n}. Ele não vai devolver.`; }
+    else if(it.slot){ p.max += it.pv||0; p.pv += it.pv||0; state.ui.armsMsg = `${p.n} vestiu ${it.n.split(" (")[0]}: +${it.pv||0} PV. Ele não vai devolver.`; }
+    else return;
+    h.bag.splice(+b.dataset.i, 1); state.ui.bagSel = null; persist(); render();
+  },
+  async allyAtk(b){ if(busy) return; busy = true; lockButtons(); await allyAttack(+b.dataset.i); await allyAfter(); },
+  async allyCast(b){ if(busy) return; busy = true; lockButtons(); await allyCast(+b.dataset.i, b.dataset.n); await allyAfter(); },
+  async allyBoom(b){
+    if(busy) return; const c = C(), a = c.allies[+b.dataset.i]; if(!a || a.acted) return;
+    busy = true; lockButtons();
+    cLog(`${a.n} explode! 5 de dano em todos os monstros.`);
+    for(let k=0;k<c.units.length;k++) if(c.units[k].pv > 0) await hitMonster(k, 5, {spell:true, w:{n:""}, ally:true});
+    a.pv = 0; a.acted = true;
+    await allyAfter();
+  },
+  async allyJoke(b){
+    if(busy) return; const c = C(), a = c.allies[+b.dataset.i]; if(!a || a.acted) return;
+    cLog(pick([`${a.n} tropeça de propósito e faz uma reverência.`, `${a.n} imita o monstro. Ninguém ri.`, `${a.n} conta uma piada sobre um goblin e um balde.`, `${a.n} faz malabares com três ossos.`]));
+    a.acted = true; busy = true; await allyAfter();
+  },
+  async allyWait(b){ if(busy) return; const a = C().allies[+b.dataset.i]; if(!a) return; a.acted = true; busy = true; await allyAfter(); },
+  async allyAll(){
+    if(busy) return; busy = true; lockButtons();
+    const c = C();
+    for(let i=0;i<c.allies.length;i++){ const a = c.allies[i]; if(a.pv > 0 && !a.acted && a.d && allyCanAct(a) && alive().length){ pickNextTarget(); await allyAttack(i); } }
+    c.allies.forEach(a=>{ if(a.pv > 0 && allyCanAct(a) && !a.acted) a.acted = true; });
+    await allyAfter();
+  },
+  splitD(b){ const c = C(), k = b.dataset.k; c.split[k] = Math.max(0, (c.split[k]||0) + +b.dataset.d); render(); },
+  splitOk(){ if(busy) return; applySplit(); }
+};
+
+const VIEWS = {world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
 function render(){
   normalizeHands();
   if(state.screen==="create" && !state.draft) state.screen = "title";
-  if(["sheet","dungeon","explore","city","advclass"].includes(state.screen) && !state.hero) state.screen = "title";
+  if(["sheet","dungeon","explore","city","advclass","world"].includes(state.screen) && !state.hero) state.screen = "title";
+  if(state.screen==="world" && !state.world) state.screen = "sheet";
+  if(state.world && state.hero && !(state.dungeon && state.dungeon.inside) && (state.screen==="dungeon" || (state.screen==="city" && !worldCityHere()))) state.screen = "world";
   if(state.screen==="explore" && !(state.dungeon && state.dungeon.inside)) state.screen = "sheet";
   if(state.screen==="combat" && !(state.combat && state.hero)) state.screen = state.hero && state.dungeon && state.dungeon.inside ? "explore" : "title";
   $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)() + (state.ui.cult ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Armadilha!</h3><p>${esc(state.ui.cult.txt)}</p><p>Descartar um item do Cultista para ignorar a armadilha?</p>
@@ -4863,6 +6470,16 @@ function render(){
       tray.appendChild(g); r.el = g;
     });
     const cv = $("#map"); if(cv) bindMap(cv);
+  }
+  if(state.screen==="world" || state.screen==="city"){
+    const tray = $("#etray");
+    if(tray) rollLog.forEach(r=>{
+      const g = document.createElement("div"); g.className = "rg";
+      g.innerHTML = `<div class="dice"></div><span class="label">${esc(r.label)}</span>${r.note ? `<span class="rnote">${esc(r.note)}</span>` : ""}`;
+      r.vals.forEach(v=>g.querySelector(".dice").appendChild(dieCanvas(v)));
+      tray.appendChild(g); r.el = g;
+    });
+    const wv = $("#wmap"); if(wv) bindMap(wv, wcam, wmapTap, clampWZ);
   }
   if(state.screen==="combat"){ const a = $("#arena"); if(a) a.addEventListener("click", arenaTap); }
   document.querySelectorAll("canvas[data-grave]").forEach(drawGrave);
@@ -5427,6 +7044,8 @@ const actionsApito = {
 };
 const actions = {
   ...actionsApito,
+  ...actionsWorld,
+  ...actionsParty,
   shareToggle(b){ SHARE.toggle(b.dataset.u); },
   shareConfirm(b){ SHARE.confirm(b.dataset.v === "1"); },
   coopTake(b){
@@ -5537,6 +7156,7 @@ const actions = {
       state.ui.legacyMsg = `${name} recebeu o legado de ${lg.from}: as armaduras já estão vestidas e as armas e os itens estão na mochila.`;
       state.legacy = null;
     }
+    if(state.world){ worldPlaceNew(state.hero); go("sheet"); return; }
     go(state.dungeon && !state.dungeon.complete ? "dungeon" : "sheet");
   },
   pv(b){ const h = state.hero; h.pv = Math.max(0, Math.min(h.pvMax, h.pv + +b.dataset.d)); persist(); render(); },
@@ -5555,7 +7175,8 @@ const actions = {
     if(n==="Cura Natural") h.pv = Math.min(h.pvMax, h.pv+12);
     if(n==="Luz") h.torches = Math.min(10, h.torches+1);
     if(n==="Escudo Mágico"){ h.shield = (h.shield||0) + 4; msg = `Escudo Mágico: absorve os próximos ${h.shield} de dano.`; }
-    if(n==="Criar Comida"){ const q = rollExpr("2d6"); h.provisions = (h.provisions||0) + q; msg = `Criar Comida: ${q} provisões.`; }
+    if(n==="Criar Comida"){ const q = rollExpr("2d6"); h.provisions = Math.min(provMax(), (h.provisions||0) + q); msg = `Criar Comida: ${q} provisões.`; }
+    if(n==="Invocar Esqueleto"){ summonSkeleton(); msg = "Um Esqueleto se levanta e vai te seguir até você sair da masmorra."; }
     if(state.dungeon && state.dungeon.inside) log(msg); else state.ui.cityMsg = msg;
     persist(); render();
   },
@@ -5629,6 +7250,7 @@ const actions = {
     if(raceT("ogro") && /^Poção|^Pergaminho/.test(it.n)) return;
     if(/^Pergaminho/.test(it.n)) H().magic++;
     if(/^Poção de Vida/.test(it.n)) h.pv = h.pvMax;
+    if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3) h.pv = h.pvMax; state.ui.armsMsg = v >= 3 ? `Poção Verdosa (dado ${v}): você recuperou todos os PV.` : `Poção Verdosa (dado ${v}): nada além de uma coceira que dura o dia inteiro.`; }
     if(/^Poção de Magia/.test(it.n)) Object.values(h.spells).forEach(s=>s.left=s.max);
     if(/^Poção da Luminescência/.test(it.n)) h.torches = Math.min(10, h.torches+2);
     if(/^Poção da Salamandra/.test(it.n)) h.arms = Math.max(h.arms||2, raceStart(h).arms);
@@ -5680,6 +7302,7 @@ const actions = {
     }
     d.visits++;
     d.inside = true;
+    partyEnterDungeon(d);
     Object.values(d.levels).forEach(lv=>Object.values(lv.segs).forEach(s=>{ if(d.visits===1) s.ret = 1; }));
     state.ui = {}; rollLog = []; centerOn = true; mapVersion++;
     go("explore");
@@ -5812,6 +7435,7 @@ const actions = {
   rest(){
     const h = state.hero, free = hasClass("Campeão"); if((h.coins<1 && !free) || !needRest(h)) return;
     if(!free) h.coins--; h.pv = h.pvMax; Object.values(h.spells).forEach(s=>s.left=s.max);
+    party(h).forEach(p=>{ p.pv = p.max; if(p.spells) Object.values(p.spells).forEach(x=>x.left = x.max); });
     state.ui.cityMsg = "Você descansou. PV e magias recuperados.";
     persist(); render();
   },
@@ -5838,6 +7462,7 @@ const actions = {
     h.coins -= a.cost; h.adv = (h.adv||[]).concat(a.n);
     h.pvMax += a.pv; h.pv += a.pv;
     if(a.loseCura) delete h.spells["Cura"];
+    if(a.n === "Cavaleiro" && !partyOf("mount", h).length && animalSlots(h) > 0) party(h).push({id:newPid(), kind:"mount", n:"Cavalo", pv:10, max:10, d:"1", key:"Cavalo"});
     if(a.fixed) Object.entries(a.fixed).forEach(([n,q])=>{ const sp = h.spells[n] || {max:0,left:0}; sp.max += q; sp.left += q; h.spells[n] = sp; });
     const needs = []; (a.give||[]).forEach(([t,q])=>{ for(let i=0;i<q;i++) needs.push(t); });
     state.ui.advRoll = needs.length ? {cls:a.n, needs, got:[]} : null;
@@ -5912,7 +7537,7 @@ function torchCost(b){
   const h = state.hero, a = b.dataset.act, d = state.dungeon;
   if(!h || !d || !d.inside || state.screen === "combat") return 0;
   if(a === "openDoor" || a === "secret" || a === "disarm" || a === "sneak") return 1;
-  if(a === "unlock" && b.dataset.how === "pick") return hasClass("Chaveiro") || hasClass("Ladrão") ? 0 : 1;
+  if(a === "unlock" && b.dataset.how === "pick") return freeLock() ? 0 : 1;
   if(a === "repairOne" && b.dataset.how === "torch") return 1;
   return 0;
 }
@@ -5980,6 +7605,7 @@ function paint(){
     if(a==="scene") drawScene(cv);
     if(a==="torches") drawTorches(cv);
     if(a==="map") drawMap(cv);
+    if(a==="wmap") drawWorld(cv);
     if(a==="arena") drawArena(cv);
     if(a==="preview") drawPreview(cv);
   });
@@ -5996,7 +7622,7 @@ function paint(){
 let last = 0;
 function loop(ts){
   if(ts - last > 120){ last = ts; frame++; paint(); }
-  else { const m = $("#map"); if(m) drawMap(m); const ar = $("#arena"); if(ar && (fxPops.length || heroAtk || heroDieAt || heroHitUntil > performance.now())) drawArena(ar); }
+  else { const m = $("#map"); if(m) drawMap(m); const wm = $("#wmap"); if(wm) drawWorld(wm); const ar = $("#arena"); if(ar && (fxPops.length || heroAtk || heroDieAt || heroHitUntil > performance.now())) drawArena(ar); }
   requestAnimationFrame(loop);
 }
 
