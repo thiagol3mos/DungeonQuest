@@ -313,6 +313,18 @@ b,strong{font-weight:400 !important}
 .allies .chip.dead{opacity:.4;text-decoration:line-through}
 .allyb{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px dotted currentColor}
 .allyb.done{opacity:.55}
+.tlist{display:flex;flex-direction:column;gap:6px}
+.trait{display:flex;flex-direction:column;gap:3px;align-items:flex-start;margin:4px 0}
+.trait .small{line-height:1.35}
+.tdetails summary{cursor:pointer;font-weight:bold}
+.guide p,.guide li{line-height:1.45;font-size:15px}
+.guide h3{font-size:17px}
+.guide ul{padding-left:18px;margin:6px 0}
+.gdots{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.gdots button{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;background:transparent;padding:0;min-height:0}
+.gdots button.on{background:currentColor}
+.linkbtn{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:6px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.linkbtn.on{font-weight:bold;text-decoration:none}
 </style>
 </head>
 <body>
@@ -3652,6 +3664,7 @@ function viewTitle(){
       </div>` :
       `<button class="btn ${h?"ghost":""}" data-act="newHero">Novo aventureiro</button>`}
     <div class="row">
+      <button class="btn ghost" data-act="guide">Guia do Aventureiro</button>
       <button class="btn ghost" data-act="go" data-to="cemetery">Salão dos Heróis</button>
       <button class="btn ghost" data-act="go" data-to="save">Backup</button>
     </div>
@@ -3986,7 +3999,7 @@ function monCard(g){
       <canvas class="monpic" width="48" height="40" data-mon="${esc(monKey(x))}" data-boss="${x.boss?1:0}"></canvas>
       <span class="who">${x.boss ? "Chefe: " : ""}${x.list.length>1 ? N(x.list.length)+" " : ""}${x.name}</span>
       <div class="stats"><span class="chip solid">${N(x.pv)} PV${x.list.length>1?" cada":""}</span><span class="chip">Dano ${N(x.dano)}</span></div>
-      ${x.tr ? `<div class="traits">${x.tr.split(", ").map(t=>`<span class="chip">${t}</span>`).join("")}</div>` : ""}
+      ${traitsHTML(x.tr)}
     </div>`).join("");
 }
 function viewExplore(){
@@ -4819,6 +4832,7 @@ function viewCombat(){
   ${armor ? `<div class="stats">${armor}</div>` : ""}
   <div class="tgts">${units}</div>
   <div class="sheet">${panel}</div>
+  ${combatTraitsHTML()}
   <div class="sheet"><h3>Combate</h3><div class="log">${c.log.slice(0,8).map(l=>`<p>${esc(l)}</p>`).join("")}</div></div>`;
 }
 
@@ -4986,6 +5000,17 @@ const hk = (q, r) => `${q},${r}`;
 const hq = k => k.split(",").map(Number);
 function hexNb(k){ const [q,r] = hq(k); return HDIR.map(([a,b])=>hk(q+a, r+b)); }
 function hexDist(a, b){ const [q1,r1] = hq(a), [q2,r2] = hq(b), dq = q1-q2, dr = r1-r2; return (Math.abs(dq)+Math.abs(dr)+Math.abs(dq+dr))/2; }
+function dirOf(a, b){
+  const pa = hexPx(a), pb = hexPx(b), ang = Math.atan2(pb.y - pa.y, pb.x - pa.x);
+  let best = 0, bd = 9;
+  HDIR.forEach(([q,r],i)=>{ const v = hexPx(hk(q,r)), d = Math.abs(Math.atan2(Math.sin(ang - Math.atan2(v.y, v.x)), Math.cos(ang - Math.atan2(v.y, v.x)))); if(d < bd){ bd = d; best = i; } });
+  return HDIRN[best];
+}
+function distTxt(d){ return d <= 1 ? "logo ao lado" : `a ${d} hexágonos`; }
+function nearDgs(pos, rad){
+  const w = WD(); rad = rad || 3;
+  return Object.keys(w.hex).filter(k=>k !== pos && w.hex[k].dg && hexDist(pos, k) <= rad).map(k=>{ const m = w.hex[k].dg, r = dgRec(m); return {k, m, d:hexDist(pos,k), dir:dirOf(pos,k), done:!!(r && r.complete)}; }).sort((a,b)=>a.d-b.d);
+}
 function hexPx(k){ const [q,r] = hq(k); return {x:q*HEXW + r*HEXW/2, y:r*HEXH}; }
 function pxHex(x, y){
   const r0 = Math.round(y/HEXH); let best = null, bd = 1e9;
@@ -5682,7 +5707,7 @@ function viewWorld(){
       <div class="mon"><canvas class="monpic" width="48" height="40" data-mon="${esc(e.key)}" data-boss="0"></canvas>
       <span class="who">${e.qty>1 ? N(e.qty)+" "+esc(e.pl) : esc(e.n)}</span>
       <div class="stats"><span class="chip solid">${N(e.pv)} PV${e.qty>1?" cada":""}</span><span class="chip">Dano ${N(e.dano)}</span></div>
-      ${e.tr ? `<div class="traits">${e.tr.split(", ").map(t=>`<span class="chip">${t}</span>`).join("")}</div>` : ""}</div>
+      ${traitsHTML(e.tr)}</div>
       <div class="stack"><button class="btn" data-act="wFight">Lutar</button>
       ${ignoresEvents(h) ? `<button class="btn ghost" data-act="wIgnore">Ignorar o encontro <small>(vantagem da raça)</small></button>` : ""}
       ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(${h.spells["Camuflagem"].left} uso${h.spells["Camuflagem"].left>1?"s":""})</small></button>` : ""}</div></div>`;
@@ -5729,7 +5754,7 @@ function viewWorld(){
 function worldCityTop(){
   const w = WD(), h = state.hero, hx = wHere(), loc = hx.loc, fort = loc.k === "fort";
   const coast = hexNb(w.pos).some(k=>w.hex[k] && w.hex[k].t === "ag");
-  const near = hexNb(w.pos).filter(k=>w.hex[k] && w.hex[k].dg).map(k=>({k, m:w.hex[k].dg, dir:HDIRN[hexNb(w.pos).indexOf(k)]}));
+  const near = nearDgs(w.pos);
   const need = provMax() - (h.provisions||0), afford = Math.min(need, h.coins);
   const row = (title, txt, btn) => `<div class="spell"><div class="txt"><b>${title}</b><span class="small">${txt}</span></div>${btn}</div>`;
   return `
@@ -5741,8 +5766,8 @@ function worldCityTop(){
   </div>
   <div class="sheet">
     <h3>Rumores de masmorras</h3>
-    ${near.length ? near.map(n=>{ const r = dgRec(n.m); return `<p class="small"><b>${esc(n.m.name)}</b> fica ${n.dir}${r && r.complete ? " (completada)" : ""}.</p>`; }).join("") : `<p class="muted small">Ninguém comentou de masmorras por perto ainda.</p>`}
-    ${near.some(n=>{ const r = dgRec(n.m); return !(r && r.complete); }) ? "" : `<button class="btn" data-act="wAsk">Perguntar na taverna</button>`}
+    ${near.length ? near.map(n=>`<p class="small"><b>${esc(n.m.name)}</b> fica ${distTxt(n.d)}, ${n.dir}${n.done ? " (completada)" : ""}.</p>`).join("") : `<p class="muted small">Ninguém comentou de masmorras por perto ainda.</p>`}
+    ${near.some(n=>!n.done) ? "" : `<button class="btn" data-act="wAsk">Perguntar na taverna</button><p class="muted small">A masmorra pode estar a até 3 hexágonos daqui.</p>`}
     ${fort ? `<p class="muted small">Toda fortaleza tem esgotos embaixo. <span class="soon">Em breve</span></p>` : ""}
   </div>`;
 }
@@ -5813,14 +5838,20 @@ const actionsWorld = {
   },
   wBoat(){ const h = state.hero, w = WD(); if(h.coins < 1 || w.boat) return; h.coins--; w.boat = true; state.ui.cityMsg = "Você contratou um barco. Ele espera no porto."; persist(); render(); },
   async wAsk(){
-    const w = WD(), nb = hexNb(w.pos);
-    if(nb.some(k=>{ const m = w.hex[k].dg; if(!m) return false; const r = dgRec(m); return !(r && r.complete); })) return;
+    const w = WD();
+    if(nearDgs(w.pos).some(n=>!n.done)) return;
     wBegin();
     const [side] = await roll("Lado", 1);
-    let k = null;
-    for(let i=0;i<6;i++){ const n = nb[(side-1+i)%6], hx = w.hex[n]; if(hx.t !== "ag" && !hx.loc && !hx.dg){ k = n; break; } }
-    if(!k){ rollNote("Nada"); state.ui.cityMsg = "Ninguém na taverna sabe de masmorras por perto."; wEnd(); return; }
-    rollNote(HDIRN[nb.indexOf(k)]);
+    rollNote(HDIRN[side-1]);
+    const [dv] = await roll("Distância", 1), dist = Math.ceil(dv/2);
+    rollNote(`${dist} hexágono${dist>1?"s":""}`);
+    let k = null, kd = 0;
+    for(let d=dist; d>=1 && !k; d--) for(let i=0;i<6 && !k;i++){
+      const di = (side-1+i)%6; let cur = w.pos;
+      for(let st=0; st<d; st++){ const [q,r] = hq(cur), nx = hk(q+HDIR[di][0], r+HDIR[di][1]); if(!w.hex[nx]) w.hex[nx] = worldGen(w.hex[cur].t); cur = nx; }
+      const hx = w.hex[cur]; if(hx.t !== "ag" && !hx.loc && !hx.dg){ k = cur; kd = d; }
+    }
+    if(!k){ state.ui.cityMsg = "Ninguém na taverna sabe de masmorras por perto."; wEnd(); return; }
     const t = w.hex[k].t;
     let type = null;
     for(let g=0; g<12 && !type; g++){
@@ -5832,7 +5863,8 @@ const actionsWorld = {
     for(const lb of ["Nome (parte 2)","Nome (parte 3)","Nome (parte 4)"]){ const v = await roll(lb, 3); parts.push(v[0]+v[1]+v[2]); }
     const name = worldDungeonName(type, parts[0], parts[1], parts[2]);
     w.hex[k].dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type, name, dice:parts};
-    state.ui.cityMsg = `Na taverna, falam d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}, ${HDIRN[nb.indexOf(k)]} da cidade.`;
+    w.sel = k;
+    state.ui.cityMsg = `Na taverna, falam d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}: fica ${distTxt(kd)}, ${dirOf(w.pos, k)} da cidade.`;
     wLog(state.ui.cityMsg);
     wEnd();
   },
@@ -6437,7 +6469,154 @@ const actionsParty = {
   splitOk(){ if(busy) return; applySplit(); }
 };
 
-const VIEWS = {world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
+/* ---------- atributos dos monstros: descrição de cada um ---------- */
+const TRAIT_INFO = {
+  "Morto-Vivo":"Ao ser derrotado, role um dado: se cair 1, ele se levanta de novo com 1 PV.",
+  "Explosivo":"No turno dele, se o dado de habilidade cair 1, ele explode: causa dano igual aos PV que ainda tem e morre.",
+  "Espólios":"Deixa espólios ao ser derrotado. Na masmorra, role um dado por criatura: 1 a 4 dá 1 moeda, 5 dá uma chave e 6 dá um tesouro. Na viagem, cada uma deixa 1d6−1 moedas.",
+  "Veneno":"O dano dele é veneno: passa direto pela armadura e vai para os seus PV.",
+  "Regeneração":"No turno dele, se o dado de habilidade cair 1, ele recupera 6 PV.",
+  "Paralisar":"No turno dele, se o dado de habilidade cair 1, o próximo ataque te paralisa por 1d6 turnos.",
+  "Necromancia":"No turno dele, se o dado de habilidade cair 1, ele levanta um Esqueleto (4 PV; Dano 1; Morto-Vivo).",
+  "Morte Súbita":"No turno dele, se o dado de habilidade cair 1, ele prepara um golpe mortal: o próximo ataque dele mata.",
+  "Magia":"No turno dele, se o dado de habilidade cair 1, ele prepara uma magia que soma 1d6 ao próximo ataque.",
+  "Intangível":"Golpes com dano de número par não o afetam.",
+  "Horda":"No turno dele, se o dado de habilidade cair 1, mais um Orc entra no combate.",
+  "Fogo":"No turno dele, se o dado de habilidade cair 1, ele pega fogo e o próximo ataque causa +10 de dano.",
+  "Ponto Fraco":"Se o seu dado de ataque cair 6, o dano dobra.",
+  "Corpo de Pedra":"Ignora golpes de 3 de dano ou menos.",
+  "Regen":"No turno dele, se o dado de habilidade cair 1, ele recupera 6 PV."
+};
+function traitsHTML(tr){
+  if(!tr) return "";
+  return `<div class="traits tlist">${tr.split(", ").map(t=>`<div class="trait"><span class="chip">${esc(t)}</span>${TRAIT_INFO[t] ? `<span class="small">${esc(TRAIT_INFO[t])}</span>` : ""}</div>`).join("")}</div>`;
+}
+function combatTraitsHTML(){
+  const c = C(); if(!c) return "";
+  const set = [...new Set(c.units.filter(u=>u.pv > 0 && u.tr).flatMap(u=>u.tr.split(", ")))].filter(t=>TRAIT_INFO[t]);
+  if(!set.length) return "";
+  return `<details class="sheet tdetails"><summary>Atributos dos monstros</summary>${set.map(t=>`<div class="trait"><span class="chip">${esc(t)}</span><span class="small">${esc(TRAIT_INFO[t])}</span></div>`).join("")}</details>`;
+}
+
+/* ---------- Guia do Aventureiro: manual rápido em páginas ---------- */
+const GUIDE = [
+  {t:"Bem-vindo, aventureiro", b:`
+    <p>Dungeon Quest é um jogo de exploração de masmorras para jogar sozinho (ou em dupla). Você cria um aventureiro, entra em masmorras perigosas, enfrenta monstros, pega tesouros e tenta sair vivo.</p>
+    <p><b>O objetivo:</b> descer até a Sala Final de cada masmorra e derrotar o Chefe. Quando o Chefe cai, a masmorra está completada.</p>
+    <p><b>Os dados decidem quase tudo.</b> Sempre que uma regra pedir uma rolagem, o jogo rola os dados para você e mostra o resultado na bandeja.</p>
+    <p><b>A morte é para valer.</b> Quem morre vai para o Salão dos Heróis. O corpo fica onde caiu, com tudo o que carregava, esperando o próximo aventureiro ir buscá-lo.</p>`},
+  {t:"Criando o aventureiro", b:`
+    <p><b>Raça:</b> define os seus PV iniciais e dá uma vantagem especial. As raças são divididas em Básicas, Incomuns, Exóticas, Monstruosas e Zoadas.</p>
+    <p><b>Classe:</b> soma PV, define o equipamento e algumas magias iniciais.</p>
+    <p><b>PV (Pontos de Vida):</b> se chegarem a zero, você morre.</p>
+    <p>Todo aventureiro começa com <b>10 tochas</b>. Elas são a sua vida dentro da masmorra.</p>
+    <p>Mais tarde, na cidade, você pode comprar <b>Classes Avançadas</b>, que exigem feitos (como derrotar certos monstros) e dão novas vantagens.</p>`},
+  {t:"Tochas e escuridão", b:`
+    <ul>
+      <li>Entrar na masmorra (pela primeira vez ou voltando da cidade) não gasta tocha.</li>
+      <li>Abrir uma porta gasta <b>1 tocha</b>. Porta trancada gasta <b>1 tocha a mais</b>, a não ser que você seja Chaveiro ou tenha um Arrombador.</li>
+      <li>Mover em Silêncio e procurar passagens secretas também gastam 1 tocha.</li>
+      <li>A magia Luz pode substituir uma tocha.</li>
+      <li>Se a última tocha acabar dentro da masmorra, você é <b>devorado pela escuridão</b>.</li>
+    </ul>
+    <p>Na cidade, cada tocha custa 1 moeda. O máximo é 10.</p>`},
+  {t:"Explorando a masmorra", b:`
+    <p>A masmorra é desenhada conforme você avança. Toque numa porta para abri-la: o jogo rola o que existe do outro lado (sala, corredor, escada, monstros, baús ou armadilhas).</p>
+    <ul>
+      <li>A <b>primeira sala</b> nunca tem monstros.</li>
+      <li>Cada masmorra tem <b>três níveis</b>. As escadas levam ao próximo nível, e o terceiro termina na <b>Sala Final</b>, onde está o Chefe.</li>
+      <li>Se o nível não tiver escada para descer, a última porta fechada leva à Sala Final. O jogo avisa antes de você abri-la.</li>
+      <li>Você pode sair para a cidade e voltar depois. Mas, ao voltar, cada sala no caminho rola monstros de novo.</li>
+    </ul>`},
+  {t:"Antes de lutar", b:`
+    <p><b>Mover em Silêncio</b> (1 tocha): role um dado por monstro. Se algum cair 1, eles te veem e atacam primeiro. Se ninguém te ver, você pode pegar os tesouros e abrir portas sem lutar.</p>
+    <p><b>Passagem secreta</b> (1 tocha): 1 dispara uma armadilha; 2 ou 3, nada; 4 ou 5, um baú escondido; 6, uma passagem secreta.</p>
+    <p><b>Baús e armadilhas:</b> baús guardam tesouros, mas portas, baús e passagens podem esconder armadilhas. Quando uma armadilha aparece, o botão de desarmar fica disponível.</p>
+    <p><b>Iniciativa:</b> você ataca primeiro, a não ser que tenha quebrado a porta ou falhado ao Mover em Silêncio.</p>`},
+  {t:"Combate", b:`
+    <ul>
+      <li>Toque no monstro para escolher o alvo. O dano da sua arma é rolado no dado.</li>
+      <li>Com duas armas, as duas atacam no mesmo turno, cada uma podendo acertar um monstro diferente.</li>
+      <li>No turno deles, os monstros atacam. Quem tem atributos rola um <b>dado de habilidade</b> à parte: se cair 1, o atributo é ativado.</li>
+      <li>Quando você recebe dano, escolhe onde ele cai: nos seus PV ou dividido entre as peças da armadura. Peça que chega a zero é destruída.</li>
+      <li>Dano de <b>veneno</b> ignora a armadura.</li>
+      <li>Magias e itens também podem ser usados no seu turno. Algumas magias, como o Teletransporte, servem para fugir.</li>
+    </ul>`},
+  {t:"Atributos dos monstros", b:()=>`<p>Toque num monstro antes da luta para ver os atributos dele. Na tela de combate, eles ficam em "Atributos dos monstros".</p>${Object.entries(TRAIT_INFO).filter(([k])=>k!=="Regen").map(([k,v])=>`<div class="trait"><span class="chip">${k}</span><span class="small">${v}</span></div>`).join("")}`},
+  {t:"Itens e equipamento", b:`
+    <ul>
+      <li>A <b>mochila</b> tem o limite escolhido nos ajustes (10, 20 ou sem limite).</li>
+      <li>Armas e peças de armadura podem ser equipadas pela ficha. Armaduras quebradas se consertam na cidade.</li>
+      <li>A <b>Lamparina</b> deixa sua mão livre da tocha: com ela você pode usar duas armas ou uma arma de Duas Mãos.</li>
+      <li>O <b>cadeado</b> ao lado de um item impede que ele seja vendido por engano.</li>
+      <li>Poções, pergaminhos e itens mágicos são usados pela mochila ou no combate.</li>
+    </ul>`},
+  {t:"A cidade", b:`
+    <ul>
+      <li><b>Descansar</b> (1 moeda): recupera todos os PV e as magias.</li>
+      <li><b>Comprar tochas</b> (1 moeda cada) e <b>consertar armaduras</b> (1 moeda por peça).</li>
+      <li><b>Vendedor:</b> 6 itens, com estoque renovado a cada masmorra.</li>
+      <li><b>Vender</b> os tesouros da mochila.</li>
+      <li><b>Classes Avançadas</b> e <b>Mercenários</b>.</li>
+    </ul>
+    <p>Se o aventureiro ficar sem condições de lutar (por exemplo, perder um braço), ele se aposenta e o próximo herda os itens.</p>`},
+  {t:"Mundo Expandido: viagem", b:`
+    <p>Pela cidade, toque em <b>Explorar o mundo</b> para sair num mapa de hexágonos. Cada vez que você entra num hexágono, os vizinhos dele são revelados.</p>
+    <ul>
+      <li><b>Provisões:</b> cada viagem gasta provisões conforme o terreno: Planície 1; Montanha 3; Floresta, Pântano, Deserto e Água 2. Sem provisões, cada uma que faltar custa 1 PV.</li>
+      <li>Para andar na <b>água</b> é preciso contratar um barco numa cidade da costa. Rochas não podem ser atravessadas.</li>
+      <li><b>Eventos:</b> ao entrar num hexágono sem localidade, rolam-se 2d6. Com 7 ou mais, nada acontece; com menos, vem um monstro ou o clima.</li>
+      <li>Um <b>oásis</b> pode ser de verdade (recupera todos os PV) ou só uma miragem.</li>
+    </ul>`},
+  {t:"Cidades e fortalezas", b:`
+    <ul>
+      <li><b>Afinidade:</b> nem toda raça é bem-vinda em toda cidade.</li>
+      <li><b>Taverna:</b> perguntando, você descobre uma masmorra a até 3 hexágonos de distância.</li>
+      <li><b>Cultura:</b> cada raça vende algo próprio (Lamparina anã, Botas Élficas, Poção Verdosa, Gládio Orc, magia gnoma).</li>
+      <li><b>Dinheiro:</b> Trabalho Árduo, Jogo de Azar, Vida Bandida e, nas fortalezas, a Arena (vence: 20 moedas; perde: morre).</li>
+      <li>Nas <b>fortalezas</b>, os itens valem o dobro na venda e dá para falar com o Rei.</li>
+    </ul>`},
+  {t:"Companheiros", b:`
+    <p>Companheiros não aparecem no mapa: eles só surgem na tela de combate, ao seu lado, com as ações deles separadas das suas.</p>
+    <ul>
+      <li><b>Mercenários:</b> contratados na cidade para uma masmorra. Seguram a tocha para você, mas gastam provisões na viagem.</li>
+      <li><b>Animais:</b> adestrados num terreno vazio com pelo menos 2 vizinhos iguais (4 provisões e um dado). Máximo de 3.</li>
+      <li><b>Montarias:</b> deixam a viagem mais barata, mas não entram em masmorras. Só uma por vez.</li>
+      <li><b>Invocações:</b> magias que trazem aliados para o combate.</li>
+    </ul>
+    <p>Quando os monstros atacam, você divide o dano entre você e os companheiros, no mínimo 1 para cada.</p>`},
+  {t:"Jogando em dupla", b:`
+    <ul>
+      <li>Cada jogador usa o próprio aparelho. Um cria a sala e o outro entra com o código.</li>
+      <li>Só um segura a tocha, e quem age paga a tocha. Longe da luz, você tem 3 movimentos antes de precisar acender a sua.</li>
+      <li>Com dois jogadores, cada sala rola monstros duas vezes e o Chefe tem o dobro de vida.</li>
+      <li>No combate, cada um faz o seu turno completo, e o dano dos monstros é dividido entre os dois.</li>
+      <li>Os espólios são escolhidos numa tela de seleção.</li>
+      <li>Se um morrer, o corpo fica na masmorra, e ele só volta com outro aventureiro quando o parceiro retornar à cidade (ou morrer).</li>
+    </ul>
+    <p>Boa sorte, e não deixe a tocha apagar!</p>`}
+];
+function viewGuide(){
+  const n = GUIDE.length, i = Math.max(0, Math.min(n-1, state.ui.gp||0)), pg = GUIDE[i];
+  const body = typeof pg.b === "function" ? pg.b() : pg.b;
+  return `
+  ${bar("Guia do Aventureiro", state.ui.guideBack || "title")}
+  <div class="sheet guide">
+    <p class="muted small">Página ${i+1} de ${n}</p>
+    <h3>${pg.t}</h3>
+    ${body}
+  </div>
+  <div class="row"><button class="btn ghost" data-act="guidePg" data-d="-1" ${i===0?"disabled":""}>Anterior</button><button class="btn" data-act="guidePg" data-d="1" ${i===n-1?"disabled":""}>Próxima</button></div>
+  <div class="gdots">${GUIDE.map((g,k)=>`<button class="${k===i?"on":""}" data-act="guideGo" data-p="${k}" aria-label="Página ${k+1}: ${esc(g.t)}"></button>`).join("")}</div>
+  <div class="sheet"><h3>Índice</h3>${GUIDE.map((g,k)=>`<button class="linkbtn ${k===i?"on":""}" data-act="guideGo" data-p="${k}">${k+1}. ${g.t}</button>`).join("")}</div>`;
+}
+const actionsGuide = {
+  guide(b){ state.ui = {gp:0, guideBack:b && b.dataset.back || "title"}; go("guide"); },
+  guidePg(b){ state.ui.gp = Math.max(0, Math.min(GUIDE.length-1, (state.ui.gp||0) + +b.dataset.d)); render(); window.scrollTo(0,0); },
+  guideGo(b){ state.ui.gp = +b.dataset.p; render(); window.scrollTo(0,0); }
+};
+
+const VIEWS = {guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
 function render(){
   normalizeHands();
   if(state.screen==="create" && !state.draft) state.screen = "title";
@@ -7046,6 +7225,7 @@ const actions = {
   ...actionsApito,
   ...actionsWorld,
   ...actionsParty,
+  ...actionsGuide,
   shareToggle(b){ SHARE.toggle(b.dataset.u); },
   shareConfirm(b){ SHARE.confirm(b.dataset.v === "1"); },
   coopTake(b){
