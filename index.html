@@ -327,6 +327,11 @@ b,strong{font-weight:400 !important}
 .linkbtn.on{font-weight:bold;text-decoration:none}
 .bigcode{font-size:34px;letter-spacing:8px;text-align:center;margin:8px 0;font-weight:bold}
 .codein{width:100%;font-size:24px;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:10px;box-sizing:border-box;margin:6px 0}
+.slotrow{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px dotted currentColor}
+.slotrow:last-child{border-bottom:0}
+.slotrow .txt{display:flex;flex-direction:column;gap:3px;flex:1}
+.slotrow.cur b{text-decoration:underline;text-underline-offset:3px}
+.slotbtns{display:flex;gap:6px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -775,8 +780,10 @@ function applySkin(){
   mapVersion++;
 }
 function loadState(){
-  try{ const raw = localStorage.getItem(KEY); if(raw){ const s = JSON.parse(raw); if(s && s.v===1) return s; } }catch(e){}
-  return freshState();
+  loadMeta();
+  const s = readSlot(meta.cur) || freshState();
+  if(meta.settings) s.settings = meta.settings;
+  return s;
 }
 function migrate(){
   if(state.dungeon) fixDungeon(state.dungeon);
@@ -800,8 +807,16 @@ function migrate(){
     if(dd && dd.st==="open" && dd.dir==="N" && dd.x !== st.x && !Object.values(lv1.doors).some(o=>o!==dd && o.seg===dd.seg && o.dir==="N" && o.x===st.x)) dd.x = st.x;
   });
 }
-function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} if(typeof COOP !== "undefined" && COOP.on()) COOP.sync(); }
-function go(screen){ state.screen = screen; toastMsg=""; rollLog = []; persist(); render(); window.scrollTo(0,0); }
+function persist(){
+  if(!meta) loadMeta();
+  try{ localStorage.setItem(slotKey(meta.cur), JSON.stringify(state)); }catch(e){}
+  const L = meta.slots[meta.cur] || (meta.slots[meta.cur] = {n:0, synced:0});
+  L.n = (L.n||0) + 1; L.at = Date.now(); L.days = state.world ? state.world.days : 0; L.sum = slotSummary();
+  meta.settings = state.settings; saveMeta();
+  CLOUD.schedule();
+  if(typeof COOP !== "undefined" && COOP.on()) COOP.sync();
+}
+function go(screen){ state.screen = screen; toastMsg=""; rollLog = []; persist(); render(); window.scrollTo(0,0); if(["title","city","world"].includes(screen)) CLOUD.flush(); }
 
 function encodeSave(){
   const json = JSON.stringify({...state, screen:"title", ui:{}});
@@ -3659,12 +3674,14 @@ function viewTitle(){
   <div class="logo"><h1>DUNGEON QUEST</h1><p class="muted">Exploração de masmorras</p></div>
   <div class="stack">
     ${h ? `<button class="btn" data-act="go" data-to="${d && d.inside ? "explore" : "sheet"}">Continuar com ${esc(h.name)}</button>` : ""}
-    ${h && ui.confirmNew ? `
+    ${ui.slotsFull ? `
       <div class="sheet dashed">
-        <p>${esc(h.name)} ainda está vivo. Criar outro aventureiro manda ${esc(h.name)} para o Salão dos Heróis como abandonado.</p>
-        <div class="row"><button class="btn ghost" data-act="cancelNew">Manter</button><button class="btn" data-act="abandon">Abandonar</button></div>
+        <p>Você já tem ${MAX_SLOTS} jogos salvos. Para começar outro, apague um deles.</p>
+        <div class="row"><button class="btn ghost" data-act="cancelNew">Voltar</button><button class="btn" data-act="slotsFullOk">Ver jogos salvos</button></div>
       </div>` :
-      `<button class="btn ${h?"ghost":""}" data-act="newHero">Novo aventureiro</button>`}
+      `<button class="btn ${h?"ghost":""}" data-act="newGame">Novo aventureiro</button>`}
+    ${slotIds().length > 1 ? `<button class="btn ghost" data-act="go" data-to="slots">Carregar jogo salvo</button>` : ""}
+    ${toastMsg ? `<p class="toast">${esc(toastMsg)}</p>` : ""}
     <div class="row">
       <button class="btn ghost" data-act="guide">Guia do Aventureiro</button>
       <button class="btn ghost" data-act="go" data-to="cemetery">Salão dos Heróis</button>
@@ -4889,25 +4906,26 @@ function viewSave(){
   ${bar("Backup")}
   <div class="sheet">
     <h3>Save automático</h3>
-    <p>O jogo salva sozinho neste aparelho a cada ação. No iPhone, deixe o jogo instalado na tela de início para o Safari não apagar o progresso.</p>
+    <p>O jogo salva sozinho neste aparelho a cada ação, e você pode ter até ${MAX_SLOTS} jogos (veja "Carregar jogo salvo" na tela inicial). No iPhone, deixe o jogo instalado na tela de início para o Safari não apagar o progresso.</p>
   </div>
   <div class="sheet">
-    <h3>Enviar backup</h3>
-    <p class="small">Guarda o jogo na nuvem e mostra um código curto. No outro aparelho, use esse código em "Carregar backup".</p>
-    ${state.ui.cloudCode ? `<p class="bigcode" aria-label="Código do backup">${esc(state.ui.cloudCode)}</p>
-      <button class="btn ghost" data-act="cloudCopy">Copiar código</button>
-      <p class="muted small">O código vale uma vez: depois de carregado no outro aparelho, o backup é apagado da nuvem. Enviar de novo gera um código novo.</p>` : ""}
-    <button class="btn" data-act="cloudSend" ${NET.ready() ? "" : "disabled"}>${state.ui.cloudCode ? "Enviar de novo" : "Enviar backup"}</button>
-    ${NET.ready() ? "" : `<p class="muted small">A conexão com a nuvem não está configurada.</p>`}
+    <h3>Nuvem</h3>
+    <p class="small">Seus jogos sobem sozinhos para a nuvem enquanto você joga. Ao abrir o app, ele sempre continua da versão mais atual (a que tiver mais dias no mapa do mundo).</p>
+    <p class="small"><b>${esc(cloudStatusTxt())}</b></p>
   </div>
   <div class="sheet">
-    <h3>Carregar backup</h3>
-    <p class="small">Digite o código gerado no outro aparelho. Isso substitui o jogo atual deste aparelho.</p>
-    <input id="cloudIn" class="codein" maxlength="6" placeholder="Código" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" value="${esc(state.ui.cloudIn||"")}">
-    ${state.ui.cloudAsk ? `<p class="small"><b>Tem certeza?</b> O jogo deste aparelho será substituído pelo backup.</p>
-      <div class="row"><button class="btn ghost" data-act="cloudCancel">Cancelar</button><button class="btn" data-act="cloudLoad" data-ok="1">Substituir</button></div>`
-      : `<button class="btn" data-act="cloudLoad" ${NET.ready() ? "" : "disabled"}>Carregar backup</button>`}
+    <h3>Ligar outro aparelho</h3>
+    <p class="small">Para jogar os mesmos jogos no celular e no PC, gere um código aqui e use no outro aparelho. É só uma vez.</p>
+    ${state.ui.linkCode ? `<p class="bigcode" aria-label="Código para ligar aparelhos">${esc(state.ui.linkCode)}</p><p class="muted small">No outro aparelho, abra Backup e use este código em "Usar código".</p>` : ""}
+    <button class="btn" data-act="linkMake" ${CLOUD.ok() ? "" : "disabled"}>${state.ui.linkCode ? "Gerar outro código" : "Gerar código"}</button>
   </div>
+  <div class="sheet">
+    <h3>Usar código</h3>
+    <p class="small">Digite o código gerado no outro aparelho. Os jogos dos dois aparelhos passam a ficar juntos.</p>
+    <input id="linkIn" class="codein" maxlength="6" placeholder="Código" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false">
+    <button class="btn" data-act="linkUse" ${CLOUD.ok() ? "" : "disabled"}>Usar código</button>
+  </div>
+  ${/textbackup/.test(location.hash) ? `
   <div class="sheet">
     <h3>Código em texto (sem internet)</h3>
     <p class="small">Copie o código abaixo e guarde onde quiser. Em jogos longos ele fica grande demais para mensagens; nesse caso, use "Enviar backup".</p>
@@ -4921,6 +4939,7 @@ function viewSave(){
     ${navigator.clipboard && navigator.clipboard.readText ? `<button class="btn ghost" data-act="pasteSave">Colar da área de transferência</button>` : ""}
     <button class="btn ghost" data-act="import">Restaurar este save</button>
   </div>
+` : ""}
   <p class="toast" id="toast">${esc(toastMsg)}</p>`;
 }
 
@@ -6626,7 +6645,6 @@ function viewGuide(){
     ${body}
   </div>
   <div class="row"><button class="btn ghost" data-act="guidePg" data-d="-1" ${i===0?"disabled":""}>Anterior</button><button class="btn" data-act="guidePg" data-d="1" ${i===n-1?"disabled":""}>Próxima</button></div>
-  <div class="gdots">${GUIDE.map((g,k)=>`<button class="${k===i?"on":""}" data-act="guideGo" data-p="${k}" aria-label="Página ${k+1}: ${esc(g.t)}"></button>`).join("")}</div>
   <div class="sheet"><h3>Índice</h3>${GUIDE.map((g,k)=>`<button class="linkbtn ${k===i?"on":""}" data-act="guideGo" data-p="${k}">${k+1}. ${g.t}</button>`).join("")}</div>`;
 }
 const actionsGuide = {
@@ -6635,7 +6653,229 @@ const actionsGuide = {
   guideGo(b){ state.ui.gp = +b.dataset.p; render(); window.scrollTo(0,0); }
 };
 
-const VIEWS = {guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
+/* =========================================================
+   VÁRIOS JOGOS SALVOS (até 5) E SINCRONIZAÇÃO COM A NUVEM
+   Cada jogo é independente (aventureiro, masmorras, mundo e Salão dos Heróis).
+   A nuvem guarda os jogos na pasta da "chave do jogador"; outro aparelho é ligado uma vez por um código curto.
+   Ao abrir o app, a versão mais nova de cada jogo é baixada sozinha; a versão substituída fica como cópia anterior.
+   ========================================================= */
+const META_KEY = KEY.replace("notequest.save.v1", "notequest.meta.v1");
+const MAX_SLOTS = 5;
+let meta = null, cloudIdx = {};
+function rid(n){ const L = "abcdefghijkmnpqrstuvwxyz23456789"; return "j" + Array.from({length:n-1},()=>L[Math.floor(Math.random()*L.length)]).join(""); }
+function slotKey(id){ return KEY + ".s." + id; }
+function prevKey(id){ return KEY + ".p." + id; }
+function saveMeta(){ try{ localStorage.setItem(META_KEY, JSON.stringify(meta)); }catch(e){} }
+function loadMeta(){
+  try{ meta = JSON.parse(localStorage.getItem(META_KEY) || "null"); }catch(e){ meta = null; }
+  if(!meta || !meta.slots) meta = {player:null, cur:null, slots:{}, del:{}};
+  if(!meta.del) meta.del = {};
+  if(!meta.player) meta.player = rid(20);
+  if(!meta.cur || !meta.slots[meta.cur]){
+    const id = rid(8), old = localStorage.getItem(KEY);
+    if(old) try{ localStorage.setItem(slotKey(id), old); }catch(e){}       /* o save antigo vira o primeiro jogo */
+    meta.cur = id; meta.slots[id] = {n:1, synced:0, at:Date.now(), sum:{}};
+  }
+  saveMeta();
+}
+function slotSummary(s){
+  s = s || state; const h = s.hero, d = s.dungeon, w = s.world;
+  let where = "";
+  if(d && d.inside) where = d.name;
+  else if(w && w.hex && w.hex[w.pos]){ const hx = w.hex[w.pos]; where = hx.loc && (hx.loc.k === "city" || hx.loc.k === "fort") ? locLabel(hx.loc) : (hx.dg ? hx.dg.name : TERR[hx.t].n); }
+  else if(h) where = "Cidade";
+  return {name:h ? h.name : "", who:h ? `${raceName(h)} ${classLabel(h)}` : "", pv:h ? h.pv : 0, pvMax:h ? h.pvMax : 0, where, dead:s.cemetery ? s.cemetery.length : 0};
+}
+function slotIds(){
+  const ids = new Set(Object.keys(meta.slots));
+  Object.keys(cloudIdx||{}).forEach(id=>{ if(!meta.del[id]) ids.add(id); });
+  return [...ids];
+}
+function readSlot(id){ try{ const raw = localStorage.getItem(slotKey(id)); if(raw){ const s = JSON.parse(raw); if(s && s.v === 1) return s; } }catch(e){} return null; }
+function useState(s){
+  const keep = state && state.settings ? state.settings : (meta.settings || null);
+  state = s || freshState();
+  if(keep) state.settings = keep;
+  migrate(); applySkin(); mapVersion++;
+}
+const CLOUD = {
+  timer:null, busy:false, status:"",
+  ok(){ return !!(meta && meta.player) && NET.ready() && (NET.sim() || /^https?:/.test(location.protocol)); },
+  base(){ return `contas/${meta.player}`; },
+  schedule(){ if(!this.ok() || this.timer) return; this.timer = setTimeout(()=>{ this.timer = null; this.flush(); }, 15000); },
+  async flush(){
+    if(!this.ok() || this.busy) return;
+    const L = meta.slots[meta.cur]; if(!L || L.n <= L.synced) return;
+    this.busy = true;
+    try{ await this.syncSlot(meta.cur); this.status = "ok"; }catch(e){ this.status = "off"; }
+    this.busy = false;
+  },
+  async push(id){
+    const raw = localStorage.getItem(slotKey(id)), L = meta.slots[id]; if(!raw || !L) return;
+    if(emptySlot(readSlot(id))) return;                                   /* jogo vazio não sobe */
+    const n = L.n, at = L.at || Date.now(), days = L.days || 0, gen = L.gen || 0;
+    await NET.put(`${this.base()}/slots/${id}`, {d:raw, n, at, days, gen});
+    await NET.put(`${this.base()}/idx/${id}`, {n, at, days, gen, sum:L.sum || {}});
+    L.synced = n; cloudIdx[id] = {n, at, days, gen, sum:L.sum || {}}; saveMeta();
+  },
+  async pull(id, c){
+    const rec = await NET.get(`${this.base()}/slots/${id}`); if(!rec || !rec.d) return false;
+    const old = localStorage.getItem(slotKey(id));
+    try{ if(old) localStorage.setItem(prevKey(id), old); localStorage.setItem(slotKey(id), rec.d); }catch(e){ return false; }
+    meta.slots[id] = {n:rec.n, synced:rec.n, at:rec.at, days:rec.days || 0, gen:rec.gen || 0, sum:(c && c.sum) || {}, prev:!!old || (meta.slots[id] && meta.slots[id].prev)};
+    saveMeta();
+    if(id === meta.cur) useState(readSlot(id));
+    return true;
+  },
+  /* decide quem é o mais atual: uma versão restaurada (gen maior) sempre vence;
+     depois, quem tem mais dias no mapa do mundo; empatando, quem jogou mais ações */
+  async syncSlot(id, c){
+    if(c === undefined) c = await NET.get(`${this.base()}/idx/${id}`);
+    const L = meta.slots[id];
+    if(!c){ if(L) await this.push(id); return; }
+    cloudIdx[id] = c;
+    if(!L){ return; }
+    const cmp = ((L.gen||0) - (c.gen||0)) || ((L.days||0) - (c.days||0)) || (L.n - (c.n||0));
+    if(cmp > 0) await this.push(id);
+    else if(cmp < 0) await this.pull(id, c);
+    else if(L.synced !== L.n){ L.synced = L.n; saveMeta(); }
+  },
+  async boot(){
+    if(!this.ok()) return;
+    this.busy = true;
+    try{
+      const [idx, del] = await Promise.all([NET.get(`${this.base()}/idx`), NET.get(`${this.base()}/del`)]);
+      Object.keys(del || {}).forEach(id=>{ meta.del[id] = 1; if(meta.slots[id] && id !== meta.cur) removeLocal(id); });
+      cloudIdx = {}; Object.entries(idx || {}).forEach(([id,v])=>{ if(!meta.del[id] && v) cloudIdx[id] = v; });
+      for(const id of Object.keys(meta.slots)) await this.syncSlot(id, cloudIdx[id] || null);
+      this.status = "ok";
+    }catch(e){ this.status = "off"; }
+    this.busy = false; saveMeta();
+    if(!busy && ["title","slots","save","sheet"].includes(state.screen)) render();
+  }
+};
+function emptySlot(s){ return !s || (!s.hero && !(s.cemetery||[]).length && !s.world && !s.dungeon && !s.draft); }
+function removeLocal(id){ try{ localStorage.removeItem(slotKey(id)); localStorage.removeItem(prevKey(id)); }catch(e){} delete meta.slots[id]; }
+function newSlot(){
+  const id = rid(8);
+  meta.slots[id] = {n:1, synced:0, at:Date.now(), sum:{}};
+  meta.cur = id; saveMeta();
+  useState(freshState());
+  persist();
+  return id;
+}
+function fmtWhen(t){ if(!t) return ""; try{ return new Date(t).toLocaleString("pt-BR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}); }catch(e){ return ""; } }
+function viewSlots(){
+  const ids = slotIds().sort((a,b)=>((meta.slots[b]||cloudIdx[b]||{}).at||0) - ((meta.slots[a]||cloudIdx[a]||{}).at||0));
+  const rows = ids.map(id=>{
+    const L = meta.slots[id], c = cloudIdx[id], s = (L && L.sum && L.sum.name !== undefined ? L.sum : null) || (c && c.sum) || {};
+    const at = Math.max((L && L.at)||0, (c && c.at)||0), cur = id === meta.cur, ask = state.ui.delSlot === id;
+    return `<div class="slotrow ${cur ? "cur" : ""}">
+      <div class="txt"><b>${s.name ? esc(s.name) : "Jogo sem aventureiro"}${cur ? " <span class=\"chip\">atual</span>" : ""}</b>
+        ${s.who ? `<span class="small">${esc(s.who)} · ${N(s.pv)}/${N(s.pvMax)} PV</span>` : ""}
+        <span class="small muted">${s.where ? esc(s.where) + " · " : ""}${fmtWhen(at)}${!L ? " · na nuvem" : ""}</span>
+        ${L && L.prev && localStorage.getItem(prevKey(id)) ? `<button class="linkbtn small" data-act="slotPrev" data-id="${id}">Voltar à versão anterior</button>` : ""}</div>
+      ${ask ? `<div class="row"><button class="btn ghost" data-act="slotDelNo">Manter</button><button class="btn" data-act="slotDel" data-id="${id}" data-ok="1">Apagar</button></div>`
+        : `<div class="slotbtns">${cur ? "" : `<button class="use" data-act="slotLoad" data-id="${id}">Jogar</button>`}<button class="use" data-act="slotDel" data-id="${id}" aria-label="Apagar jogo">✕</button></div>`}
+    </div>`;
+  }).join("");
+  return `
+  ${bar("Jogos salvos")}
+  <p class="muted small">Até ${MAX_SLOTS} jogos. Cada um tem seu aventureiro, suas masmorras, seu mundo e seu Salão dos Heróis.</p>
+  <div class="sheet">${rows || `<p class="muted small">Nenhum jogo salvo.</p>`}</div>
+  ${state.ui.delSlot ? `<p class="small">Apagar remove o jogo deste aparelho e da nuvem, para sempre.</p>` : ""}
+  <p class="toast" id="toast">${esc(toastMsg)}</p>`;
+}
+function cloudStatusTxt(){
+  if(!CLOUD.ok()) return "A nuvem não está disponível aqui.";
+  if(CLOUD.busy) return "Sincronizando...";
+  if(CLOUD.status === "off") return "Sem conexão: os jogos sobem para a nuvem quando a internet voltar.";
+  const L = meta.slots[meta.cur];
+  return L && L.n > L.synced ? "Há progresso esperando para subir para a nuvem." : "Tudo salvo na nuvem.";
+}
+const actionsSlots = {
+  newGame(){
+    if(COOP.on()){ toastMsg = "Saia da dupla antes de começar outro jogo."; render(); return; }
+    if(!state.hero){ startDraft(); return; }
+    if(slotIds().length >= MAX_SLOTS){ state.ui.slotsFull = true; render(); return; }
+    persist(); CLOUD.flush();
+    newSlot(); startDraft();
+  },
+  slotsFullOk(){ state.ui = {}; go("slots"); },
+  async slotLoad(b){
+    const id = b.dataset.id; if(busy || id === meta.cur) return;
+    if(COOP.on()){ toastMsg = "Saia da dupla antes de trocar de jogo."; render(); return; }
+    busy = true; lockButtons(); toastMsg = "Carregando...";
+    const t = $("#toast"); if(t) t.textContent = toastMsg;
+    persist(); try{ await CLOUD.flush(); }catch(e){}
+    try{ if(CLOUD.ok()) await Promise.race([CLOUD.syncSlot(id, meta.slots[id] ? undefined : (cloudIdx[id] || null)), new Promise(r=>setTimeout(r, 5000))]); }catch(e){}
+    if(!meta.slots[id] && cloudIdx[id]){ try{ meta.slots[id] = {n:0, synced:0, at:0, sum:cloudIdx[id].sum || {}}; await CLOUD.pull(id, cloudIdx[id]); }catch(e){} }
+    const s = readSlot(id);
+    busy = false;
+    if(!s){ if(meta.slots[id] && !localStorage.getItem(slotKey(id))) delete meta.slots[id]; toastMsg = "Não foi possível baixar esse jogo agora. Confira a internet."; render(); return; }
+    const was = meta.cur, wasEmpty = emptySlot(state);
+    meta.cur = id; saveMeta(); useState(s);
+    if(wasEmpty && was !== id){ removeLocal(was); saveMeta(); }
+    toastMsg = ""; state.ui = {};
+    go(state.hero ? (state.dungeon && state.dungeon.inside ? "explore" : (state.world ? "world" : "sheet")) : "title");
+  },
+  slotDel(b){
+    const id = b.dataset.id;
+    if(!b.dataset.ok){ state.ui.delSlot = id; render(); return; }
+    state.ui.delSlot = null;
+    removeLocal(id); meta.del[id] = 1; delete cloudIdx[id];
+    if(CLOUD.ok()){ const base = CLOUD.base(); NET.put(`${base}/slots/${id}`, null).catch(()=>{}); NET.put(`${base}/idx/${id}`, null).catch(()=>{}); NET.put(`${base}/del/${id}`, Date.now()).catch(()=>{}); }
+    if(id === meta.cur){ const rest = Object.keys(meta.slots); if(rest.length){ meta.cur = rest[0]; useState(readSlot(rest[0])); } else newSlot(); }
+    saveMeta(); render();
+  },
+  slotDelNo(){ state.ui.delSlot = null; render(); },
+  slotPrev(b){
+    const id = b.dataset.id, old = localStorage.getItem(prevKey(id)); if(!old) return;
+    if(state.ui.prevAsk !== id){ state.ui.prevAsk = id; toastMsg = "Toque de novo para voltar este jogo à versão anterior (a atual vira a cópia)."; render(); return; }
+    const cur = localStorage.getItem(slotKey(id));
+    try{ localStorage.setItem(slotKey(id), old); if(cur) localStorage.setItem(prevKey(id), cur); }catch(e){ return; }
+    const L = meta.slots[id], ps = readSlot(id); L.n = Math.max(L.n, L.synced) + 1; L.at = Date.now(); L.days = ps && ps.world ? ps.world.days : 0;
+    L.gen = Math.max(L.gen || 0, (cloudIdx[id] && cloudIdx[id].gen) || 0) + 1;     /* força esta versão sobre a mais atual, em todos os aparelhos */
+    saveMeta();
+    if(id === meta.cur) useState(readSlot(id));
+    state.ui = {}; toastMsg = "Versão anterior restaurada."; if(CLOUD.ok()) CLOUD.push(id).catch(()=>{}); render();
+  },
+  async linkMake(){
+    if(busy || !CLOUD.ok()) return;
+    busy = true; lockButtons();
+    try{
+      const L = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code = null;
+      for(let i=0;i<6 && !code;i++){ const c = Array.from({length:6},()=>L[Math.floor(Math.random()*L.length)]).join(""); if(await NET.get(`links/${c}`) == null) code = c; }
+      if(!code) throw 0;
+      await NET.put(`links/${code}`, {p:meta.player, t:Date.now()});
+      for(const id of Object.keys(meta.slots)) await CLOUD.syncSlot(id);
+      state.ui.linkCode = code; toastMsg = "";
+    }catch(e){ toastMsg = "Não foi possível gerar o código. Confira a internet."; }
+    busy = false; render();
+  },
+  async linkUse(){
+    if(busy || !CLOUD.ok()) return;
+    const inp = $("#linkIn"), code = ((inp && inp.value) || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(code.length !== 6){ toastMsg = "O código tem 6 letras e números."; render(); return; }
+    busy = true; lockButtons(); toastMsg = "Ligando...";
+    try{
+      const rec = await NET.get(`links/${code}`);
+      if(!rec || !rec.p){ busy = false; toastMsg = "Código não encontrado. Gere um novo no outro aparelho."; render(); return; }
+      if(rec.p !== meta.player){
+        meta.player = rec.p;
+        Object.values(meta.slots).forEach(L=>{ L.synced = -1; if(L.n < 1) L.n = 1; });   /* os jogos deste aparelho entram na conta */
+        saveMeta();
+      }
+      NET.put(`links/${code}`, null).catch(()=>{});
+      busy = false; await CLOUD.boot();
+      toastMsg = "Aparelho ligado! Seus jogos aparecem em Carregar jogo salvo.";
+    }catch(e){ busy = false; toastMsg = "Não foi possível ligar. Confira a internet e o código."; }
+    render();
+  }
+};
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden){ if(CLOUD.timer){ clearTimeout(CLOUD.timer); CLOUD.timer = null; } CLOUD.flush(); } });
+
+const VIEWS = {slots:viewSlots, guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
 function render(){
   normalizeHands();
   if(state.screen==="create" && !state.draft) state.screen = "title";
@@ -7245,6 +7485,7 @@ const actions = {
   ...actionsWorld,
   ...actionsParty,
   ...actionsGuide,
+  ...actionsSlots,
   shareToggle(b){ SHARE.toggle(b.dataset.u); },
   shareConfirm(b){ SHARE.confirm(b.dataset.v === "1"); },
   coopTake(b){
@@ -7876,6 +8117,7 @@ function start(data){
   cam.z = isZ() ? .85 : 3;
   render();
   requestAnimationFrame(loop);
+  CLOUD.boot();
 }
 window.claude?.hot?.snapshot?.(()=>({state}));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
