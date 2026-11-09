@@ -334,23 +334,37 @@ b,strong{font-weight:400 !important}
 .slotbtns{display:flex;gap:6px;flex-shrink:0}
 /* ---------- layout de PC ---------- */
 html.pc #app{max-width:1120px}
-html.pc #app.pcv{max-width:none;display:grid;grid-template-columns:minmax(0,1fr) 440px;column-gap:24px;row-gap:12px;align-items:start;padding-left:24px;padding-right:24px}
+html.pcfix, html.pcfix body{height:100%;overflow:hidden;margin:0}
+html.pc #app.pcv{max-width:none;height:100vh;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) 440px;grid-template-rows:auto minmax(0,1fr);column-gap:24px;row-gap:12px;align-items:stretch;padding:14px 24px 16px;overflow:hidden}
 #app.pcv > .bar{grid-column:1/3}
-#app.pcv .pcL{grid-column:1;position:sticky;top:12px;height:calc(100vh - 104px);display:flex;flex-direction:column;gap:10px;min-width:0}
-#app.pcv .pcL.pc-combat{height:auto}
-#app.pcv .pcL .mapbox{flex:1;height:auto;min-height:320px}
+#app.pcv .pcL{grid-column:1;display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0}
+#app.pcv .pcL .mapbox{flex:1;height:auto;min-height:280px}
 #app.pcv .pcL .etray:empty{display:none}
 #app.pcv .pcL > p{margin:0}
-#app.pcv .pcR{grid-column:2;display:flex;flex-direction:column;gap:16px;min-width:0}
+#app.pcv .pcR{grid-column:2;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;overflow-y:auto;padding-right:4px}
+#app.pcv .pcR > *{flex-shrink:0}
+#app.pcv-world .pcR{overflow:hidden;padding-right:0}
 #app.pcv .pcL .arena{width:min(100%, calc((100vh - 330px) * 1.5));align-self:center}
 #app.pcv .pcL .tgts{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pcside{display:flex;flex-direction:column;gap:8px}
+#app.pcv .pcR > .pcside.fill{flex:1 1 auto;min-height:0}
 .pctabs{display:flex;gap:6px}
 .pctabs button{flex:1;min-width:0;font-family:var(--display);font-size:12px;letter-spacing:.02em;text-transform:uppercase;padding:8px 2px;border:2px solid var(--ink);background:transparent;color:var(--ink);opacity:.65;cursor:pointer}
 .pctabs button.on{opacity:1;background:var(--ink);color:var(--paper)}
 .pctabs button:hover{opacity:1}
 .pcbody{display:flex;flex-direction:column;gap:12px;max-height:40vh;overflow-y:auto;padding-right:4px}
+.pcbody > *{flex-shrink:0}
+.pcside.fill .pcbody{flex:1;max-height:none;min-height:0}
 .pcbody > .sheet{margin:0}
+.pctool{display:flex;gap:8px}
+.pctool button{flex:1;min-width:0;font-family:var(--body);font-size:16px;padding:8px 6px;border:3px solid var(--ink);background:#24315a;color:#f3ead2;box-shadow:3px 3px 0 #0b1024;cursor:pointer}
+.pctool button.on{background:#e9dcb4;color:#18213d}
+.pctool button:disabled{opacity:.4;box-shadow:none;cursor:default}
+#app.pcc > .pctool{grid-column:1/3}
+.hexpop{position:absolute;left:0;top:0;z-index:3;display:flex;flex-direction:column;align-items:stretch;gap:4px;pointer-events:none}
+.hexpop button{pointer-events:auto}
+.hexpop .lbl{font-family:var(--display);font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:#141a33;color:#f3ead2;border:2px solid #f3ead2;padding:3px 8px;text-align:center;white-space:nowrap}
+.hexpop .why{font-family:var(--body);font-size:14px;background:#141a33;color:#f3ead2;border:2px solid #f3ead2;padding:4px 8px;max-width:240px}
 #app.pcc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px;row-gap:16px;align-items:start}
 #app.pcc > *{grid-column:1/3}
 #app.pcc > .pcA{grid-column:1}
@@ -467,7 +481,8 @@ const RACES_X = {
 /* raça pelo código salvo: número = tabela comum (2d6); texto = tabelas novas */
 function R(id){ if(id === null || id === undefined) return null; return typeof id === "number" || /^\d+$/.test(id) ? RACES[+id] : RACES_X[id]; }
 function raceName(h){ const r = R(h.race); return r ? r.n + (h.race2 && R(h.race2) ? ` (${R(h.race2).n})` : "") : "?"; }
-function raceT(t, h){ h = h || state.hero; if(!h) return false; return [R(h.race), R(h.race2)].some(r=>r && r.t === t); }
+const MUT_T = {chifre:"horn", bolhas:"noArmor"};
+function raceT(t, h){ h = h || state.hero; if(!h) return false; return [R(h.race), R(h.race2)].some(r=>r && r.t === t) || (h.mut||[]).some(m=>MUT_T[m] === t); }
 function raceAdvHTML(r){ return `${r.adv}${r.soon ? ` <span class="soon">Em breve</span>` : r.part ? ` <span class="soon">Em breve: ${esc(r.part)}</span>` : ""}`; }
 
 /* =========================================================
@@ -782,6 +797,298 @@ const DUNGEONS = {
     arma:[["Espeto","1d6-1"],["Facão","1d6"],["Lança","1d6+1"],["Lança","1d6+1"],["Lança Longa","1d6+2",1],["Lança Longa","1d6+2",1]]}
 };
 for(const k in DUNGEONS){ const D = DUNGEONS[k]; D.corr = D.corr || ["S1","M1","M1","L2","G2","E"]; D.room = D.room || SEG_ROOM; }
+/* =========================================================
+   MASMORRAS MORTAIS, 1ª ETAPA (páginas 48 a 57)
+   Cidadela dos Anões, Pirâmide, Zigurate, Laboratório e Necrópole
+   ========================================================= */
+SHAPES.C3L = {n:"Corredor largo com três portas",k:"corr",w:1,d:4,doors:3};
+SHAPES.C1F = {n:"Corredor com uma porta no fundo",k:"corr",w:1,d:4,doors:1};
+SHAPES.CST = {n:"Escadaria curta",k:"stairs",w:1,d:2,doors:1};
+const TRAP_DECAP = (t) => ["decap", t || "Você é decapitado por uma lâmina."];
+const TRAP_ACID = ["acid","Ácido esguicha do teto e destrói uma peça de armadura que você estiver vestindo."];
+const TRAP_STAKES = ["dmg","Você cai em um buraco com estacas.",3];
+const SEC_BASE = ["trap","nada","nada","chest","chest","stair"];
+const PURIF = "Poção da Purificação (retira uma Maldição)";
+const MAD = "Poção do Louco (ganha 3 Magias Básicas)";
+Object.assign(DUNGEONS, {
+  7:{n:"Cidadela",a:"A",
+    intro:"A entrada dessa masmorra é um imenso hall esculpido em pedra no meio de uma montanha. Duas estátuas de anões brandindo seus machados estão em volta da pesada porta de pedra. Ao entrar, você encontra um salão imenso e fundo. No centro há uma grande fonte agora seca, e nos lados há 3 portas em cada lado. Todas estas portas dão para uma escadaria curta com uma porta no fundo.",
+    start:"cidadela", st:["C1","C2","C2","C2","C3","C3L"], sec:SEC_BASE,
+    trap:[TRAP_DECAP(),["dmg","Um martelo gigante sai do teto.",5],TRAP_STAKES,["dmg","Um dardo sai da parede.",1],["dmg","Um dardo sai da parede.",1],TRAP_NADA],
+    cont:[["Troféus de caça de monstros subterrâneos.",""],["Cozinha destruída e 1d6 moedas.","cs"],["Cama com um Baú ao lado.","xs"],
+      ["Armário com 2 Tesouros.","tt"],["Escrivaninha com 1 Baú.","x"],["Estandartes de guerra cheios de pó.","s"],
+      ["Sala de treinamento com um Tesouro.","t"],["Depósito de Lixo.","s"],["Arsenal com 2d6 Tesouros.","t2"],
+      ["Grande mesa com papéis e mapas.","s"],["Sala de tortura com ossos de orcs.","s"]],
+    mon:[["1","Líder Orc","Líderes Orcs",12,5,"Espólios, Horda"],["3","Orc","Orcs",6,3,"Espólios"],["2","Orc","Orcs",6,3,"Espólios"],
+      ["1","Orc","Orcs",6,3,"Espólios"],["1d6","Goblin","Goblins",3,1,"Explosivo"],null,null,
+      ["2","Esqueleto de Anão","Esqueletos de Anão",4,3,"Morto-Vivo"],["1","Fantasma Anão","Fantasmas Anões",6,4,"Intangível"],
+      ["1","Golem Ossos e Pedra","Golens Ossos e Pedra",15,6,"Morto-Vivo"],["1","Limo Vivo","Limos Vivos",10,1,"Espólios, Regeneração"]],
+    tes:["Estatueta Anã (vale 6 moedas na cidade)","Barril de Cerveja Anã (recupera 5 PV)",JEWEL,"Jóia muito valiosa (vale 150 moedas na cidade)","@mar","@mag"],
+    mar:["Braceletes dos Anões (3 PV)","Ombreiras dos Anões (4 PV)","Capacete para Tochas (3 PV; encaixa tochas e libera a mão)","Facão Orc (Dano 1d6+1)","Chifre de Guerra (aumenta seu dano em +1)","Cabeça do Rei Orc (Orcs causam -1 de dano)"],
+    mag:["Anel do Morto (Maldição; não pode usar Armadura)","Martelo Anão (Dano 1d6; +2 contra Orc)","Machado Anão (Dano 1d6+1; +2 contra Orc)","Capa do Rei Anão (dano +1 contra Orc)","Picareta de Guerra Anão (Dano 1d6+2)","Peitoral dos Anões (10 PV; ignora Veneno)"],
+    boss:[[1,"A Morte",50,3,"Morte Súbita","A Morte estava esperando por você."],
+          [1,"Bolrag",40,6,"Fogo","De dentro de um imenso buraco aberto no chão do salão, o demônio Bolrag aparece."],
+          [1,"Minotauro",30,7,"Horda","Apoiado em um imenso machado, o Minotauro está sentado em um trono de ossos de anões."],
+          [1,"Espírito do Rei Anão",20,5,"Intangível","A sala é muito fria. Ao fundo, sentado em um trono de pedra, está o Espírito do Rei Anão."],
+          [1,"Líder Xamã Orc",20,2,"Magia, Horda","O Líder Xamã Orc está cercado de 3 Orcs.",["3","Orc","Orcs",6,3,""]],
+          [1,"Rei Amaldiçoado",30,7,"Necromancia","O antigo rei anão foi corrompido pela morte e agora é o Rei Amaldiçoado."]],
+    relic:{n:"Relíquia Anã", list:["Estandarte do Império Anão (encaixado no Peitoral, dá +1 de dano)","Picareta da Aniquilação (Dano 1d6+2; ao matar uma criatura, causa +2 na próxima igual)","Machado Pesado das Profundezas (Dano 1d6+4; Duas Mãos; +3 contra Demônios)","Marreta do Deus Anão (Dano 1d6+5; Duas Mãos)","Elmo do Rei Anão (11 PV)","Machado do Rei Anão (Dano 1d6+3; +1 contra Orc)"]},
+    arma:null},
+  8:{n:"Pirâmide",a:"A",
+    intro:"Uma enorme estrutura de pedra no formato de pirâmide. Algumas partes estão cobertas de areia, mas é possível ver uma pequena entrada na base. Uma grande rocha esculpida cobre a entrada, e você consegue arrastá-la um pouco para passar. Lá dentro, uma escadaria comprida desce para a escuridão. No fundo dela há uma porta de metal.",
+    start:"stairs", sec:["trap","trap","chest","chest","chest","stair"],
+    trap:[["death","Um enorme bloco de pedra cai em cima de você."],["mon","Levantam soldados mumificados!",["1d6","Soldado Mumificado","Soldados Mumificados",5,2,"Morto-Vivo"]],["mon","Levantam soldados mumificados!",["1d6","Soldado Mumificado","Soldados Mumificados",5,2,"Morto-Vivo"]],
+      ["mon","Levanta uma múmia!",["1","Múmia","Múmias",4,1,"Morto-Vivo"]],["pit","Uma nuvem de gás faz você desmaiar. Gaste 1 tocha."],TRAP_NADA],
+    cont:[["Sarcófago com 2d6 Tesouros.","t2"],["Estátuas de deuses animais.",""],["Um poço no centro da sala.","s"],
+      ["Parede coberta por desenhos de deuses animais.","s"],["Estátua quebrada de algum deus animal.",""],["Sarcófago com Baú dentro.","x"],
+      ["Vários vasos com desenhos de deuses animais.","s"],["Parede coberta por desenhos de deuses animais.","s"],["Dezenas de velas por todos cantos.","s"],
+      ["Estátua de um deus com cabeça de crocodilo.","s"],["Sarcófago com 2d6 Tesouros.","t2"]],
+    mon:[["1","Sacerdotisa Mumificada","Sacerdotisas Mumificadas",7,2,"Magia"],["3","Soldado Mumificado","Soldados Mumificados",5,2,"Morto-Vivo"],
+      ["2","Soldado Mumificado","Soldados Mumificados",5,2,"Morto-Vivo"],["2","Sentinela de Aço","Sentinelas de Aço",8,3,""],
+      ["1d6","Escaravelho Gigante","Escaravelhos Gigantes",3,2,""],null,null,["1d6","Escorpião","Escorpiões",2,1,"Veneno"],
+      ["3","Sentinela de Aço","Sentinelas de Aço",8,3,""],["1","Estátua do Deus Chacal","Estátuas do Deus Chacal",10,3,"Corpo de Pedra"],
+      ["1","Aranha Gigante","Aranhas Gigantes",10,4,"Paralisar"]],
+    tes:["Estatueta de Ouro (vale 3d6 moedas na cidade)",LIFE,"@scroll",JEWEL,"@mar","@mag"],
+    mar:["Gato Mumificado (rerrola uma vez uma Armadilha)","Colar do Rei Antigo (Múmias causam -1 de dano)","Amuleto do Escaravelho (ignora armadilhas em baús)","Chapéu do Sol (ganha 1 tocha sempre que matar um Escorpião)","@armor","@arma"],
+    mag:["[Armadura] do Deus Chacal (Maldição; não pode recuperar PV)","[Armadura] da Deusa Coruja (sabe uma Magia Avançada)","[Armadura] do Rei do Deserto (+2 PV)","Coquilha Beltrâmica (afugenta Escorpiões)","[Arma] do Rei do Deserto (+4 contra Corpo de Pedra)","[Arma] das Setenta Noites (se cair 6, paralisa o alvo por 2 turnos)"],
+    boss:[[1,"Imperador Escorpião",30,3,"Veneno","Nuvem esverdeada cobre a sala. Deitado sobre um altar está o Imperador Escorpião."],
+          [1,"Rei do Deserto",20,7,"Morto-Vivo","De dentro de um sarcófago sai o Rei do Deserto."],
+          [1,"Rainha Eterna",12,1,"Magia","Ali está a Rainha Eterna e seus 10 Soldados Mumificados.",["10","Soldado Mumificado","Soldados Mumificados",5,2,"Morto-Vivo"]],
+          [1,"Miragem Maldita",12,5,"Intangível","Uma imagem monstruosa surge no meio da sala. Esta é a Miragem Maldita."],
+          [1,"Escaravelho Gigante Alado",60,3,"Fogo","Ali está o assustador Escaravelho Gigante Alado."],
+          [1,"Deus Chacal",50,7,"Necromancia","De pé no meio da sala, segurando suas duas kopesh, está o Deus Chacal."]],
+    arma:[["Cetro","1d6-1"],["Kukri","1d6"],["Katar","1d6"],["Kopesh","1d6+1"],["Foice","1d6+1"],["Cajado","1d6+1",1]],
+    armorT:{1:["Elmo",3,"Máscara Mortuária"],2:["Braceletes",2],3:["Botas",3],4:["Ombreiras",3],5:["Elmo",4],6:["Peitoral",10]}},
+  9:{n:"Zigurate",a:"O",
+    intro:"Esta masmorra está escondida embaixo de uma imensa estrutura piramidal. Uma escadaria no meio dela leva até o topo, onde há um poço escuro e uma corda ao lado. Você desce por mais de vinte metros até chegar em uma grande sala quadrada com quatro portas, uma em cada parede.",
+    start:"zig", st:["C1","C1","C2","C2","C3","C3"], corr:["S1","M1","M1","M1","L2","G2"], room:["GP","GP","C1F","C1F","E","E"], sec:SEC_BASE,
+    trap:[TRAP_DECAP(),TRAP_ACID,TRAP_STAKES,["rmon","Abre uma passagem e sai um monstro!"],["rmon","Abre uma passagem e sai um monstro!"],TRAP_NADA],
+    cont:[["Cadáveres de diversas raças pendurados nas paredes.",""],["Ossada de uma serpente gigante.","s"],["Cama com um Baú ao lado.","x"],
+      ["Armários com vestimentas feitas de penas coloridas.",""],["Altar de sacrifício.","s"],["Sala vazia.",""],
+      ["Teto coberto por desenhos de estrelas.",""],["Dois sarcófagos. Cada um pode ter uma Passagem Secreta.","s2"],["Sala de ornamentos com 1d6 Tesouros.","t1"],
+      ["Grande mesa com um banquete apodrecido.","s"],["Sala de tortura com ossos de goblins.","s"]],
+    mon:[["1","Líder de Tribo Javaligor","Líderes de Tribo Javaligor",15,5,"Espólios"],["3","Soldado Javaligor","Soldados Javaligor",6,3,"Espólios"],
+      ["2","Soldado Javaligor","Soldados Javaligor",6,3,"Espólios"],["1","Goblin Assassino","Goblins Assassinos",3,3,"Explosivo"],
+      ["1d6","Goblin","Goblins",3,1,"Explosivo"],null,null,["1","Pantera","Panteras",5,4,""],
+      ["1","Morcego Gigante","Morcegos Gigantes",10,4,"Veneno"],["1","Estátua do Deus Sol","Estátuas do Deus Sol",15,6,"Corpo de Pedra"],
+      ["1","Serpente Emplumada","Serpentes Emplumadas",12,3,""]],
+    tes:["Fruta Estranha (se comer, recupera o uso de uma Magia)",LIFE,"@scroll","Ornamento de Ouro e Jóias (vale 100 moedas na cidade)","@mar","@mag"],
+    mar:["Bebida Doce Viciante (recupera 1 PV)","Peitoral Emplumado (8 PV)","Botas Emplumadas (3 PV; gasta só 1 provisão em Pântanos)","Capacete de Crocodilo (5 PV)","Pedra das Estrelas (gaste 1 provisão e rerrole um Evento de viagem)",PURIF],
+    mag:["Anel do Crocodilo (Maldição; você fica com escamas)","Anel do Emplumado (Maldição; os pelos viram penas)","Máscara da Coruja (1 PV; ignora Intangível)","Adaga de Sacrifício do Deus Sol (Dano 1d6; +2 dentro de Santuários)","Capacete de Crocodilo (Dano 1d6+2)","Capacete do Deus Sol (10 PV)"],
+    boss:[[1,"Medusa",20,7,"Paralisar","Atrás de um altar de pedra está a Medusa, esperando por você."],
+          [1,"Crânio Sagrado",20,6,"Regeneração","O chão está coberto de muco esverdeado. Do meio do muco surge o Crânio Sagrado."],
+          [1,"Hagork",30,7,"Horda","No meio da sala está Hagork, o Deus dos Orcs."],
+          [1,"Pavão Misterioso",17,5,"Magia","Um cheiro de ódio vem dessa sala. Ali está o Pavão Misterioso com seus truques."],
+          [1,"Sacerdotisa Emplumada",50,2,"Magia","Segurando o crânio de um tigre, a Sacerdotisa Emplumada tenta fazer um ritual."],
+          [1,"Deus Sol",80,8,"Ponto Fraco","Uma luz forte vem da sala. Ali dentro está o Deus Sol."]],
+    arma:null},
+  10:{n:"Laboratório",a:"O",
+    intro:"A entrada dessa masmorra é uma torre abandonada em ruínas. Ao entrar você encontra um grande alçapão já aberto, com uma escadaria para baixo coberta de limo e plantas. Lá embaixo dá para ver uma porta de metal enferrujada.",
+    start:"stairs", st:["C1","C1","C2","C2","C3","C3"], corr:["S1","M1","M1","M1","L2","G2"], room:["GP","GP","C1F","C1F","E","E"], sec:SEC_BASE,
+    trap:[["arm","Uma lâmina corta uma das suas mãos."],TRAP_ACID,TRAP_STAKES,["mon","Surge uma Bolha Assassina!",["1","Bolha Assassina","Bolhas Assassinas",9,3,"Regeneração"]],TRAP_NADA,TRAP_NADA],
+    cont:[["Armários com corpos de criaturas empalhadas e em jarros de vidro.","s"],["Mesa com um corpo humano seco.","s"],["Três celas com animais mortos.","s"],
+      ["Armário com 1d6 Tesouros.","t1"],["Grande biblioteca de livros de alquimia.",""],["Grande mesa com 1d6 Tesouros.","t1"],
+      ["Mesa com alguns livros e anotações.",""],["Grande caldeirão com um líquido estranho.","k"],["Poço coberto por lixo e 1 Tesouro.","t"],
+      ["Mesa com diversos itens de cozinha.","s"],["Quarto com uma coroa sob a cama e um Baú.","x"]],
+    mon:[["1","Ogro Costurado","Ogros Costurados",40,3,"Morto-Vivo, Ponto Fraco"],["1","Olho Flutuante","Olhos Flutuantes",20,2,"Paralisar"],
+      ["2","Zumbi Tóxico","Zumbis Tóxicos",4,3,"Morto-Vivo, Veneno"],["1","Zumbi Tóxico","Zumbis Tóxicos",4,3,"Morto-Vivo, Veneno"],
+      ["1d6","Cadeira Viva","Cadeiras Vivas",2,1,""],null,null,["1","Bolha Assassina","Bolhas Assassinas",9,3,"Regeneração"],
+      ["3","Rato Mutante","Ratos Mutantes",6,3,""],["3","Cão Tóxico","Cães Tóxicos",5,3,"Veneno"],["1","Aberração","Aberrações",29,4,"Ponto Fraco"]],
+    tes:["Poção de Mana (recupera o uso de todas as Magias)",LIFE,"@scroll","Frasco com Pó de Ouro (vale 20 moedas na cidade)","@mar","@pot"],
+    mar:["Poção do Lugar Distante (vá para qualquer lugar já descoberto do mundo)",PURIF,"Peitoral de Couro (6 PV; carrega até 3 poções a mais)","Máscara do Alquimista (3 PV)","Espada do Rei Alquimista (Dano 1d6; +3 contra quem tem Veneno)","Pedra Filosofal (pedra falante; não cala a boca)"],
+    pot:["Poção da Mutação (role na tabela de Mutação)","Poção do Goblin (você fica com a aparência de um goblin)","Poção Zumbi (se morrer, volta como zumbi com 1 PV máximo)","Poção da Luminescência (vale como duas tochas)","Poção Mão na Roda (cria um novo braço)",MAD],
+    boss:[[1,"Rei Alquimista",20,5,"Morto-Vivo, Veneno","Fazendo misturas em frascos, o Rei Alquimista está desesperado."],
+          [1,"Abominação Alquímica",50,3,"Veneno, Paralisar","Feita de partes de criaturas diferentes, ali está a Abominação Alquímica."],
+          [1,"Bolha Explosiva",60,2,"Veneno, Explosivo","Nascida de uma grande reação, a Bolha Explosiva se bate dentro da sala."],
+          [1,"Fera Tóxica",40,3,"Veneno","O antigo alquimista daqui bebeu muitas poções e se tornou a Fera Tóxica."],
+          [1,"Monstrinho Inflamável",35,4,"Fogo","Ele era um pequenino ladrão até entrar aqui. Agora ele é o Monstrinho Inflamável."],
+          [1,"Rei Alquimista",30,5,"Morto-Vivo, Veneno","Fazendo misturas em frascos, o Rei Alquimista está desesperado."]],
+    arma:null},
+  11:{n:"Necrópole",a:"A",
+    intro:"O lugar exala um odor de morte e podridão. Há uma grande área cercada que parece ter sido um cemitério, coberta por lápides e mausoléus. No centro, uma estrutura de pedra tem o nome do lugar esculpido em cima da pesada porta dupla de metal. Ao abri-la, o cheiro piora e uma escadaria longa e escura leva direto para baixo. No final dela há uma porta de metal.",
+    start:"stairs", st:["C1","C2","C2","C3","C3","C3"], corr:["S1","M1","L2","G2","E","E"], room:["S1","M","LL","GP","E","E"], sec:["trap","trap","chest","chest","stair","stair"],
+    trap:[TRAP_DECAP("Uma lâmina desce do teto e te decapita."),["mon","Levantam esqueletos soldados!",["1d6","Esqueleto Soldado","Esqueletos Soldados",4,2,"Morto-Vivo"]],["mon","Levantam esqueletos soldados!",["1d6","Esqueleto Soldado","Esqueletos Soldados",4,2,"Morto-Vivo"]],
+      ["torches","Uma grade cai em você. Para sair, você gasta 1d6 tochas.","1d6"],["dmg","Um dardo sai de uma parede.",1],TRAP_NADA],
+    cont:[["Sarcófago vazio com seu nome.",""],["Vários vasos com plantas mortas.",""],["Textos esculpidos pelo chão.","s"],
+      ["Ossos humanos por todas as partes.","s"],["Pilha de ossos e 1d6 moedas.","c"],["Sarcófago com Baú dentro.","x"],
+      ["Vários caixões de madeira.","s"],["Paredes de crânios.","s"],["Dezenas de velas por todos cantos.","s"],
+      ["Estátua quebrada de uma pessoa.","s"],["Sala de Tesouro com 2d6 Tesouros.","t2"]],
+    mon:[["1","Lich","Liches",22,6,"Necromancia, Morto-Vivo"],["1","Rei Fantasma","Reis Fantasmas",10,4,"Intangível"],
+      ["1","Golem Ossos","Golens Ossos",20,5,"Morto-Vivo"],["2","Sentinela de Aço","Sentinelas de Aço",8,3,""],
+      ["2","Esqueleto Soldado","Esqueletos Soldados",4,2,"Morto-Vivo"],null,null,["2","Sentinela de Aço","Sentinelas de Aço",8,3,""],
+      ["1","Aranha Gigante","Aranhas Gigantes",10,4,"Paralisar"],["2","Aranha Gigante","Aranhas Gigantes",10,4,"Paralisar"],
+      ["1","Rainha das Mãos de Lâminas","Rainhas das Mãos de Lâminas",18,10,""]],
+    tes:["Poção de Magia (recupera todos usos de Magia)",LIFE,"@scroll",JEWEL,"@mar","@mag"],
+    mar:["Coroa do Príncipe Degolado (não morre em armadilhas de lâmina)",LUCK,FURY,"Safira da Magia (aprende uma Magia Básica aleatória)","Rubi da Durabilidade (cole em uma armadura para +2 PV)","Rubi de Encantamento (cole em uma arma para +1 de dano)"],
+    mag:[MAD,"Elmo do Rei Anão (11 PV)","Peitoral do Herói dos Pequeninos (13 PV)","Foice da Destruição (Dano 1d6+2)","Tridente Vampírico (Dano 1d6+2; Duas Mãos; recupera 1 PV a cada ataque)","Machado de Batalha Vorpal (Dano 1d6+1; mata na hora quando cai 6 no dado)"],
+    bossGen:{
+      base:[["Animal",20,3,""],["Esqueleto",12,4,"Morto-Vivo"],["Zumbi",15,5,"Morto-Vivo"],["Fantasma",12,4,"Intangível"],["Necromante",20,4,"Necromancia"],["Lich",25,6,"Necromancia, Morto-Vivo"]],
+      mid:[["Colossal",{pv:30}],["Gigante",{pv:15}],["Monstruoso",{dano:2}],["Venenoso",{tr:"Veneno"}],["Pegajoso",{tr:"Paralisar"}],["das Garras",{dano:3}]],
+      end:[["da Morte",{tr:"Morte Súbita"}],["de Pedra",{pv:10}],["do Fogo",{tr:"Fogo"}],["do Gelo",{tr:"Paralisar"}],["Indestrutível",{pv:30}],["Esquecido pelos Deuses",{pv:40}]]},
+    relic:{n:"Relíquia Esquecida", list:["Cão de Pedra Mágica (vai sempre te seguir; 4 PV e causa 2 de dano)","Adaga das Almas (Dano 1d6-1; ao matar uma criatura Intangível, ganha +1 de dano)","Ombreiras do Rei Gigante (10 PV)","Botas do Domador de Monstros (6 PV; +1 nas rolagens de domar animais)","Alabarda dos Soldados Infernais (Dano 1d6+4; Duas Mãos; +3 contra criaturas com Fogo)","Espada Mágica dos Deuses (Dano 1d6+4; recupera 1 PV para cada Morto-Vivo destruído)"]},
+    arma:null}
+});
+[7,8,9,10,11].forEach(k=>{ const D = DUNGEONS[k]; D.corr = D.corr || ["S1","M1","M1","L2","G2","E"]; D.room = D.room || SEG_ROOM; D.arma = D.arma || DUNGEONS[k === 9 ? 5 : 6].arma; D.mag = D.mag || D.pot; });
+/* tabela de Mutação do Laboratório (página 55) */
+const MUTATION = {
+  comum:[null,"Todos os pelos do seu corpo caíram.","Nasceu uma barba imensa no seu rosto.","Seu cabelo e seus pelos mudaram de cor.","Você mudou de sexo.",null],
+  rara:[["poodle","Nasceu um rabo de poodle."],["olho","Brotou um olho no seu umbigo."],["pedra","Sua pele ficou grossa como pedra: +4 PV."],["chifre","Nasceram chifres na sua cabeça: você pode dar Chifradas (1d6)."],["verde","Seu sangue ficou verde: você é imune a Veneno."],["braco","Brotou um braço extra em um dos ombros."]],
+  fatal:[["derrete","Você derreteu, virou uma gosma e morreu."],["explode","Você explodiu em milhares de pedaços."],["zumbi","Sua pele apodreceu e você virou um zumbi: se morrer, volta com metade dos PV máximos."],["fraco","Você ficou muito fraco: -6 PV máximos."],["bolhas","Bolhas brotaram pelo corpo: você não consegue usar armadura."],["dedo","Nasceu um dedo a mais no pé: você não consegue usar botas."]]
+};
+/* ruínas: tipo de masmorra por terreno (página 31); 0 = ainda não disponível, rola de novo */
+const RUINS_TABLE = {
+  pl:[0,1,10,8,0], mo:[0,2,7,0,0], fl:[0,3,10,9,0], tu:[0,6,9,11,0]
+};
+function ruinsRow(s){ return s <= 4 ? 0 : s <= 7 ? 1 : s <= 9 ? 2 : s <= 11 ? 3 : 4; }
+
+/* ---------- regras das masmorras novas: itens, maldições, mutações ---------- */
+const CURSE_RX = /\(Maldição/;
+const isCursed = it => !!(it && CURSE_RX.test(it.n));
+/* item carregado (mochila ou vestido) */
+function carrying(rx, h){ h = h || state.hero; if(!h) return false; return h.bag.some(it=>rx.test(it.n)) || ARMOR_SLOTS.some(s=>h.armor[s] && rx.test(h.armor[s].n)) || [h.weapon, ...offs(h)].some(w=>w && rx.test(w.n||"")); }
+function cursedOn(rx, h){ h = h || state.hero; if(!h) return false; return [...h.bag, ...ARMOR_SLOTS.map(s=>h.armor[s]).filter(Boolean)].some(it=>isCursed(it) && rx.test(it.n)); }
+function mutated(k, h){ h = h || state.hero; return !!(h && (h.mut||[]).includes(k)); }
+/* "+N contra X": alvos que os itens novos reconhecem */
+const CONTRA = [
+  [/contra Orc/, u=>/Orc|Hagork/.test(u.name)],
+  [/contra Demônios/, u=>/Demônio|Bolrag|Imp\b|Capeta|Diabo/.test(u.name)],
+  [/contra Corpo de Pedra/, u=>has(u,"Corpo de Pedra")],
+  [/contra criaturas com Fogo/, u=>has(u,"Fogo")],
+  [/contra quem tem Veneno/, u=>has(u,"Veneno")],
+  [/contra enxames/, u=>/Enxame/.test(u.name)],
+  [/contra humanóides/, u=>/Orc|Goblin|Bandido|Cultista|Javaligor|Necromante|Rei|Rainha|Sacerdotisa|Anão|Humano|Elfo/.test(u.name)],
+  [/dentro de Santuários/, u=>!!(state.dungeon && state.dungeon.type === 4)]
+];
+function contraBonus(u, W){
+  const h = state.hero; let b = 0;
+  const test = (txt) => { CONTRA.forEach(([rx, ok])=>{ if(rx.test(txt) && ok(u)){ const m = txt.match(/\+(\d)[^;)]*?(contra|dentro)/); b += m ? +m[1] : 1; } }); };
+  if(W && W.n) test(W.n);
+  /* itens passivos carregados: Capa do Rei Anão */
+  h.bag.concat(ARMOR_SLOTS.map(s=>h.armor[s]).filter(Boolean)).forEach(it=>{ if(!it.weapon && /^Capa do Rei Anão/.test(it.n)) test(it.n); });
+  if(carrying(/^Chifre de Guerra/)) b += 1;
+  if(carrying(/^Estandarte do Império Anão/) && h.armor.Peitoral) b += 1;
+  if(W && /^Picareta da Aniquilação/.test(W.n) && W.last && W.last === u.name) b += 2;
+  if(h.sunBless && state.dungeon && state.dungeon.inside) b += 1;
+  return b;
+}
+/* dano dos monstros: itens que reduzem */
+function monDmgCut(u){
+  let c = 0;
+  if(/Orc|Hagork/.test(u.name) && carrying(/^Cabeça do Rei Orc/)) c++;
+  if(/Múmia|Mumificad|Rei do Deserto/.test(u.name) && carrying(/^Colar do Rei Antigo/)) c++;
+  return c;
+}
+function poisonImmune(h){ h = h || state.hero; return !!h && (mutated("verde", h) || wearing(/^Peitoral dos Anões/)); }
+/* criatura derrotada pelo herói: efeitos de itens */
+function onHeroKill(u, W){
+  const h = state.hero; if(!h) return;
+  if(/Escorpi/.test(u.name) && carrying(/^Chapéu do Sol/)){ h.torches = Math.min(10, h.torches+1); cLog("O Chapéu do Sol brilha: +1 tocha."); }
+  if(W && /^Picareta da Aniquilação/.test(W.n)) W.last = u.name;
+  if(W && /^Adaga das Almas/.test(W.n) && has(u,"Intangível")){ W.d = bumpDmg(W.d, 1); cLog(`A Adaga das Almas absorve a alma: agora causa ${W.d}.`); }
+  if(W && /^Espada Mágica dos Deuses/.test(W.n) && has(u,"Morto-Vivo")){ h.pv = Math.min(h.pvMax, h.pv+1); cLog("A Espada Mágica dos Deuses te devolve 1 PV."); }
+}
+/* monstros que fogem de itens (Coquilha Beltrâmica) */
+function scareMon(seg){
+  if(!seg || !seg.mon || seg.mon.boss) return;
+  if(!carrying(/^Coquilha Beltrâmica/)) return;
+  const groups = [seg.mon, ...(seg.mon.extra||[])], keep = groups.filter(g=>!/Escorpi/.test(g.key||g.name));
+  if(keep.length === groups.length) return;
+  log("Os escorpiões sentem a Coquilha Beltrâmica e fogem!");
+  if(!keep.length){ seg.mon = null; return; }
+  const [a, ...rest] = keep; a.extra = rest; seg.mon = a;
+}
+/* armaduras e armas citadas pelo nome */
+const SLOT_BY_WORD = [[/^(Elmo|Capacete|Máscara|Coroa|Chapéu)/,"Elmo"],[/^Peitoral/,"Peitoral"],[/^Ombreiras/,"Ombreiras"],[/^Braceletes/,"Braceletes"],[/^(Botas|Sandálias)/,"Botas"],[/^Anel/,"Anel"]];
+function inferGear(it){
+  if(!it || it.slot || it.weapon) return it;
+  if(/^Capacete de Crocodilo \(Dano/.test(it.n)){ it.slot = "Elmo"; it.pv = 0; it.bite = (it.n.match(/Dano (\d+d6(?:[+-]\d+)?)/)||[])[1] || "1d6+2"; it.magic = true; return it; }
+  const pv = it.n.match(/\((\d+) PV/), dano = it.n.match(/\(Dano (\d+d6(?:[+-]\d+)?)/);
+  if(dano){ it.weapon = true; it.d = dano[1]; it.two = /Duas Mãos/.test(it.n); it.magic = true; return it; }
+  const sw = SLOT_BY_WORD.find(([rx])=>rx.test(it.n));
+  if(sw && (pv || /^Anel/.test(it.n))){ it.slot = sw[1]; it.pv = pv ? +pv[1] : 0; it.magic = true; }
+  return it;
+}
+/* Deusa Coruja: a peça vestida ensina uma Magia Avançada */
+function syncGrants(h){
+  h = h || state.hero; if(!h) return;
+  const want = {};
+  ARMOR_SLOTS.forEach(s=>{ const p = h.armor[s]; if(p && p.grant) want[p.grant] = true; });
+  Object.keys(h.spells).forEach(n=>{ const s = h.spells[n]; if(s.g && !want[n]){ if(s.max > 1){ s.max--; s.left = Math.min(s.left, s.max); delete s.g; } else delete h.spells[n]; } });
+  Object.keys(want).forEach(n=>{ const s = h.spells[n]; if(!s) h.spells[n] = {max:1, left:1, g:true}; else if(!s.g){ s.max++; s.left++; s.g = true; } });
+}
+/* Peitoral de Couro: até 3 poções a mais na mochila */
+function potionRoom(h){ h = h || state.hero; if(!h || !wearing(/^Peitoral de Couro/)) return 0; return Math.min(3, h.bag.filter(it=>/^Poção/.test(it.n)).length); }
+/* tesouros novos */
+function makePlainArmor(dt){
+  const t = (dt && dt.armorT) || ARMOR_TABLE, [slot, pv, nm] = t[d6()];
+  return {n:`${nm || slot} (${pv} PV)`, slot, pv};
+}
+function relicItem(dt){ return inferGear(fixWearable({n:dt.relic.list[d6()-1], magic:true})); }
+/* Necrópole: chefe montado com três colunas */
+function necroBoss(v){
+  const G = DUNGEONS[11].bossGen, [b, pv0, d0, tr0] = G.base[v[0]-1], [m, mm] = G.mid[v[1]-1], [e, me] = G.end[v[2]-1];
+  let pv = pv0, dano = d0; const trs = tr0 ? tr0.split(", ") : [];
+  [mm, me].forEach(x=>{ if(x.pv) pv += x.pv; if(x.dano) dano += x.dano; if(x.tr && !trs.includes(x.tr)) trs.push(x.tr); });
+  return {key:b, name:`${b} ${m} ${e}`, pv, dano, tr:trs.join(", ")};
+}
+/* Laboratório: mutação ao sair (página 55) */
+async function labMutation(why){
+  const h = state.hero; if(!h) return;
+  busy = true; lockButtons();
+  const [v] = await roll(why || "Mutação", 1);
+  let col = "comum", r = v;
+  if(v === 1 || v === 6){ col = v === 1 ? "fatal" : "rara"; [r] = await roll(v === 1 ? "Mutação Fatal" : "Mutação Rara", 1); }
+  busy = false;
+  if(col === "comum"){ const t = MUTATION.comum[v-1]; rollNote(t.replace(/\.$/,"")); (h.marks = h.marks || []).push(t); wLogAny(`Mutação: ${t}`); persist(); render(); return; }
+  const [k, txt] = MUTATION[col][r-1];
+  rollNote(txt.split(":")[0].replace(/\.$/,""));
+  wLogAny(`Mutação ${col === "rara" ? "rara" : "fatal"}: ${txt}`);
+  if(k === "derrete" || k === "explode"){ killHero(k === "derrete" ? "Derreteu numa mutação" : "Explodiu numa mutação"); persist(); render(); return; }
+  (h.mut = h.mut || []).push(k);
+  if(k === "pedra"){ h.pvMax += 4; h.pv += 4; }
+  if(k === "fraco"){ h.pvMax = Math.max(1, h.pvMax - 6); h.pv = Math.min(h.pv, h.pvMax); }
+  if(k === "braco") h.arms = (h.arms||2) + 1;
+  if(k === "bolhas"){ ARMOR_SLOTS.forEach(s=>{ if(h.armor[s]){ h.bag.push(h.armor[s]); delete h.armor[s]; } }); }
+  if(k === "dedo" && h.armor.Botas){ h.bag.push(h.armor.Botas); delete h.armor.Botas; }
+  if(!["poodle","olho"].includes(k)) (h.marks = h.marks || []).push(txt.split(":")[0]);
+  else (h.marks = h.marks || []).push(txt);
+  persist(); render();
+}
+function wLogAny(m){ if(state.world && !(state.dungeon && state.dungeon.inside)) wLog(m); else log(m); state.ui.cityMsg = m; state.ui.armsMsg = m; }
+/* volta da morte: Poção Zumbi e a mutação de zumbi */
+function zombieBack(){
+  const h = state.hero; if(!h) return false;
+  if(h.zpot){ h.zpot = false; h.pvMax = 1; h.pv = 1; (h.marks = h.marks || []).push("Virou zumbi pela Poção Zumbi."); log("A Poção Zumbi faz efeito: você volta como zumbi, com 1 PV máximo!"); return true; }
+  if(mutated("zumbi", h)){ const m = Math.floor(h.pvMax/2); if(m >= 1){ h.pvMax = m; h.pv = m; log(`Você é um zumbi: volta com ${m} PV máximos.`); return true; } }
+  return false;
+}
+/* maldições: efeitos de carregar */
+function carryingCursed(h){ h = h || state.hero; return !!h && (h.bag.some(isCursed) || ARMOR_SLOTS.some(sl=>isCursed(h.armor[sl]))); }
+function curseTick(h){
+  h = h || state.hero; if(!h) return;
+  if(cursedOn(/^Anel do Morto/, h) || mutated("bolhas", h)){
+    let moved = false;
+    ARMOR_SLOTS.forEach(s=>{ const p = h.armor[s]; if(p && !p.stone){ h.bag.push(p); delete h.armor[s]; moved = true; } });
+    if(moved) log(mutated("bolhas", h) ? "As bolhas não deixam você vestir armadura." : "O Anel do Morto não deixa você usar armadura.");
+  }
+  if(mutated("dedo", h) && h.armor.Botas){ h.bag.push(h.armor.Botas); delete h.armor.Botas; }
+}
+function chacalTick(h){
+  h = h || state.hero; if(!h) return;
+  if(cursedOn(/do Deus Chacal/, h)){ if(h.chacal != null && h.pv > h.chacal) h.pv = h.chacal; h.chacal = h.pv; }
+  else h.chacal = null;
+}
+function removeCurse(h){
+  h = h || state.hero;
+  let i = h.bag.findIndex(isCursed);
+  if(i >= 0){ const it = h.bag.splice(i,1)[0]; return it.n.split(" (")[0]; }
+  const s = ARMOR_SLOTS.find(sl=>isCursed(h.armor[sl]));
+  if(s){ const it = h.armor[s]; delete h.armor[s]; return it.n.split(" (")[0]; }
+  return null;
+}
+/* aumenta o modificador de dano de uma arma ("1d6+1" vira "1d6+2") */
+function bumpDmg(d, n){ const m = d.match(/^(\d+d\d+)([+-]\d+)?$/); if(!m) return d; const v = (m[2] ? +m[2] : 0) + n; return m[1] + (v ? (v > 0 ? "+" + v : String(v)) : ""); }
+
 
 /* =========================================================
    ESTADO E SAVE
@@ -797,7 +1104,7 @@ let mapVersion = 1, mapHero = null;
 function freshState(){ return {v:1, screen:"title", hero:null, draft:null, cemetery:[], dungeon:null, ui:{}, settings:defaultSettings()}; }
 function defaultSettings(){ return {skin:"zelda", bagCap:10, map:"auto"}; }
 const isZ = () => !!(state && state.settings && state.settings.skin === "zelda");
-const bagMax = () => (state.settings && state.settings.bagCap) ? state.settings.bagCap + (state.hero ? partyCargo(state.hero) : 0) : Infinity;
+const bagMax = () => (state.settings && state.settings.bagCap) ? state.settings.bagCap + (state.hero ? partyCargo(state.hero) + potionRoom(state.hero) : 0) : Infinity;
 const bagLabel = h => bagMax()===Infinity ? String(h.bag.length) : `${h.bag.length}/${bagMax()}`;
 function applySkin(){
   document.documentElement.dataset.skin = state.settings.skin;
@@ -835,6 +1142,7 @@ function migrate(){
 }
 function persist(){
   if(!meta) loadMeta();
+  if(state.hero) chacalTick(state.hero);
   try{ localStorage.setItem(slotKey(meta.cur), JSON.stringify(state)); }catch(e){}
   const L = meta.slots[meta.cur] || (meta.slots[meta.cur] = {n:0, synced:0});
   L.n = (L.n||0) + 1; L.at = Date.now(); L.days = state.world ? state.world.days : 0; L.sum = slotSummary();
@@ -1455,6 +1763,12 @@ function buildLevel1(){
   if(dt.start==="stairs"){
     start = makeSeg(lv, "ENT", {x:0,y:-1,w:1,h:2}, "N", {k:"stairs", name:"Escadaria de entrada", exit:true});
     addDoor(lv, start, "N", 0);
+  } else if(dt.start==="cidadela"){
+    start = makeSeg(lv, "ENT", {x:-3,y:-7,w:8,h:8}, "N", {k:"room", name:"Salão da fonte seca", exit:true});
+    [1,3,5].forEach(k=>{ ["W","E"].forEach(sd=>{ const dd = addDoor(lv, start, sd, k); if(dd) dd.cst = true; }); });
+  } else if(dt.start==="zig"){
+    start = makeSeg(lv, "ENT", {x:-2,y:-5,w:6,h:6}, "N", {k:"room", name:"Sala quadrada", exit:true});
+    addDoor(lv, start, "N", 2); addDoor(lv, start, "W", 2); addDoor(lv, start, "E", 2); addDoor(lv, start, "S", 4);
   } else if(dt.start==="corr3"){
     start = makeSeg(lv, "ENT", {x:0,y:-4,w:2,h:5}, "N", {k:"corr", name:"Longo corredor de entrada", exit:true});
     addDoor(lv, start, "N", "mid"); addDoor(lv, start, "W", 2); addDoor(lv, start, "E", 2);
@@ -1501,6 +1815,8 @@ function applyContent(seg, roll){
   if(fx.includes("x")) seg.chests = 1;
   if(fx.startsWith("c")) seg.loot = {coins:rollExpr("1d6")};
   if(fx==="t") seg.loot = {tres:1};
+  if(fx==="tt") seg.loot = {tres:2};
+  if(fx==="s2") seg.secretN = 2;
   if(fx==="t1") seg.loot = {tres:rollExpr("1d6")};
   if(fx==="t2") seg.loot = {tres:rollExpr("2d6")};
   if(fx==="m") seg.loot = {magic:rollExpr("2d6")};
@@ -1520,10 +1836,12 @@ function lootText(l){
 
 /* itens e recompensas */
 function makeArmor(rest){
-  const [slot, pv] = ARMOR_TABLE[d6()];
+  const dt = rtDT || DT0(), [slot, pv, nm] = ((dt && dt.armorT) || ARMOR_TABLE)[d6()];
   const bonus = (rest.match(/\(([+-]\d+) PV\)/)||[])[1];
   const total = pv + (bonus ? +bonus : 0);
-  return {n:`${slot} ${rest}`, slot, pv:Math.max(0,total), magic:true};
+  const it = {n:`${nm || slot} ${rest}`, slot, pv:Math.max(0,total), magic:true};
+  if(/Deusa Coruja/.test(rest)){ const sp = SPELL_TABLES.avancada.r[d6()+d6()]; it.grant = sp; it.n = `${nm || slot} da Deusa Coruja (sabe ${sp})`; }
+  return it;
 }
 function makeWeapon(suffix, magic){
   const [n, dmg, two] = (rtDT || DT()).arma[d6()-1];
@@ -1533,7 +1851,7 @@ function itemFrom(text, magic){
   if(text.startsWith("[Armadura]")) return makeArmor(text.replace("[Armadura] ",""));
   if(text.startsWith("[Arma]")) return makeWeapon(text.replace("[Arma] ",""), true);
   if(text.startsWith("Remo do Barqueiro")) return {n:text, weapon:true, d:"1d6+1", magic:true};
-  return fixWearable({n:text, magic:!!magic});
+  return inferGear(fixWearable({n:text, magic:!!magic}));
 }
 function fixWearable(it){
   if(/^Chapéu do Bobo/.test(it.n)){ it.slot = "Elmo"; it.pv = 2; }
@@ -1551,6 +1869,8 @@ function rollTreasure(dt){
   if(e==="@mar") return itemFrom(dt.mar[d6()-1], true);
   if(e==="@mag") return itemFrom(dt.mag[d6()-1], true);
   if(e==="@arma") return makeWeapon("", false);
+  if(e==="@armor") return makePlainArmor(dt);
+  if(e==="@pot") return inferGear(fixWearable({n:dt.pot[d6()-1], magic:true}));
   if(e==="@scroll") return {n:`Pergaminho Mágico (${SPELLS[d6()].n})`, scroll:true, magic:true};
   return {n:e};
 }
@@ -1600,7 +1920,7 @@ function collectLoot(seg){
    ========================================================= */
 function blocked(seg){ return seg.mon && !seg.mon.sneak; }
 function lvc(cur, max){ const p = max > 0 ? cur/max : 0; return p > .5 ? "lv-g" : p > .2 ? "lv-y" : "lv-r"; }
-function hasLamp(h){ h = h || state.hero; return !!h && (h.bag.some(it=>/^Lamparina/.test(it.n)) || (h === state.hero && !!torchHolder(h))); }
+function hasLamp(h){ h = h || state.hero; return !!h && (h.bag.some(it=>/^Lamparina/.test(it.n)) || (h.armor && h.armor.Elmo && /^Capacete para Tochas/.test(h.armor.Elmo.n)) || (h === state.hero && !!torchHolder(h))); }
 function wCopy(w){ return w.shield ? {n:w.n} : {n:w.n, weapon:true, d:w.d, two:w.two, magic:w.magic}; }
 /* mãos: cada braço segura uma coisa; a tocha ocupa uma mão (a Lamparina libera); Duas Mãos ocupa duas */
 const UNARMED = () => ({n:"Mãos nuas", d:"1d6-3", unarmed:true});
@@ -1617,6 +1937,7 @@ function handsFree(h){ h = h || state.hero; if(!h) return 1; return Math.max(0, 
 /* um braço, sem Lamparina e sem poção que devolva o braço: fim de carreira ao chegar na cidade */
 function mustRetire(h){ h = h || state.hero; return !!h && handsFree(h) === 0 && (h.arms||2) < 2 && !h.bag.some(it=>/^Poção da Salamandra|^Poção Mão na Roda/.test(it.n)); }
 function normalizeHands(){
+  if(state.hero){ curseTick(state.hero); syncGrants(state.hero); }
   const VELA_N = "Vela dos Protetores (acenda a vela e os bônus do próximo baú serão dobrados!)";
   if(state.hero) state.hero.bag.forEach(it=>{ if(/^Vela dos Protetores/.test(it.n)) it.n = VELA_N; });
   if(state.shop && state.shop.items) state.shop.items.forEach(it=>{ if(/^Vela dos Protetores/.test(it.n)) it.n = VELA_N; crownize(it); });
@@ -1693,6 +2014,7 @@ function spendTorch(n, why){
 }
 function samambro(){
   const h = state.hero; if(!h) return false;
+  if(zombieBack()) return true;
   if(hasAlly("Corvo", h)){ const v = d6(); if(v >= 4){ h.pv = 1; log(`O Corvo grasna, e o dado deu ${v}: você volta à vida com 1 PV!`); return true; } log(`O Corvo grasna, mas o dado deu ${v}.`); }
   if(!raceT("samambro")) return false;
   const v = d6();
@@ -1751,6 +2073,7 @@ function pathClear(){ return exitRoute().ok; }
 function leaveDungeon(){
   const d = D(), h = state.hero;
   d.inside = false;
+  if(h && h.sunBless){ h.sunBless = 0; log("A luz divina dos Deuses Esquecidos se apaga."); }
   if(h){
     if(d.complete && !(d.countedFor||[]).includes(h.name)){ d.countedFor = (d.countedFor||[]).concat(h.name); H(h).dungeons++; }
     ARMOR_SLOTS.forEach(sl=>{ if(h.armor[sl] && h.armor[sl].stone){ delete h.armor[sl]; log("A Armadura de Pedra se desfaz em pó."); } });
@@ -1779,9 +2102,11 @@ async function trap(origin){
   if(seg.disarmed){ log("Uma armadilha disparou, mas você já tinha desarmado este lugar."); return true; }
   if(raceT("ar")){ log("Uma armadilha dispara, mas você a ignora como o vento."); return true; }
   const luck = hasItem(/^Poção da Sorte/);
-  const [v] = await roll("Armadilha", 1);
-  const t = DT().trap[v-1];
-  rollNote(t[0]==="nada" ? "Nada acontece" : t[0]==="blade" ? "Lâmina" : t[0]==="pit" ? "Fosso" : t[0]==="mon" ? "Monstros!" : t[0]==="dmg" ? `${t[2]} de dano` : "Armadilha");
+  if(origin === "chest" && carrying(/^Amuleto do Escaravelho/)){ log("O baú tinha uma armadilha, mas o Amuleto do Escaravelho te protege."); return true; }
+  let [v] = await roll("Armadilha", 1);
+  let t = DT().trap[v-1];
+  if(t[0] !== "nada"){ const gi = hasItem(/^Gato Mumificado/); if(gi >= 0){ h.bag.splice(gi,1); log(`${t[1]} O Gato Mumificado mia e você rerrola a armadilha.`); [v] = await roll("Armadilha (Gato)", 1); t = DT().trap[v-1]; } }
+  rollNote(t[0]==="nada" ? "Nada acontece" : t[0]==="blade" || t[0]==="decap" ? "Lâmina" : t[0]==="pit" ? "Fosso" : t[0]==="mon" || t[0]==="rmon" ? "Monstros!" : t[0]==="dmg" ? `${t[2]} de dano` : t[0]==="acid" ? "Ácido" : t[0]==="arm" ? "Perde um braço" : t[0]==="death" ? "Morte" : t[0]==="torches" ? "Preso" : "Armadilha");
   if(t[0] === "nada"){ log(t[1]); return true; }
   if(luck >= 0){ h.bag.splice(luck,1); log(`${t[1]} A Poção da Sorte te livrou da armadilha.`); return true; }
   const cult = [...h.bag.map((it,i)=>({it, where:"bag", i})), ...ARMOR_SLOTS.filter(sl=>h.armor[sl]).map(sl=>({it:h.armor[sl], where:"armor", i:sl}))].filter(o=>/do Cultista/.test(o.it.n));
@@ -1802,11 +2127,31 @@ async function trap(origin){
     log("Uma lâmina desce do teto e passa raspando."); return true;
   }
   if(t[0]==="dmg"){ log(t[1]); return hurt(t[2], t[1].replace(/\.$/,"")); }
+  if(t[0]==="decap"){
+    if(wearing(CROWN_RX)){ rollNote("Salvo pela Coroa!"); log(`${t[1].replace(/\.$/,"")}, mas a Coroa do Príncipe Degolado te salva!`); return true; }
+    log(t[1]); killHero(t[1].replace(/\.$/,"")); return false;
+  }
+  if(t[0]==="death"){ log(t[1]); killHero(t[1].replace(/\.$/,"")); return false; }
+  if(t[0]==="arm"){ h.arms = Math.max(0, (h.arms||2) - 1); log(`${t[1]} Restam ${h.arms} braço${h.arms===1?"":"s"}.`); return true; }
+  if(t[0]==="acid"){
+    const worn = ARMOR_SLOTS.filter(sl=>h.armor[sl]);
+    if(!worn.length){ log(`${t[1].split(" e destrói")[0]}, mas você não veste nenhuma armadura.`); return true; }
+    const sl = worn[Math.floor(Math.random()*worn.length)], it = h.armor[sl]; delete h.armor[sl]; H(h).armorLost++;
+    log(`Ácido esguicha do teto e destrói ${it.n.split(" (")[0]}.`); return true;
+  }
+  if(t[0]==="torches"){ const n = rollExpr(t[2]); log(`${t[1]} O dado deu ${n}.`); return spendTorch(n, "Preso na grade"); }
+  if(t[0]==="rmon"){
+    if(seg.exit){ log(`${t[1]} Mas nada surge aqui: a primeira sala nunca tem monstros.`); return true; }
+    const mv = await roll("Monstro", 2), row = DT().mon[mv[0]+mv[1]-2];
+    if(!row){ log(`${t[1]} A passagem estava vazia.`); return true; }
+    const g = monsterGroup(row, "hero"); seg.mon = mergeMon(seg.mon, g); scareMon(seg);
+    log(`${t[1]} ${g.qty} ${g.name}.`); return true;
+  }
   if(t[0]==="pit"){ log(t[1]); return spendTorch(1, "Saindo do fosso"); }
   if(t[0]==="mon" && seg.exit){ log(`${t[1]} Mas nada surge aqui: a primeira sala nunca tem monstros.`); return true; }
   if(t[0]==="mon"){
     const g = monsterGroup(t[2], "hero");
-    seg.mon = mergeMon(seg.mon, g);
+    seg.mon = mergeMon(seg.mon, g); scareMon(seg);
     log(`${t[1]} ${g.qty} ${g.name}.`);
     return true;
   }
@@ -1909,8 +2254,18 @@ async function reveal(door, quiet){
       return;
     }
   }
+  if(door.cst){
+    door.cst = false;
+    const rect = fitRect(lv, door.dir, tx, ty, 1, 2);
+    if(rect){
+      const st = makeSeg(lv, "CST", rect, door.dir, {from:door.id, k:"stairs", name:"Escadaria curta", desc:"Uma escadaria curta com uma porta no fundo."});
+      door.to = st.id; addDoor(lv, st, door.dir, 0);
+      log(`Você abriu a porta ${DIRNAME[door.dir]}: uma escadaria curta com uma porta no fundo.`);
+      moveTo(st.id, true); return;
+    }
+  }
   const col = from.k === "stairs" ? "stairs" : from.k === "corr" ? "corr" : "room";
-  const table = col === "stairs" ? SEG_STAIRS : col === "corr" ? DT().corr : DT().room;
+  const table = col === "stairs" ? (DT().st || SEG_STAIRS) : col === "corr" ? DT().corr : DT().room;
   const [sv] = await roll("Segmento", 1);
   const code = table[sv-1], sh = SHAPES[code];
   rollNote(sh.n);
@@ -1929,6 +2284,7 @@ async function reveal(door, quiet){
     applyContent(seg, c);
     seg.mon = monsterGroup(DT().mon[m-2], quiet ? "hero" : "mon"); if(seg.mon && !quiet) seg.mon.broke = true;
     if(COOP.two()){ const [m2] = await rollPar([["Monstros (2º jogador)",2]]); const g2 = monsterGroup(DT().mon[m2[0]+m2[1]-2], quiet ? "hero" : "mon"); if(g2){ seg.mon = mergeMon(seg.mon, g2); if(!quiet) seg.mon.broke = true; seg.mon.first = quiet ? "hero" : "mon"; } }
+    scareMon(seg);
     rollNote(DT().cont[c-2][0].replace(/\.$/,""), "Conteúdo");
     rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro", "Monstros");
     lv.last = seg.id;
@@ -2052,11 +2408,12 @@ async function doSecret(){
   seg.secretTried = true;
   const dwarf = raceT("secret2") || hasAlly("Minerador Anão");
   const v = await roll(dwarf ? "Passagem (Anão)" : "Passagem", dwarf ? 2 : 1);
-  const r = Math.max(...v);
-  rollNote(r === 1 ? "Armadilha!" : r <= 3 ? "Nada" : r <= 5 ? "Baú escondido" : "Passagem secreta!");
-  if(r === 1){ log("Procurando a passagem, você ativou uma armadilha!"); await trap("secret"); }
-  else if(r <= 3) log("Não há nada aqui.");
-  else if(r <= 5){ seg.chests++; log("Você encontrou um Baú escondido!"); }
+  const r = Math.max(...v), out = (DT().sec || SEC_BASE)[r-1];
+  if(seg.secretN > 1){ seg.secretN--; seg.secretTried = false; }
+  rollNote(out === "trap" ? "Armadilha!" : out === "nada" ? "Nada" : out === "chest" ? "Baú escondido" : "Passagem secreta!");
+  if(out === "trap"){ log("Procurando a passagem, você ativou uma armadilha!"); await trap("secret"); }
+  else if(out === "nada") log("Não há nada aqui.");
+  else if(out === "chest"){ seg.chests++; log("Você encontrou um Baú escondido!"); }
   else {
     const sides = [seg.fwd, LEFT[seg.fwd], RIGHT[seg.fwd]].sort(()=>Math.random()-.5);
     let ok = false;
@@ -2128,6 +2485,12 @@ async function doDefeat(){
     seg.loot = {tres: v[0]+v[1]};
     d.complete = true;
     log(`Atrás do chefe você encontra ${v[0]+v[1]} Tesouros. Masmorra completada!`);
+    if(DT().relic){
+      const [r] = await roll(DT().relic.n, 1), txt = DT().relic.list[r-1];
+      rollNote(txt.split(" (")[0]);
+      if(/^Cão de Pedra/.test(txt)){ party(h).push({id:newPid(), kind:"animal", n:"Cão de Pedra", pv:4, max:4, d:"2", key:"Cão de Pedra", free:true}); log(`${DT().relic.n}: um Cão de Pedra Mágica desperta e passa a te seguir!`); }
+      else { const it = relicItem(DT()); if(addItem(it)) log(`${DT().relic.n}: ${it.n}.`); flushIncoming(); }
+    }
   }
   endAction();
 }
@@ -2135,8 +2498,15 @@ async function doBoss(seg){
   const d = D();
   startAction();
   seg.final = true; seg.name = "Sala Final"; seg.chests = 0; seg.secret = false; seg.loot = null;
+  if(DT().bossGen){
+    const v3 = await roll("Chefe", 3), b = necroBoss(v3);
+    rollNote(b.name);
+    seg.desc = `No centro da sala está o ${b.name}.`;
+    seg.mon = {key:b.key, name:b.name, qty:1, pv:b.pv, dano:b.dano, tr:b.tr, list:[{pv:b.pv, max:b.pv}], first:"hero", sneak:false, sneakTried:true, boss:true};
+    log(seg.desc); endAction(); return;
+  }
   const [v] = await roll("Chefe", 1);
-  const [q, n, pv, dano, tr, txt] = DT().boss[v-1];
+  const [q, n, pv, dano, tr, txt, extra] = DT().boss[v-1];
   rollNote(q > 1 ? `${q} ${n}` : n);
   seg.desc = txt;
   seg.mon = {key:n, name:n, qty:q, pv, dano, tr, list:Array.from({length:q},()=>({pv,max:pv})), first:"hero", sneak:false, sneakTried:true, boss:true};
@@ -2146,6 +2516,7 @@ async function doBoss(seg){
   if(/Guardião/.test(n)) seg.mon.name = "Guardiões Etéreos";
   if(/Necrótico/.test(n)) seg.mon.name = "Reis Necróticos";
   if(/Vigia/.test(n)) seg.mon.name = "Vigias";
+  if(extra){ const g = monsterGroup(extra, "hero"); seg.mon.extra = [g]; }
   log(txt);
   endAction();
 }
@@ -2745,6 +3116,297 @@ const SPR_BOSSES = {
   "Templo":["Deus Tentáculo","Besta Sangrenta","Horror Miante","Vigia","Lorde Demônio","Deus Serpente"],
   "Calabouço":["Serpente de Fogo","Vespa Gigante do Ferrão Mortal","Cão Infernal","Medusa","Ogro Maldito","Dragão"]
 };
+/* ---------- sprites das masmorras novas (1ª etapa), pintados com formas ---------- */
+/* grade de letras: cada letra é uma cor da paleta; "@" é o contorno automático */
+function sprPaint(W, H, fn, noOutline){
+  const g = Array.from({length:H}, ()=>Array(W).fill("."));
+  const P = (x,y,c)=>{ x = Math.round(x); y = Math.round(y); if(x>=0 && y>=0 && x<W && y<H && c && c !== ".") g[y][x] = c; };
+  const rect = (x,y,w,h,c)=>{ for(let j=0;j<h;j++) for(let i=0;i<w;i++) P(x+i, y+j, typeof c === "function" ? c(i,j,w,h) : c); };
+  const disc = (cx,cy,rx,ry,c)=>{ for(let y=Math.floor(cy-ry); y<=Math.ceil(cy+ry); y++) for(let x=Math.floor(cx-rx); x<=Math.ceil(cx+rx); x++){ const dx = (x-cx)/rx, dy = (y-cy)/ry, e = dx*dx+dy*dy; if(e <= 1) P(x, y, typeof c === "function" ? c(dx,dy,e,x,y) : c); } };
+  const line = (x0,y0,x1,y1,c,t)=>{ const k = Math.max(Math.abs(x1-x0), Math.abs(y1-y0)) || 1; for(let i=0;i<=k;i++){ const x = x0+(x1-x0)*i/k, y = y0+(y1-y0)*i/k; P(x,y,c); if(t) P(x+1,y,c); } };
+  /* trapézio: topo (y, meia largura a) até baixo (y+h, meia largura b) */
+  const trap = (cx,y,a,h,b,c)=>{ for(let j=0;j<h;j++){ const hw = a + (b-a)*j/Math.max(1,h-1); for(let x=Math.round(cx-hw); x<=Math.round(cx+hw); x++) P(x, y+j, typeof c === "function" ? c((x-cx)/Math.max(1,hw), j/h, x, y+j) : c); } };
+  /* luz de cima à esquerda: L claro, M médio, D escuro */
+  const sh = (L,M,D) => (dx,dy)=> dx+dy < -.55 ? L : dx+dy > .55 ? D : M;
+  const shx = (L,M,D) => (u)=> u < -.45 ? L : u > .45 ? D : M;
+  fn({P, rect, disc, line, trap, sh, shx, W, H, B:H-1});
+  if(!noOutline){
+    const filled = (x,y)=> x>=0 && y>=0 && x<W && y<H && g[y][x] !== "." && g[y][x] !== "@";
+    const out = [];
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(g[y][x] === "." && (filled(x-1,y)||filled(x+1,y)||filled(x,y-1)||filled(x,y+1))) out.push([x,y]);
+    out.forEach(([x,y])=>g[y][x] = "@");
+  }
+  return g.map(r=>r.join("").replace(/\.+$/,""));
+}
+/* corpo humanoide: cx centro, B chão; s = medidas e cores */
+function sprHuman(o, s){
+  const {P, rect, disc, trap, sh, shx} = o, cx = s.cx, B = s.B;
+  const lh = s.lh, tw = s.tw, th = s.th, hr = s.hr;
+  const ty = B - lh - th + 1, hy = ty - hr + (s.neck === undefined ? 1 : s.neck);
+  /* pernas e pés */
+  if(!s.robe){
+    rect(cx - s.lg - s.lw + 1, B - lh + 1, s.lw, lh, (i)=> i === 0 ? s.leg[0] : s.leg[1]);
+    rect(cx + s.lg, B - lh + 1, s.lw, lh, (i)=> i === s.lw-1 ? s.leg[2] : s.leg[1]);
+    if(s.foot){ rect(cx - s.lg - s.lw, B, s.lw + 1, 1, s.foot); rect(cx + s.lg, B, s.lw + 1, 1, s.foot); }
+  }
+  /* tronco (ou manto até o chão) */
+  if(s.robe) trap(cx, ty, tw/2, B - ty + 1, s.robe, shx(...s.body));
+  else trap(cx, ty, tw/2, th, (s.belly || tw/2), shx(...s.body));
+  if(s.belt) rect(cx - Math.round((s.belly||tw/2)), ty + th - 2, Math.round((s.belly||tw/2))*2 + 1, 1, s.belt);
+  /* braços */
+  const al = s.al || th, aw = s.aw || 2, ax = Math.round(tw/2) + 1;
+  rect(cx - ax - aw + 1, ty + 1, aw, al, (i)=> i === 0 ? s.arm[0] : s.arm[1]);
+  rect(cx + ax, ty + 1, aw, al, (i)=> i === aw-1 ? s.arm[2] : s.arm[1]);
+  if(s.hand){ rect(cx - ax - aw + 1, ty + 1 + al, aw, 1, s.hand); rect(cx + ax, ty + 1 + al, aw, 1, s.hand); }
+  if(s.shoulder){ disc(cx - ax, ty + 1, aw, 1.6, s.shoulder[0]); disc(cx + ax + aw - 1, ty + 1, aw, 1.6, s.shoulder[1]); }
+  /* cabeça */
+  disc(cx, hy, hr, s.hry || hr, sh(...s.skin));
+  const ey = Math.round(hy + (s.eyeY || 0)), ex = s.eyeX || Math.max(1, Math.round(hr*.45));
+  if(s.eye){ P(cx - ex, ey, s.eye); P(cx + ex, ey, s.eye); if(s.eyeW){ P(cx - ex - 1, ey, s.eye); P(cx + ex + 1, ey, s.eye); } }
+  return {cx, B, ty, hy, hr, ax, aw, al, ey};
+}
+const SPR_NEW = {
+/* ===== Cidadela ===== */
+"Líder Orc":{pal:{g:"#6a9a50",G:"#4a7a38",d:"#2e5226",a:"#8a2a2a",A:"#5a1a1a",k:"#3a2a1e",K:"#2a1e14",m:"#d0d6e4",M:"#8a92a6",y:"#f0c838",r:"#ffe040",w:"#f0ecd8","@":"#141210",h:"#6a4424"},head:[11,2],
+  rows:sprPaint(24,24,o=>{ const b = sprHuman(o,{cx:11,B:23,lh:5,lw:3,lg:1,tw:12,th:9,belly:6,hr:5,body:["a","a","A"],leg:["k","k","K"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:0,foot:"K",belt:"y",shoulder:["M","M"],aw:3});
+    o.P(b.cx-2,b.hy+3,"w"); o.P(b.cx+2,b.hy+3,"w"); o.rect(b.cx-5,b.hy-5,11,2,"m"); o.rect(b.cx-4,b.hy-6,9,1,"M"); o.P(b.cx-6,b.hy-4,"m"); o.P(b.cx+6,b.hy-4,"m");
+    o.line(20,4,20,22,"h"); o.rect(18,3,5,4,(i,j)=> j===0||i===0 ? "m" : "M"); })},
+"Esqueleto de Anão":{pal:{w:"#ece4cc",W:"#b8ac90",V:"#8a806a",k:"#2a2018",m:"#a8b0c4",M:"#61687a",h:"#f0e6cc",y:"#c8a040","@":"#1a1410"},head:[9,2],
+  rows:sprPaint(20,20,o=>{ const b = sprHuman(o,{cx:9,B:19,lh:4,lw:2,lg:1,tw:9,th:6,belly:4,hr:4,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","w","W"],eye:"k",eyeY:0,eyeW:true,aw:1});
+    for(let y=b.ty+1;y<b.ty+6;y+=2) o.rect(b.cx-3,y,7,1,"V"); o.rect(b.cx,b.ty,1,6,"W");
+    o.trap(b.cx,b.hy+3,2,4,1,"W"); o.P(b.cx,b.hy+7,"V");
+    o.disc(b.cx,b.hy-2,4.6,2.2,(dx,dy)=> dy<0 ? (dx<0?"m":"M") : null); o.rect(b.cx-5,b.hy-1,11,1,"y");
+    o.line(b.cx-5,b.hy-3,b.cx-7,b.hy-6,"h"); o.line(b.cx+5,b.hy-3,b.cx+7,b.hy-6,"h");
+    o.line(16,8,16,18,"W"); o.rect(15,6,3,3,"m"); })},
+"Fantasma Anão":{pal:{b:"rgba(150,205,255,.78)",B:"rgba(95,145,225,.72)",L:"rgba(215,238,255,.88)",e:"#ffffff",k:"#14204a","@":"rgba(20,30,70,.55)"},fly:5,
+  rows:sprPaint(20,22,o=>{ o.disc(10,7,5,5,o.sh("L","b","B")); o.trap(10,8,4,10,7,o.shx("L","b","B"));
+    o.disc(10,13,5.5,4,o.sh("L","L","b")); for(let x=3;x<=17;x+=3){ o.P(x,18,"B"); o.P(x+1,19,"B"); o.P(x,19,"."); }
+    o.P(8,6,"k"); o.P(12,6,"k"); o.P(8,5,"e"); o.P(12,5,"e"); o.rect(9,9,3,1,"k");
+    o.rect(3,10,2,5,"b"); o.rect(15,10,2,5,"B"); o.rect(6,1,9,2,"B"); o.P(10,0,"B"); })},
+"Golem Ossos e Pedra":{pal:{s:"#b0aca4",S:"#8e8a82",d:"#5e5a54",w:"#ece4cc",W:"#b8ac90",k:"#2a2826",g:"#f0a040","@":"#161412"},fx:"eyes",eyes:[[10,4],[14,4]],head:[12,1],
+  rows:sprPaint(26,26,o=>{ const b = sprHuman(o,{cx:12,B:25,lh:6,lw:4,lg:2,tw:14,th:10,belly:6,hr:5,body:["s","S","d"],leg:["s","S","d"],arm:["w","W","S"],skin:["s","S","d"],eye:"g",eyeY:0,eyeX:2,aw:4,al:11,neck:2});
+    for(let i=0;i<4;i++) o.rect(b.cx-4,b.ty+2+i*2,9,1,i%2?"w":"W"); o.rect(b.cx,b.ty+1,1,8,"w");
+    o.rect(b.cx-2,b.hy+2,5,1,"k"); o.P(b.cx-1,b.hy+3,"w"); o.P(b.cx+1,b.hy+3,"w");
+    o.disc(2,b.ty+12,2.5,2,o.sh("s","S","d")); o.disc(22,b.ty+12,2.5,2,o.sh("s","S","d")); })},
+"A Morte":{pal:{k:"#1e1826",K:"#2e2638",L:"#4a4058",w:"#ece4cc",W:"#b8ac90",X:"#0a0610",r:"#ff3030",m:"#d8dce6",M:"#8a92a6",q:"#5a3a20","@":"#08060c"},head:[15,6],
+  rows:sprPaint(34,40,o=>{ o.trap(15,12,6,27,13,(u,v)=> u<-.5 ? "L" : u<.3 ? "K" : "k");
+    o.disc(15,10,7,8,(dx,dy)=> dy<.25 || Math.abs(dx)>.62 ? (dx<-.3?"L":"K") : null); o.disc(15,11,4.4,4.6,o.sh("w","w","W"));
+    o.rect(13,10,2,2,"X"); o.rect(17,10,2,2,"X"); o.P(13,10,"r"); o.P(18,10,"r"); o.P(15,13,"X"); o.rect(13,15,5,1,"W");
+    o.line(8,22,13,26,"w"); o.line(21,24,25,22,"w"); o.disc(26,22,1.4,1.4,"w");
+    for(let x=4;x<=27;x+=3) o.P(x,39,"."); o.line(27,1,27,38,"q"); o.trap(23,1,1,3,6,(u)=> u<0 ? "m" : "M"); o.line(17,2,22,1,"m"); })},
+"Bolrag":{pal:{r:"#b0301c",R:"#701a10",L:"#e05a30",k:"#1a0a08",y:"#ffe040",o:"#f88020",f:"#ffe890",h:"#4a3a3a",H:"#2a2020",w:"#f0e0c0","@":"#120604"},fx:"eyes",eyes:[[16,8],[20,8]],head:[18,4],
+  rows:sprPaint(38,40,o=>{ /* asas */ [[-1,3],[1,33]].forEach(([s,x0])=>{ for(let k=0;k<12;k++){ const x = 18 + s*(5+k), top = 6 + Math.abs(k-5)*.6; o.line(x, top, x, top + 16 - k, k%3===0 ? "H" : "h"); } });
+    const b = sprHuman(o,{cx:18,B:39,lh:9,lw:4,lg:2,tw:14,th:12,belly:7,hr:5,body:["L","r","R"],leg:["r","r","R"],arm:["L","r","R"],skin:["L","r","R"],eye:"y",eyeY:-1,eyeX:2,aw:3,al:13,foot:"k"});
+    o.line(b.cx-4,b.hy-4,b.cx-7,b.hy-9,"w"); o.line(b.cx+4,b.hy-4,b.cx+7,b.hy-9,"w"); o.rect(b.cx-2,b.hy+2,5,1,"k"); o.P(b.cx-1,b.hy+3,"w"); o.P(b.cx+1,b.hy+3,"w");
+    for(let x=3;x<36;x++){ const f = Math.round(Math.sin(x*.9)*1.5+1.5); for(let k=0;k<=f;k++) o.P(x,39-k,k===f?"f":k?"o":"y"); }
+    o.line(31,12,35,4,"o"); o.line(32,12,36,5,"y"); })},
+"Espírito do Rei Anão":{pal:{b:"rgba(150,210,255,.8)",B:"rgba(90,140,220,.74)",L:"rgba(220,240,255,.9)",e:"#ffffff",k:"#14204a",y:"#f0d060",Y:"#b0902a","@":"rgba(20,30,70,.55)"},fly:5,head:[14,3],
+  rows:sprPaint(30,36,o=>{ o.disc(14,9,6,6,o.sh("L","b","B")); o.trap(14,11,6,16,11,o.shx("L","b","B"));
+    o.disc(14,18,7,7,o.sh("L","L","b")); o.trap(14,19,4,9,1,"L"); for(let x=4;x<=25;x+=3){ o.P(x,28,"B"); o.P(x+1,29,"B"); }
+    o.rect(11,8,2,2,"k"); o.rect(16,8,2,2,"k"); o.P(11,8,"e"); o.P(16,8,"e");
+    o.rect(9,1,11,3,"y"); [9,12,15,18].forEach(x=>{ o.P(x,0,"y"); o.P(x+1,0,"Y"); }); o.rect(9,3,11,1,"Y");
+    o.rect(2,14,3,8,"b"); o.rect(24,14,3,8,"B"); o.line(27,6,27,24,"L"); o.trap(27,4,1,4,4,"b"); })},
+"Líder Xamã Orc":{pal:{g:"#6a9a50",G:"#4a7a38",d:"#2e5226",c:"#6a3a8a",C:"#4a2468",D:"#2e1644",r:"#ffe040",w:"#f0ecd8",f:"#e04030",F:"#f0c040",B:"#3a7ad8",q:"#6a4424",b:"#60d0ff","@":"#141210"},head:[14,6],
+  rows:sprPaint(30,38,o=>{ const b = sprHuman(o,{cx:14,B:37,lh:0,lw:3,lg:1,tw:12,th:14,hr:6,robe:10,body:["c","C","D"],leg:["d","d","d"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:0,eyeX:3,aw:3,al:12});
+    o.P(b.cx-2,b.hy+4,"w"); o.P(b.cx+2,b.hy+4,"w"); o.rect(b.cx-1,b.hy+3,3,1,"d");
+    [-6,-4,-2,0,2,4,6].forEach((x,i)=>o.line(b.cx+x,b.hy-5,b.cx+x*1.3,b.hy-10-(i%2)*2,["f","F","B"][i%3]));
+    for(let i=0;i<5;i++) o.P(b.cx-4+i*2,b.ty+3,"w"); o.line(26,2,26,36,"q"); o.disc(26,3,2,2,"b"); o.P(26,3,"w"); })},
+"Rei Amaldiçoado":{pal:{w:"#d0c8b8",W:"#8a8476",k:"#1a1418",g:"#6af06a",y:"#d8b040",Y:"#8a6a1a",m:"#8a92a6",M:"#4e5466",c:"#4a3a5a",C:"#2e2238",D:"#1e1426",b:"#b8b2b8",B:"#7a747a","@":"#0c0a0e"},head:[15,6],
+  rows:sprPaint(32,38,o=>{ const b = sprHuman(o,{cx:15,B:37,lh:7,lw:4,lg:1,tw:16,th:13,belly:8,hr:6,body:["m","M","M"],leg:["c","C","D"],arm:["m","M","M"],skin:["w","w","W"],eye:"g",eyeY:0,eyeX:3,aw:3,al:12,foot:"k",shoulder:["m","M"]});
+    o.rect(b.cx-1,b.ty+1,3,12,"M"); o.rect(b.cx-5,b.hy+1,2,2,"k"); o.rect(b.cx+4,b.hy+1,2,2,"k"); o.P(b.cx-4,b.hy+1,"g"); o.P(b.cx+4,b.hy+1,"g");
+    o.trap(b.cx,b.hy+4,4,9,2,(u,v)=> u<0?"b":"B"); for(let y=b.hy+5;y<b.hy+12;y+=2) o.P(b.cx,y,"k");
+    o.rect(b.cx-5,b.hy-7,11,3,"y"); [-5,-2,1,4].forEach(x=>o.P(b.cx+x,b.hy-8,"y")); o.rect(b.cx-5,b.hy-5,11,1,"Y");
+    o.line(29,6,29,36,"M"); o.trap(29,2,1,5,4,(u)=>u<0?"m":"M"); })},
+/* ===== Pirâmide ===== */
+"Múmia":{pal:{w:"#ece0bc",W:"#c0b090",V:"#8a7a5a",k:"#2a2016",r:"#ff5030","@":"#1a140c"},head:[9,2],
+  rows:sprPaint(20,22,o=>{ const b = sprHuman(o,{cx:9,B:21,lh:6,lw:2,lg:1,tw:8,th:7,belly:4,hr:3.6,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","W","V"],eye:"r",eyeY:0,aw:2,al:3});
+    for(let y=b.ty;y<21;y+=2) o.line(b.cx-4,y,b.cx+4,y+1,"V"); for(let y=b.hy-3;y<b.hy+4;y+=2) o.line(b.cx-3,y,b.cx+3,y+1,"V");
+    o.rect(b.cx-8,b.ty+1,4,2,"W"); o.rect(b.cx+5,b.ty+1,4,2,"V"); o.P(b.cx-1,b.hy+2,"k"); o.P(b.cx+1,b.hy+2,"k"); o.P(b.cx+5,21,"W"); })},
+"Soldado Mumificado":{pal:{w:"#e4d8b4",W:"#b0a080",V:"#807050",k:"#2a2016",r:"#ff5030",y:"#e0b838",Y:"#9a7a28",b:"#3a7ad8",B:"#24508a",q:"#d0d6e4",s:"#8c5628","@":"#1a140c"},head:[9,3],
+  rows:sprPaint(22,24,o=>{ const b = sprHuman(o,{cx:9,B:23,lh:6,lw:2,lg:1,tw:8,th:8,belly:4,hr:3.8,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","W","V"],eye:"r",eyeY:1,aw:2,belt:"y"});
+    for(let y=b.ty+1;y<23;y+=2) o.line(b.cx-3,y,b.cx+3,y+1,"V"); o.rect(b.cx-4,b.ty,9,2,"y"); o.rect(b.cx-3,b.ty+1,7,1,"b");
+    o.trap(b.cx,b.hy-4,3,5,5,(u,v)=> Math.round(v*5)%2 ? "b" : "y"); o.rect(b.cx-5,b.hy+1,2,4,"b"); o.rect(b.cx+4,b.hy+1,2,4,"B");
+    o.line(18,1,18,22,"s"); o.trap(18,0,0,3,1.4,"q"); })},
+"Sacerdotisa Mumificada":{pal:{w:"#ece0bc",W:"#c0b090",V:"#8a7a5a",k:"#2a2016",g:"#6af0c0",y:"#f0c838",Y:"#9a7a28",b:"#3a7ad8",B:"#24508a",p:"#c04aa0","@":"#1a140c"},fx:"eyes",eyes:[[8,5],[11,5]],head:[9,3],
+  rows:sprPaint(22,24,o=>{ const b = sprHuman(o,{cx:9,B:23,lh:0,lw:2,lg:1,tw:8,th:8,hr:3.8,robe:7,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","W","V"],eye:"g",eyeY:1,eyeX:2,aw:2,al:7});
+    for(let y=b.ty+2;y<23;y+=3) o.line(b.cx-6,y,b.cx+6,y+1,"V"); o.rect(b.cx-5,b.ty,11,2,"y"); for(let x=b.cx-4;x<=b.cx+4;x+=2) o.P(x,b.ty+2,"b");
+    o.disc(b.cx,b.hy-1,5.4,4.4,(dx,dy)=> dy<-.1 || Math.abs(dx)>.68 ? (Math.round((dy+1)*4)%2 ? "b" : "y") : null);
+    o.rect(b.cx-1,b.hy-6,3,2,"y"); o.P(b.cx,b.hy-7,"p"); o.line(18,2,18,22,"y"); o.disc(18,2,2.2,2,(dx,dy)=> dx*dx+dy*dy<.3 ? null : "y"); })},
+"Escaravelho Gigante":{pal:{c:"#2a7a9a",C:"#1a4e66",L:"#7ad0e8",k:"#0e1a22",y:"#e0c040","@":"#081014"},
+  rows:sprPaint(22,16,o=>{ for(let i=0;i<3;i++){ o.line(5,6+i*3,1,8+i*3,"k"); o.line(16,6+i*3,20,8+i*3,"k"); }
+    o.disc(10.5,8.5,6.5,6.5,(dx,dy)=> Math.abs(dx)<.08 ? "k" : dx+dy< -.6 ? "L" : dx+dy>.5 ? "C" : "c"); o.disc(10.5,2,3,2,"C");
+    o.line(8,0,6,-2,"k"); o.line(13,0,15,-2,"k"); o.P(9,1,"y"); o.P(12,1,"y"); o.line(10,0,10,-3,"k"); o.line(11,0,11,-3,"k"); })},
+"Estátua do Deus Chacal":{pal:{s:"#b4b0a8",S:"#8a867e",d:"#5a5650",e:"#f0c040",k:"#2a2826",y:"#c8a040","@":"#161412"},head:[10,4],
+  rows:sprPaint(22,26,o=>{ o.rect(2,22,18,4,(i,j)=> j===0 ? "s" : i===17 ? "d" : "S");
+    const b = sprHuman(o,{cx:10,B:21,lh:5,lw:3,lg:1,tw:9,th:8,belly:4,hr:3.5,body:["s","S","d"],leg:["s","S","d"],arm:["s","S","d"],skin:["s","S","d"],eye:"e",eyeY:0,eyeX:1,aw:2,belt:"y"});
+    o.trap(b.cx+2,b.hy,1,3,2.5,"S"); o.P(b.cx+5,b.hy+2,"k"); o.line(b.cx-2,b.hy-3,b.cx-3,b.hy-8,"s"); o.line(b.cx+1,b.hy-3,b.cx+2,b.hy-8,"S");
+    o.rect(b.cx-4,b.ty,9,1,"y"); o.line(18,4,18,20,"d"); o.trap(18,2,1,3,2,"S"); })},
+"Rei do Deserto":{pal:{w:"#ece0bc",W:"#c0b090",V:"#8a7a5a",k:"#2a2016",r:"#ff5030",y:"#f0c838",Y:"#a8801c",b:"#2a5aa8",B:"#1a3a78",q:"#d0d6e4",Q:"#8a92a6","@":"#120c08"},head:[14,7],
+  rows:sprPaint(32,40,o=>{ const b = sprHuman(o,{cx:14,B:39,lh:10,lw:4,lg:1,tw:14,th:13,belly:7,hr:5.5,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","W","V"],eye:"r",eyeY:1,eyeX:2,aw:3,al:12,belt:"y"});
+    for(let y=b.ty+1;y<39;y+=2) o.line(b.cx-6,y,b.cx+6,y+1,"V"); o.rect(b.cx-8,b.ty,17,3,"y"); for(let x=b.cx-7;x<=b.cx+7;x+=2) o.P(x,b.ty+1,"b");
+    o.disc(b.cx,b.hy-1,7.5,6,(dx,dy)=> dy<-.05 || Math.abs(dx)>.7 ? (Math.round((dy+1)*5)%2 ? "b" : "y") : null); o.trap(b.cx,b.hy-11,1,5,3,"y"); o.P(b.cx,b.hy-12,"b");
+    o.rect(b.cx-1,b.hy+5,3,3,"y"); o.line(28,2,28,38,"Q"); o.disc(28,3,3,2.4,(dx,dy)=> dx*dx+dy*dy<.25 ? null : "q"); })},
+"Rainha Eterna":{pal:{w:"#ece0bc",W:"#c0b090",V:"#8a7a5a",k:"#2a2016",g:"#6af0c0",y:"#f8d040",Y:"#b08a20",b:"#2a5aa8",B:"#1a3a78",p:"#a03aa0","@":"#120c08"},head:[13,7],
+  rows:sprPaint(28,38,o=>{ const b = sprHuman(o,{cx:13,B:37,lh:0,lw:3,lg:1,tw:12,th:12,hr:5,robe:11,body:["w","W","V"],leg:["w","W","V"],arm:["w","W","V"],skin:["w","W","V"],eye:"g",eyeY:1,eyeX:2,aw:3,al:11});
+    for(let y=b.ty+3;y<37;y+=3) o.line(b.cx-9,y,b.cx+9,y+1,"V"); o.rect(b.cx-7,b.ty,15,3,"y"); for(let x=b.cx-6;x<=b.cx+6;x+=2) o.P(x,b.ty+1,"p");
+    o.rect(b.cx-11,36,23,2,"y"); o.disc(b.cx,b.hy-1,7,6,(dx,dy)=> dy<-.05 || Math.abs(dx)>.68 ? (Math.round((dy+1)*5)%2 ? "b" : "y") : null);
+    o.disc(b.cx,b.hy-9,3,3,(dx,dy)=> dx*dx+dy*dy<.35 ? "p" : "y"); o.line(b.cx-12,b.ty+6,b.cx-9,b.ty+12,"y"); o.line(b.cx+12,b.ty+6,b.cx+9,b.ty+12,"y"); })},
+"Miragem Maldita":{pal:{a:"rgba(240,190,120,.6)",A:"rgba(200,120,80,.65)",L:"rgba(255,230,180,.7)",r:"#ff4030",y:"#ffe080",k:"rgba(70,20,20,.75)","@":"rgba(80,30,20,.45)"},fly:5,fx:"eyes",eyes:[[10,9],[22,9]],
+  rows:sprPaint(34,34,o=>{ o.disc(16,14,13,12,o.sh("L","a","A")); o.trap(16,20,12,12,16,(u,v)=> (Math.round(u*8+v*12))%3===0 ? "A" : "a");
+    for(let x=1;x<32;x+=4){ o.P(x,32,"A"); o.P(x+1,33,"a"); }
+    o.disc(10,9,2.6,2,"k"); o.disc(22,9,2.6,2,"k"); o.P(10,9,"r"); o.P(22,9,"r"); o.disc(16,17,8,3.4,"k"); for(let x=9;x<=23;x+=2){ o.P(x,16,"y"); o.P(x+1,18,"y"); }
+    o.line(3,13,0,6,"A"); o.line(29,13,32,6,"A"); })},
+"Escaravelho Gigante Alado":{pal:{c:"#1a6a8a",C:"#0e3e56",L:"#5ab8d8",k:"#0a1218",y:"#f0c040",o:"#f88020",f:"#ffe070",w:"rgba(210,235,255,.65)",W:"rgba(150,200,240,.55)","@":"#060a0e"},fly:6,
+  rows:sprPaint(40,32,o=>{ [[-1],[1]].forEach(([s])=>{ for(let k=0;k<13;k++){ const x = 20 + s*(7+k); o.line(x, 4+k*.5, x, 14+k*.3, k%4===0 ? "W" : "w"); } });
+    for(let i=0;i<3;i++){ o.line(14,16+i*3,8,20+i*4,"k"); o.line(25,16+i*3,31,20+i*4,"k"); }
+    o.disc(19.5,17,8,9,(dx,dy)=> Math.abs(dx)<.06 ? "k" : dx+dy< -.6 ? "L" : dx+dy>.5 ? "C" : "c"); o.disc(19.5,7,4.5,3,"C");
+    o.line(17,5,13,0,"k"); o.line(22,5,26,0,"k"); o.P(17,6,"y"); o.P(22,6,"y"); o.line(19,4,19,1,"k"); o.line(20,4,20,1,"k");
+    for(let x=10;x<30;x+=3){ o.P(x,29,"o"); o.P(x+1,30,"f"); } })},
+"Deus Chacal":{pal:{k:"#1e1e26",K:"#30303e",L:"#4e4e60",y:"#f0c838",Y:"#b08a20",e:"#ff3030",w:"#ece0bc",W:"#c0b090",q:"#d0d6e4",Q:"#8a92a6",b:"#2a5aa8","@":"#08080c"},head:[16,7],
+  rows:sprPaint(34,42,o=>{ const b = sprHuman(o,{cx:16,B:41,lh:11,lw:4,lg:1,tw:14,th:13,belly:6,hr:5,body:["L","K","k"],leg:["L","K","k"],arm:["L","K","k"],skin:["L","K","k"],eye:"e",eyeY:0,eyeX:2,aw:3,al:12});
+    o.rect(b.cx-6,b.B-lhOf(11)-1,13,5,(i,j)=> j%2 ? "W" : "w"); o.rect(b.cx-8,b.ty,17,3,"y"); for(let x=b.cx-7;x<=b.cx+7;x+=2) o.P(x,b.ty+1,"b");
+    o.trap(b.cx+3,b.hy,1.5,4,3,"K"); o.P(b.cx+6,b.hy+3,"k"); o.line(b.cx-3,b.hy-4,b.cx-4,b.hy-11,"K"); o.line(b.cx+2,b.hy-4,b.cx+3,b.hy-11,"k");
+    [[2,-1],[30,1]].forEach(([x,s])=>{ o.line(x,b.ty+8,x,b.ty+15,"Q"); o.line(x,b.ty+15,x+s*3,b.ty+19,"q"); o.line(x+s*3,b.ty+19,x+s*1,b.ty+21,"q"); }); })},
+/* ===== Zigurate ===== */
+"Soldado Javaligor":{pal:{h:"#8a5a32",H:"#6a4020",D:"#4a2a14",t:"#f0e8d0",k:"#1a1008",r:"#ff3030",p:"#d08a9a",f:"#e04030",F:"#40a050",l:"#3a6a2a",L:"#5a8a3a",s:"#8c5628",q:"#c8ccd4","@":"#120a04"},head:[10,4],
+  rows:sprPaint(24,24,o=>{ const b = sprHuman(o,{cx:10,B:23,lh:5,lw:3,lg:1,tw:10,th:8,belly:5,hr:4.5,body:["L","l","l"],leg:["h","H","D"],arm:["h","H","D"],skin:["h","H","D"],eye:"r",eyeY:-1,eyeX:2,aw:2,foot:"k"});
+    o.disc(b.cx,b.hy+2,3,2,o.sh("p","p","H")); o.P(b.cx-1,b.hy+2,"k"); o.P(b.cx+1,b.hy+2,"k"); o.line(b.cx-3,b.hy+3,b.cx-4,b.hy+1,"t"); o.line(b.cx+3,b.hy+3,b.cx+4,b.hy+1,"t");
+    o.P(b.cx-4,b.hy-4,"H"); o.P(b.cx+4,b.hy-4,"H"); [-2,0,2].forEach((x,i)=>o.line(b.cx+x,b.hy-4,b.cx+x,b.hy-7,["f","F","f"][i]));
+    o.line(20,1,20,22,"s"); o.trap(20,0,0,3,1.4,"q"); })},
+"Líder de Tribo Javaligor":{pal:{h:"#6a4228",H:"#4a2c18",D:"#2e1a0c",t:"#f0e8d0",k:"#1a1008",r:"#ff3030",p:"#c87a8a",f:"#e04030",F:"#f0c040",B:"#3a7ad8",l:"#8a2a1a",L:"#b04030",y:"#f0c040",s:"#6a4424",q:"#d0d6e4","@":"#120a04"},head:[12,5],
+  rows:sprPaint(28,28,o=>{ const b = sprHuman(o,{cx:12,B:27,lh:6,lw:3,lg:1,tw:12,th:10,belly:6,hr:5.5,body:["L","l","l"],leg:["h","H","D"],arm:["h","H","D"],skin:["h","H","D"],eye:"r",eyeY:-1,eyeX:2,aw:3,foot:"k",belt:"y"});
+    o.disc(b.cx,b.hy+2,3.5,2.4,o.sh("p","p","H")); o.P(b.cx-1,b.hy+2,"k"); o.P(b.cx+1,b.hy+2,"k"); o.line(b.cx-4,b.hy+3,b.cx-5,b.hy,"t"); o.line(b.cx+4,b.hy+3,b.cx+5,b.hy,"t");
+    [-5,-3,-1,1,3,5].forEach((x,i)=>o.line(b.cx+x,b.hy-5,b.cx+x*1.4,b.hy-10-(i%2),["f","F","B"][i%3]));
+    o.line(24,2,24,26,"s"); o.trap(24,0,1,5,3,"q"); })},
+"Goblin Assassino":{pal:{g:"#6aa040",G:"#4a7a2c",d:"#2e5220",c:"#2a2a34",C:"#1a1a22",r:"#ffe040",q:"#d0d6e4",w:"#f4f0dc","@":"#0a0a0e"},head:[8,3],
+  rows:sprPaint(18,18,o=>{ const b = sprHuman(o,{cx:8,B:17,lh:4,lw:2,lg:1,tw:7,th:6,belly:3,hr:3.6,body:["c","c","C"],leg:["c","C","C"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:0,eyeX:2,aw:1});
+    o.line(b.cx-4,b.hy,b.cx-7,b.hy-2,"G"); o.line(b.cx+4,b.hy,b.cx+7,b.hy-2,"d"); o.disc(b.cx,b.hy-1,4,3.4,(dx,dy)=> dy<-.1 ? "c" : null); o.rect(b.cx-2,b.hy+2,5,1,"C");
+    o.line(13,7,16,4,"q"); o.line(2,7,0,4,"q"); })},
+"Pantera":{pal:{k:"#2c2c38",K:"#1c1c26",L:"#4a4a5c",y:"#f0e040",w:"#f0f0f0",p:"#d08a9a","@":"#06060a"},flip:true,
+  rows:sprPaint(30,16,o=>{ o.disc(14,8,9,3.6,o.sh("L","k","K")); o.disc(5,6,3.6,3.2,o.sh("L","k","K")); o.trap(2,6,1,3,2,"k");
+    o.P(3,5,"y"); o.P(6,5,"y"); o.P(1,8,"p"); o.P(2,9,"w"); o.line(4,2,4,3,"k"); o.line(7,2,7,3,"K");
+    [8,11,17,20].forEach((x,i)=>o.rect(x,10,2,5,i%2?"K":"k")); [8,11,17,20].forEach(x=>o.rect(x-1,15,3,1,"K"));
+    for(let k=0;k<8;k++) o.P(23+k, 6 - Math.round(Math.sin(k*.5)*2), "k"); })},
+"Morcego Gigante":{pal:{b:"#4e2a60",B:"#2e1840",L:"#7a4a8a",r:"#ffe040",w:"#f0f0f0","@":"#0a0610"},fx:"bat",fly:12,
+  rows:sprPaint(32,16,o=>{ o.disc(16,7,3.5,4,o.sh("L","b","B")); o.P(14,6,"r"); o.P(18,6,"r"); o.P(15,9,"w"); o.P(17,9,"w"); o.line(14,3,13,0,"b"); o.line(18,3,19,0,"B");
+    [[-1],[1]].forEach(([s])=>{ for(let k=0;k<12;k++){ const x = 16 + s*(4+k), top = 4 - Math.round(Math.sin(k*.35)*3); o.line(x, top, x, top + 6 - Math.round(k*.35) + (k%3===2?2:0), k%3===2 ? "B" : "b"); } }); }),
+  rows2:sprPaint(32,16,o=>{ o.disc(16,7,3.5,4,o.sh("L","b","B")); o.P(14,6,"r"); o.P(18,6,"r"); o.P(15,9,"w"); o.P(17,9,"w"); o.line(14,3,13,0,"b"); o.line(18,3,19,0,"B");
+    [[-1],[1]].forEach(([s])=>{ for(let k=0;k<12;k++){ const x = 16 + s*(4+k), top = 7 + Math.round(k*.45); o.line(x, top, x, top + 4 - Math.round(k*.2), k%3===2 ? "B" : "b"); } }); })},
+"Estátua do Deus Sol":{pal:{y:"#f8d040",Y:"#c09020",D:"#8a6010",L:"#fff0a0",k:"#4a2a08",r:"#ff5020","@":"#2a1a04"},head:[11,6],
+  rows:sprPaint(24,28,o=>{ o.rect(3,24,18,4,(i,j)=> j===0 ? "L" : i===17 ? "D" : "Y");
+    const b = sprHuman(o,{cx:11,B:23,lh:5,lw:3,lg:1,tw:10,th:8,belly:5,hr:4.5,body:["L","y","Y"],leg:["y","Y","D"],arm:["y","Y","D"],skin:["L","y","Y"],eye:"r",eyeY:0,eyeX:2,aw:2});
+    for(let a=0;a<8;a++){ const an = a*Math.PI/4; o.line(b.cx+Math.cos(an)*6, b.hy+Math.sin(an)*6, b.cx+Math.cos(an)*8, b.hy+Math.sin(an)*8, "Y"); }
+    o.rect(b.cx-2,b.hy+2,5,1,"k"); })},
+"Serpente Emplumada":{pal:{g:"#3aa060",G:"#2a7a48",L:"#7ad080",f:"#e04030",F:"#f0c040",b:"#3a7ad8",y:"#f8e040",k:"#1a1a10",r:"#ff3030","@":"#0a140c"},
+  rows:sprPaint(30,18,o=>{ for(let k=0;k<22;k++){ const x = 6+k, y = 11 + Math.round(Math.sin(k*.45)*3); o.disc(x,y,1.6,1.8, k%4===0 ? "G" : "g"); }
+    o.disc(5,8,3.4,3,o.sh("L","g","G")); o.P(4,7,"y"); o.P(1,9,"k"); o.line(0,10,-2,11,"r");
+    [["f",0],["F",1],["b",2],["f",3]].forEach(([c,i])=>o.line(6+i,5,4+i*2,0,c)); o.line(28,9,30,6,"f"); o.line(28,10,30,9,"b"); })},
+"Medusa ":null,
+"Crânio Sagrado":{pal:{w:"#ece4cc",W:"#b8ac90",V:"#8a806a",k:"#1a1418",g:"#6af06a",m:"rgba(90,190,80,.85)",M:"rgba(55,140,45,.8)","@":"#0a0806"},fx:"eyes",eyes:[[10,10],[19,10]],
+  rows:sprPaint(30,30,o=>{ o.disc(15,11,11,10,o.sh("w","w","W")); o.trap(15,17,6,7,5,(u)=> u<-.4?"w":u>.4?"V":"W");
+    o.disc(10,11,3,3,"k"); o.disc(20,11,3,3,"k"); o.P(10,11,"g"); o.P(20,11,"g"); o.trap(15,15,0,3,1.5,"k");
+    for(let x=10;x<=20;x+=2) o.rect(x,21,1,3,"V");
+    o.disc(15,27,14,4,(dx,dy)=> dy<-.3 ? "m" : (Math.round(dx*9)%3===0 ? "M" : "m")); for(let x=3;x<28;x+=5) o.disc(x,23,1.4,1.6,"m"); })},
+"Hagork":{pal:{g:"#5a8a42",G:"#3e6a30",d:"#264a1e",r:"#ff4020",w:"#f0ecd8",y:"#f0c838",Y:"#a8801c",a:"#8a2a2a",A:"#5a1818",m:"#d0d6e4",M:"#8a92a6",h:"#6a4424",k:"#1a1a10","@":"#0c0a06"},head:[16,6],
+  rows:sprPaint(38,42,o=>{ const b = sprHuman(o,{cx:16,B:41,lh:10,lw:5,lg:2,tw:18,th:15,belly:9,hr:6.5,body:["a","a","A"],leg:["G","G","d"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:-1,eyeX:3,aw:4,al:15,foot:"k",belt:"y",shoulder:["M","M"]});
+    o.P(b.cx-3,b.hy+4,"w"); o.P(b.cx+3,b.hy+4,"w"); o.P(b.cx-3,b.hy+3,"w"); o.P(b.cx+3,b.hy+3,"w"); o.rect(b.cx-2,b.hy+4,5,1,"d");
+    o.rect(b.cx-6,b.hy-8,13,3,"y"); [-6,-3,0,3,6].forEach(x=>{ o.P(b.cx+x,b.hy-9,"y"); o.P(b.cx+x,b.hy-10,"y"); }); o.rect(b.cx-6,b.hy-6,13,1,"Y"); o.P(b.cx,b.hy-7,"r");
+    o.line(33,6,33,40,"h"); o.disc(33,7,4.5,4,(dx,dy)=> Math.abs(dx)<.2 ? "h" : dx<0 ? "m" : "M"); })},
+"Pavão Misterioso":{pal:{b:"#2a6ad8",B:"#1a4a98",L:"#6aa0f0",g:"#3ac080",G:"#2a8a5a",y:"#f0e040",k:"#1a1418",o:"#e08020",p:"#a040c0",e:"#ff3030","@":"#0a0a14"},fx:"eyes",eyes:[[16,16]],head:[16,15],
+  rows:sprPaint(34,36,o=>{ for(let a=0;a<11;a++){ const an = Math.PI*(1.05 + a*0.09), r = 15; const x = 17+Math.cos(an)*r, y = 18+Math.sin(an)*r; o.line(17,18,x,y,a%2?"G":"g"); o.disc(x,y,2,2,a%2?"b":"g"); o.P(x,y,"y"); o.P(x,y+1,"p"); }
+    o.disc(17,24,5,7,o.sh("L","b","B")); o.trap(17,14,1.5,8,2.5,o.shx("L","b","B")); o.disc(17,13,3,3,o.sh("L","b","B"));
+    o.P(16,12,"e"); o.trap(19,13,0,2,1,"o"); for(let k=0;k<3;k++) o.line(16+k,9,15+k*2,6,"b"); o.P(15,5,"y"); o.P(17,5,"y"); o.P(19,5,"y");
+    o.line(15,31,14,35,"o"); o.line(19,31,20,35,"o"); o.line(13,35,16,35,"o"); o.line(18,35,21,35,"o"); })},
+"Sacerdotisa Emplumada":{pal:{s:"#c89060",S:"#9a6a3e",D:"#6a4424",k:"#1a1008",f:"#e04030",F:"#f0c040",b:"#3a7ad8",g:"#3aa060",G:"#2a7a48",w:"#ece4cc",W:"#b8ac90",y:"#e8c040",r:"#ff4030","@":"#0c0804"},head:[14,9],
+  rows:sprPaint(30,40,o=>{ const b = sprHuman(o,{cx:14,B:39,lh:0,lw:3,lg:1,tw:12,th:12,hr:5,robe:12,body:["g","g","G"],leg:["s","S","D"],arm:["s","S","D"],skin:["s","S","D"],eye:"r",eyeY:0,eyeX:2,aw:3,al:11});
+    for(let y=b.ty+4;y<39;y+=4) for(let x=b.cx-10;x<=b.cx+10;x+=3) o.P(x+(y%8?1:0),y,"y"); o.rect(b.cx-6,b.ty,13,2,"y");
+    [-8,-6,-4,-2,0,2,4,6,8].forEach((x,i)=>o.line(b.cx+x*.6,b.hy-4,b.cx+x*1.2,b.hy-13+Math.abs(x)*.6,["f","F","b"][i%3]));
+    o.disc(3,b.ty+12,2.6,2.4,o.sh("w","w","W")); o.P(2,b.ty+12,"k"); o.P(4,b.ty+12,"k"); o.P(3,b.ty+14,"k"); o.line(26,b.ty+2,26,38,"D"); o.P(26,b.ty+1,"F"); })},
+"Deus Sol":{pal:{y:"#f8d838",Y:"#c89a20",D:"#8a6010",L:"#fff4b0",o:"#f88020",O:"#e05010",k:"#4a2a08",r:"#ff4020",w:"#fffbe8","@":"#3a2004"},head:[18,9],
+  rows:sprPaint(38,44,o=>{ for(let a=0;a<12;a++){ const an = a*Math.PI/6; o.line(18+Math.cos(an)*9, 10+Math.sin(an)*9, 18+Math.cos(an)*14, 10+Math.sin(an)*14, a%2 ? "o" : "O"); }
+    const b = sprHuman(o,{cx:18,B:43,lh:11,lw:5,lg:2,tw:18,th:14,belly:9,hr:8,body:["L","y","Y"],leg:["y","Y","D"],arm:["y","Y","D"],skin:["L","y","Y"],eye:"r",eyeY:-1,eyeX:3,aw:4,al:14,neck:3});
+    o.rect(b.cx-1,b.hy+1,3,1,"Y"); o.trap(b.cx,b.hy+3,3,2,2,"k"); o.disc(b.cx,b.ty+6,3.6,3.6,(dx,dy)=> dx*dx+dy*dy<.3 ? "w" : "o"); })},
+/* ===== Laboratório ===== */
+"Ogro Costurado":{pal:{g:"#8aa070",G:"#6a8058",d:"#46583a",k:"#2a2018",r:"#ff3030",s:"#2a1a1a",p:"#6a5a7a",P:"#4a3a5a",w:"#ece4cc",m:"#9aa2b6","@":"#0e0c0a"},head:[13,5],
+  rows:sprPaint(28,30,o=>{ const b = sprHuman(o,{cx:13,B:29,lh:7,lw:4,lg:1,tw:16,th:11,belly:9,hr:5,body:["g","G","d"],leg:["p","p","P"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:0,eyeX:2,aw:4,al:12,foot:"k"});
+    o.rect(b.cx-8,b.ty+9,17,3,"p"); o.line(b.cx-6,b.ty+1,b.cx+5,b.ty+8,"s"); for(let k=0;k<6;k++) o.P(b.cx-5+k*2,b.ty+2+k*1.2,"w");
+    o.line(b.cx-4,b.hy-3,b.cx+3,b.hy-1,"s"); o.P(b.cx-3,b.hy-3,"w"); o.P(b.cx,b.hy-2,"w"); o.rect(b.cx-2,b.hy+3,5,1,"k"); o.P(b.cx-5,b.hy+1,"m"); o.P(b.cx+5,b.hy+1,"m"); })},
+"Olho Flutuante":{pal:{p:"#c86a90",P:"#8a3a60",L:"#e8a0b8",w:"#f8f0f0",W:"#c8c0c8",g:"#40c060",G:"#2a8a40",k:"#1a0810",t:"#a04070","@":"#14060c"},fly:8,fx:"eyes",eyes:[[11,8]],
+  rows:sprPaint(24,24,o=>{ o.disc(11.5,9,9,8.5,o.sh("L","p","P")); o.disc(11.5,9,6.5,6,o.sh("w","w","W")); o.disc(11.5,9,3.5,3.5,(dx,dy)=> dx*dx+dy*dy<.3 ? "k" : "g");
+    o.P(10,7,"w"); for(let k=0;k<5;k++){ const x = 5+k*3; o.line(x,17,x-1+(k%2)*2,22,"t"); } o.disc(11.5,1,5,1.6,"P"); })},
+"Zumbi Tóxico":{pal:{g:"#7aa84a",G:"#5a8238",d:"#3a5a24",k:"#1a1a10",y:"#e8f840",c:"#5a4a3a",C:"#3a2e22",v:"#a8f848","@":"#0a0c06"},head:[9,3],
+  rows:sprPaint(20,22,o=>{ const b = sprHuman(o,{cx:9,B:21,lh:6,lw:2,lg:1,tw:8,th:7,belly:4,hr:4,body:["c","c","C"],leg:["c","C","C"],arm:["g","G","d"],skin:["g","G","d"],eye:"y",eyeY:0,eyeX:2,aw:2,al:3});
+    o.rect(b.cx-9,b.ty+1,5,2,"G"); o.rect(b.cx+4,b.ty+1,5,2,"d"); o.rect(b.cx-2,b.hy+2,4,1,"k"); o.P(b.cx+1,b.hy+3,"v"); o.P(b.cx+1,b.hy+4,"v");
+    o.P(b.cx-2,b.ty+3,"v"); o.P(b.cx+2,b.ty+5,"v"); o.P(b.cx-3,b.ty+1,"g"); })},
+"Cadeira Viva":{pal:{w:"#b07a40",W:"#7a4a24",D:"#4a2a10",L:"#d8a060",k:"#1a1008",y:"#f8e040",t:"#f0f0e0","@":"#0e0804"},
+  rows:sprPaint(16,20,o=>{ o.rect(2,0,12,10,(i,j)=> i===0||j===0 ? "L" : i===11 ? "D" : (i%3===0 ? "W" : "w")); o.rect(1,10,14,3,(i,j)=> j===0 ? "L" : "W");
+    o.rect(4,3,2,2,"y"); o.rect(10,3,2,2,"y"); o.P(5,4,"k"); o.P(11,4,"k"); o.rect(5,7,6,1,"k"); o.P(6,7,"t"); o.P(9,7,"t");
+    o.line(2,13,1,19,"W"); o.line(13,13,14,19,"D"); o.line(5,13,4,18,"W"); o.line(10,13,11,18,"D"); })},
+"Bolha Assassina":{proc:"slime",w:20,h:14,col:["#6a1a4a","rgba(240,110,180,.85)","rgba(200,70,150,.8)","#ffe8f4"]},
+"Rato Mutante":{pal:{g:"#7a9a5a",G:"#a0c070",d:"#4a6a38",p:"#e0a0b0",e:"#f8f040",n:"#e0a0b0",w:"#f0ecd8",k:"#1a1a10","@":"#0a0c06"},flip:true,fx:"tail",
+  rows:sprPaint(24,14,o=>{ o.disc(12,7,8,4.4,o.sh("G","g","d")); o.disc(5,6,3.6,3.2,o.sh("G","g","d")); o.trap(2,6,0,3,2,"g"); o.P(1,7,"n");
+    o.P(4,5,"e"); o.P(6,4,"e"); o.P(5,7,"e"); o.disc(7,2,1.6,1.6,"p"); o.disc(14,3,1.4,1.4,"p"); o.disc(17,4,1.2,1.2,"p");
+    [7,10,15,18].forEach((x,i)=>o.rect(x,11,1,3,i%2?"d":"g")); o.P(2,9,"w"); })},
+"Cão Tóxico":{pal:{g:"#6a8a3a",G:"#8ab050",d:"#3a5a20",v:"#b0f848",k:"#1a1a10",e:"#f8f040","@":"#0a0c06"},flip:true,
+  rows:sprPaint(24,18,o=>{ o.disc(13,8,8,4,o.sh("G","g","d")); o.disc(5,5,3.6,3.4,o.sh("G","g","d")); o.trap(2,6,1,3,2,"g"); o.P(1,7,"k");
+    o.P(5,4,"e"); o.P(6,4,"e"); o.line(4,1,3,-1,"d"); o.line(7,1,8,-1,"d"); o.P(2,9,"v"); o.P(2,10,"v");
+    [7,10,16,19].forEach((x,i)=>o.rect(x,11,2,6,i%2?"d":"g")); for(let k=0;k<5;k++) o.P(21+k*.7, 7-k, "g");
+    for(let k=0;k<5;k++) o.P(9+k*2, 4-(k%2), "v"); })},
+"Rei Alquimista":{pal:{w:"#d0c8b8",W:"#8a8476",k:"#1a1418",g:"#6af040",G:"#2a8a2a",y:"#e0b838",Y:"#9a7a28",p:"#6a3a8a",P:"#4a2468",D:"#2e1644",v:"#b0ff60",b:"#40a0f0",r:"#f04040","@":"#0a080c"},head:[14,7],
+  rows:sprPaint(30,38,o=>{ const b = sprHuman(o,{cx:14,B:37,lh:0,lw:3,lg:1,tw:12,th:13,hr:5.5,robe:11,body:["p","P","D"],leg:["p","P","D"],arm:["p","P","D"],skin:["w","w","W"],eye:"g",eyeY:0,eyeX:2,aw:3,al:11,hand:"W"});
+    o.rect(b.cx-3,b.hy,2,2,"k"); o.rect(b.cx+2,b.hy,2,2,"k"); o.P(b.cx-2,b.hy,"g"); o.P(b.cx+2,b.hy,"g"); o.rect(b.cx-2,b.hy+3,5,1,"k"); for(let x=b.cx-2;x<=b.cx+2;x+=2) o.P(x,b.hy+4,"w");
+    o.rect(b.cx-5,b.hy-7,11,3,"y"); [-5,-2,1,4].forEach(x=>o.P(b.cx+x,b.hy-8,"y")); o.rect(b.cx-5,b.hy-5,11,1,"Y");
+    for(let y=b.ty+2;y<37;y+=3) o.P(b.cx,y,"y"); o.disc(2,b.ty+13,2.4,3,o.sh("v","g","G")); o.rect(1,b.ty+9,3,2,"W"); o.P(2,b.ty+8,"v");
+    o.disc(26,b.ty+13,2.2,2.6,o.sh("b","b","b")); o.rect(25,b.ty+9,3,2,"W"); })},
+"Abominação Alquímica":{pal:{g:"#8aa070",G:"#6a8058",d:"#46583a",p:"#d08aa0",P:"#9a5a70",h:"#8a5a32",H:"#5a3418",k:"#1a1008",r:"#ff3030",y:"#f0f040",s:"#2a1a1a",v:"#a8f848",w:"#ece4cc","@":"#0a0806"},head:[11,5],
+  rows:sprPaint(34,38,o=>{ o.disc(17,22,12,11,(dx,dy)=> dx < -.1 ? (dx+dy<-.7?"G":"g") : (dx+dy>.6?"P":"p")); o.line(17,11,17,33,"s"); for(let y=12;y<33;y+=3) o.P(16,y,"w");
+    o.disc(11,9,5,4.5,o.sh("h","h","H")); o.disc(23,8,5.5,5,o.sh("p","p","P")); o.P(9,8,"r"); o.P(13,8,"r"); o.rect(21,7,2,2,"y"); o.rect(25,7,2,2,"y"); o.P(22,8,"k"); o.P(26,8,"k");
+    o.rect(9,12,5,1,"k"); o.rect(21,12,5,1,"k"); o.P(22,13,"w"); o.P(24,13,"w");
+    o.rect(3,17,4,12,(i)=> i===0?"g":"G"); o.rect(27,15,5,14,(i)=> i===4?"P":"p"); o.rect(10,32,5,6,"g"); o.rect(20,32,5,6,"P"); o.rect(9,37,6,1,"k"); o.rect(20,37,6,1,"k");
+    o.P(6,30,"v"); o.P(29,30,"v"); })},
+"Bolha Explosiva":{proc:"slime",w:34,h:24,col:["#3a5a10","rgba(170,240,80,.85)","rgba(120,200,50,.8)","#f8ffd0"],eyes:3},
+"Fera Tóxica":{pal:{g:"#5a8a3a",G:"#3a6224",d:"#244018",L:"#80b050",k:"#1a1a10",y:"#e8f840",v:"#a8f848",V:"#70c828",w:"#f0f0d0","@":"#060a04"},fx:"spores",head:[16,7],
+  rows:sprPaint(34,36,o=>{ o.disc(17,21,12,10,o.sh("L","g","G")); o.disc(17,10,7,6,o.sh("L","g","G"));
+    o.rect(13,8,2,2,"y"); o.rect(20,8,2,2,"y"); o.trap(17,12,4,3,5,"k"); for(let x=13;x<=21;x+=2){ o.P(x,12,"w"); o.P(x+1,14,"w"); }
+    for(let k=0;k<7;k++) o.disc(9+k*3, 13 + (k%2), 1.3, 2, "V"); o.rect(4,18,4,10,(i)=>i?"G":"g"); o.rect(26,18,4,10,(i)=>i===3?"d":"G");
+    o.rect(9,29,6,7,"G"); o.rect(19,29,6,7,"d"); o.rect(8,35,7,1,"k"); o.rect(19,35,7,1,"k"); [12,17,22].forEach(x=>o.P(x,22,"v")); })},
+"Monstrinho Inflamável":{pal:{o:"#f88020",O:"#e05010",y:"#ffe070",r:"#d03018",R:"#8a1a10",k:"#2a1008",w:"#fff8e0","@":"#140604"},head:[11,9],
+  rows:sprPaint(24,30,o=>{ for(let k=0;k<9;k++){ const x = 4+k*2, h = 6+Math.round(Math.sin(k*1.3)*3+3); o.line(x,12,x+(k%2?1:-1),12-h,k%3?"o":"y"); }
+    const b = sprHuman(o,{cx:11,B:29,lh:5,lw:3,lg:1,tw:12,th:9,belly:6,hr:6,body:["o","r","R"],leg:["r","r","R"],arm:["o","r","R"],skin:["o","r","R"],eye:"w",eyeY:-1,eyeX:2,aw:2,foot:"k",neck:2});
+    o.P(b.cx-2,b.hy-2,"y"); o.P(b.cx+2,b.hy-2,"y"); o.trap(b.cx,b.hy+2,3,2,2,"k"); o.P(b.cx-2,b.hy+2,"w"); o.P(b.cx+2,b.hy+2,"w"); o.disc(b.cx,b.ty+4,2.5,2.5,"y"); })},
+/* ===== Necrópole: corpo do chefe (a primeira coluna da tabela) ===== */
+"Animal":{pal:{h:"#6a5a4a",H:"#4a3e32",L:"#8a7a66",k:"#1a1410",r:"#ff3030",w:"#ece4cc","@":"#0a0806"},flip:true,
+  rows:sprPaint(36,24,o=>{ o.disc(20,12,13,6.5,o.sh("L","h","H")); o.disc(8,9,5.5,5,o.sh("L","h","H")); o.trap(3,9,1.5,4,3,"h"); o.P(1,10,"k");
+    o.P(6,7,"r"); o.P(9,7,"r"); o.line(5,4,4,1,"H"); o.line(10,4,11,1,"H"); o.P(2,12,"w"); o.P(4,13,"w");
+    [11,15,25,29].forEach((x,i)=>o.rect(x,17,3,6,i%2?"H":"h")); [11,15,25,29].forEach(x=>o.rect(x-1,23,4,1,"k"));
+    for(let k=0;k<7;k++) o.P(33+k*.4, 9-k, "H"); })},
+"Zumbi":{pal:{g:"#7a9a7a",G:"#5a725a",d:"#3a4e3a",k:"#1a1a14",r:"#ff3030",c:"#4a3a5a",C:"#2e2238",b:"#6a4a3a","@":"#0a0a08"},head:[13,6],
+  rows:sprPaint(28,34,o=>{ const b = sprHuman(o,{cx:13,B:33,lh:9,lw:4,lg:1,tw:14,th:12,belly:7,hr:5.5,body:["c","c","C"],leg:["b","b","b"],arm:["g","G","d"],skin:["g","G","d"],eye:"r",eyeY:0,eyeX:2,aw:3,al:4,foot:"k"});
+    o.rect(b.cx-15,b.ty+1,8,3,(i,j)=> j===0?"g":"G"); o.rect(b.cx+8,b.ty+1,8,3,(i,j)=> j===0?"G":"d"); o.rect(b.cx-2,b.hy+3,5,1,"k"); o.P(b.cx-1,b.hy+4,"k");
+    o.P(b.cx-4,b.ty+4,"C"); o.P(b.cx+3,b.ty+7,"C"); o.P(b.cx-1,b.ty+9,"G"); o.line(b.cx-3,b.hy-4,b.cx+1,b.hy-3,"d"); })},
+"Fantasma":{pal:{b:"rgba(170,215,255,.78)",B:"rgba(100,150,230,.72)",L:"rgba(225,242,255,.9)",e:"#ffffff",k:"#14204a","@":"rgba(20,30,70,.55)"},fly:6,head:[13,4],
+  rows:sprPaint(28,34,o=>{ o.disc(13,11,9,9,o.sh("L","b","B")); o.trap(13,14,9,16,12,o.shx("L","b","B")); for(let x=1;x<=26;x+=4){ o.P(x,30,"B"); o.P(x+1,31,"B"); o.P(x+2,32,"B"); }
+    o.disc(9,10,2,2.6,"k"); o.disc(17,10,2,2.6,"k"); o.P(9,9,"e"); o.P(17,9,"e"); o.disc(13,17,2.4,3,"k");
+    o.line(3,14,0,20,"b"); o.line(23,14,27,20,"B"); })}
+};
+delete SPR_NEW["Medusa "];
+function lhOf(n){ return n; }
+Object.assign(SPR, SPR_NEW);
+Object.assign(BOSS_EYES, {"A Morte":"r","Bolrag":"y","Espírito do Rei Anão":"e","Líder Xamã Orc":"r","Rei Amaldiçoado":"g","Rei do Deserto":"r","Rainha Eterna":"g","Miragem Maldita":"r","Escaravelho Gigante Alado":"y","Deus Chacal":"e","Crânio Sagrado":"g","Hagork":"r","Pavão Misterioso":"e","Sacerdotisa Emplumada":"r","Deus Sol":"r","Rei Alquimista":"g","Abominação Alquímica":"r","Fera Tóxica":"y","Monstrinho Inflamável":"w","Animal":"r","Zumbi":"r","Fantasma":"e"});
+Object.assign(SPR_BOSSES, {
+  "Cidadela":["A Morte","Bolrag","Minotauro","Espírito do Rei Anão","Líder Xamã Orc","Rei Amaldiçoado"],
+  "Pirâmide":["Imperador Escorpião","Rei do Deserto","Rainha Eterna","Miragem Maldita","Escaravelho Gigante Alado","Deus Chacal"],
+  "Zigurate":["Medusa","Crânio Sagrado","Hagork","Pavão Misterioso","Sacerdotisa Emplumada","Deus Sol"],
+  "Laboratório":["Rei Alquimista","Abominação Alquímica","Bolha Explosiva","Fera Tóxica","Monstrinho Inflamável"],
+  "Necrópole":["Animal","Esqueleto","Zumbi","Fantasma","Necromante","Lich"]
+});
+Object.assign(SPR_COMMON_BY_DUNGEON, {
+  "Cidadela":["Líder Orc","Esqueleto de Anão","Fantasma Anão","Golem Ossos e Pedra"],
+  "Pirâmide":["Sacerdotisa Mumificada","Soldado Mumificado","Múmia","Escaravelho Gigante","Estátua do Deus Chacal"],
+  "Zigurate":["Líder de Tribo Javaligor","Soldado Javaligor","Goblin Assassino","Pantera","Morcego Gigante","Estátua do Deus Sol","Serpente Emplumada"],
+  "Laboratório":["Ogro Costurado","Olho Flutuante","Zumbi Tóxico","Cadeira Viva","Bolha Assassina","Rato Mutante","Cão Tóxico"]
+});
+
 
 /* =========================================================
    VISUAL MASMORRA (32×32 por quadrado, vista 3/4)
@@ -2759,6 +3421,13 @@ const PALZ = {
   5:{S:["#1e2c18","#2c4024","#3e5a32","#527444","#6a8e58","#88aa72","#b0cc98"],F:["#26341e","#344628","#445a34","#546e42","#668452","#7a9a64"],acc:"#2c6c30",acc2:"#5aa848",acc3:"#1e4a20"},
   6:{S:["#1a2624","#2b3e3a","#405a53","#55756c","#6f9186","#97b8ab","#c2dccf"],F:["#1d2a27","#2c3d38","#3b5049","#4a6259","#5a7469","#6c867a"],acc:"#225a90",acc2:"#62a6d6",acc3:"#17406a"}
 };
+Object.assign(PALZ, {
+  7:{S:["#22262e","#323844","#48505e","#626c7c","#7e8a9c","#a2aebe","#ccd6e2"],F:["#2a2c30","#3a3d42","#4c5056","#5e636a","#72787f","#888f96"],acc:"#c89a3a",acc2:"#f0d070",acc3:"#7a5a1a"},
+  8:{S:["#5a4424","#7a5e34","#9a7a46","#b8965a","#d0b070","#e4c88a","#f4e2b0"],F:["#7a6038","#94784a","#ac905c","#c2a670","#d6bc86","#e8d29e"],acc:"#2a8a9a",acc2:"#6ac8d0",acc3:"#c8a030"},
+  9:{S:["#1e2a22","#2e3e32","#425646","#5a705c","#768e76","#98ae94","#c0d2b8"],F:["#2a3226","#3a4434","#4a5642","#5c6a52","#6e7e62","#829476"],acc:"#c83a2a",acc2:"#e8c040",acc3:"#2a8a4a"},
+  10:{S:["#1c1e1a","#2a2e26","#3c4234","#505844","#687258","#848e70","#aab494"],F:["#24261e","#32352a","#424636","#525844","#646a52","#787e64"],acc:"#6af040",acc2:"#c8ff90",acc3:"#2a7a1a"},
+  11:{S:["#1e1a24","#2c2634","#3e3648","#524a5e","#6a6278","#8a8296","#b4aec0"],F:["#221e26","#302a34","#3e3844","#4e4654","#5e5666","#706878"],acc:"#e8e0cc",acc2:"#a080d0",acc3:"#5a3a7a"}
+});
 const WATER = ["#0f2840","#17406a","#225a90","#3478b0","#62a6d6","#b6e2f6","#eefaff"];
 const WOOD = ["#2a170a","#4a2a12","#6a3e1c","#8c5628","#ae7036"];
 const IRON = ["#22252e","#3c4150","#61687a","#9aa2b6"];
@@ -3815,7 +4484,7 @@ function spellSummary(dr){ return Object.entries(buildSpells(dr)).map(([n,q])=>q
 function itemActs(it, i){
   const acts = [];
   const noArmor = raceT("noArmor") || raceT("ogro"), noPot = raceT("ogro");
-  if(it.slot) acts.push(`<button class="use" data-act="equip" data-i="${i}" ${noArmor?"disabled":""}>Vestir</button>`);
+  if(it.slot) acts.push(`<button class="use" data-act="equip" data-i="${i}" ${noArmor || (it.slot === "Botas" && mutated("dedo")) || cursedOn(/^Anel do Morto/) ?"disabled":""}>Vestir</button>`);
   const h0 = state.hero;
   if(isShield(it)) acts.push(`<button class="use" data-act="wieldShield" data-i="${i}" ${handsLeft() >= 1 ? "" : "disabled"}>Empunhar escudo</button>`);
   if(it.weapon){
@@ -3831,12 +4500,13 @@ function itemActs(it, i){
   const inDg = state.dungeon && state.dungeon.inside;
   const combatOnly = /^Poção da Fúria/.test(it.n) || (sp && !/^(Cura|Luz)$/.test(sp) && !(sp === "Teletransporte" && inDg));
   if(/^Vela dos Protetores/.test(it.n)) acts.push(`<button class="use" data-act="useItem" data-i="${i}">Acender</button>`);
-  if(/^Poção|^Pergaminho|^Safira/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="useItem" data-i="${i}" ${noPot && /^Poção|^Pergaminho/.test(it.n)?"disabled":""}>Usar</button>`);
+  const farBad = /^Poção do Lugar Distante/.test(it.n) && (!state.world || inDg);
+  if(/^Poção|^Pergaminho|^Safira|^Barril de Cerveja|^Fruta Estranha|^Bebida Doce|^Rubi/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="useItem" data-i="${i}" ${(noPot && /^Poção|^Pergaminho/.test(it.n)) || farBad || (/^Rubi da Durabilidade/.test(it.n) && !ARMOR_SLOTS.some(sl=>h0.armor[sl])) || (/^Rubi de Encantamento/.test(it.n) && h0.weapon.unarmed) ?"disabled":""}>${/^Rubi/.test(it.n) ? "Colar" : /^Barril|^Bebida/.test(it.n) ? "Beber" : /^Fruta/.test(it.n) ? "Comer" : "Usar"}</button>`);
   if(/^Apito Goblin/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="whistle" data-i="${i}">Apitar</button>`);
   if(COOP.on() && COOP.partner() && !combatOnly){ const pt = COOP.partner(), full = pt.lite && pt.lite.bagN >= pt.lite.bagMax;
     acts.push(`<button class="use" data-act="giveItem" data-i="${i}" ${!COOP.online(pt) || full || pt.dead || it.locked ? "disabled" : ""}>Enviar para ${esc(pt.name)}</button>`); }
   if((it.weapon || it.slot) && !combatOnly && !(state.combat)) partyOf("merc").filter(p=>!(MERCS[p.n] && (MERCS[p.n].noGear || MERCS[p.n].nofight))).forEach(p=>acts.push(`<button class="use" data-act="giveMerc" data-i="${i}" data-id="${p.id}">Dar para ${esc(p.n)}</button>`));
-  acts.push(`<button class="use" data-act="drop" data-i="${i}">Descartar</button>`);
+  acts.push(`<button class="use" data-act="drop" data-i="${i}" ${isCursed(it) ? "disabled" : ""}>Descartar</button>`);
   if(!combatOnly) acts.push(`<button class="use lockact ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Destravar":"Travar"} ${esc(itemName(it))}">${lockIcon(!!it.locked)} ${it.locked?"Destravar":"Travar"}</button>`);
   const handNote = () => handsFree() === 0 ? "A única mão que sobra segura a tocha." : !hasLamp() && !raceT("tongue") ? "Todas as mãos estão ocupadas, e a tocha segura uma delas. A Lamparina libera essa mão." : "Todas as mãos estão ocupadas. Desequipe algo para liberar uma.";
   const note = isShield(it) && handsLeft() < 1 ? `<p class="muted small">O escudo ocupa uma mão. ${handNote()}</p>` : it.slot && noArmor ? `<p class="muted small">Sua raça não pode vestir armadura.</p>` : noPot && /^Poção|^Pergaminho/.test(it.n) ? `<p class="muted small">Ogros não usam poções nem pergaminhos.</p>` : combatOnly ? `<p class="muted small">${sp === "Teletransporte" ? "Só dá para usar dentro da masmorra." : "Só dá para usar durante um combate."}</p>` : it.weapon && handsFree() < (it.two ? 2 : 1) ? `<p class="muted small">${it.two ? "Armas de Duas Mãos precisam de duas mãos livres." : ""} ${handNote()}</p>` : "";
@@ -3886,7 +4556,12 @@ function viewSheet(){
   })();
   const sel = state.ui.bagSel;
   const bf = BAG_FILTERS.find(b=>b.k===state.ui.bagFilter);
-  const bag = h.bag.map((it,i)=>bf && !bf.ok(it) ? "" : `<div class="stack" style="gap:6px"><button class="item ${sel===i?"sel":""}" data-act="bagSel" data-i="${i}">${it.locked ? `<span class="muted" style="float:right">${lockIcon(true)}</span>` : ""}${esc(itemName(it))}${descHTML(it)}</button>${sel===i?itemActs(it,i):""}</div>`).join("");
+  /* Peitoral de Couro: até 3 poções ficam num compartimento à parte */
+  const pocket = wearing(/^Peitoral de Couro/) ? h.bag.map((it,i)=>/^Poção/.test(it.n) ? i : -1).filter(i=>i>=0).slice(0,3) : [];
+  const itemRow = (it,i) => `<div class="stack" style="gap:6px"><button class="item ${sel===i?"sel":""}" data-act="bagSel" data-i="${i}">${it.locked ? `<span class="muted" style="float:right">${lockIcon(true)}</span>` : ""}${esc(itemName(it))}${descHTML(it)}</button>${sel===i?itemActs(it,i):""}</div>`;
+  const bagN = h.bag.length - pocket.length, bagLim = bagMax() - pocket.length;
+  const pocketHTML = wearing(/^Peitoral de Couro/) ? `<div class="sheet dashed" style="padding:10px"><span class="label">Poções no Peitoral de Couro <span class="n">${pocket.length}/3</span></span>${pocket.length ? pocket.map(i=>itemRow(h.bag[i], i)).join("") : `<p class="muted small">Vazio. As primeiras 3 poções da mochila ficam aqui.</p>`}</div>` : "";
+  const bag = h.bag.map((it,i)=>(bf && !bf.ok(it)) || pocket.includes(i) ? "" : itemRow(it,i)).join("");
   const spells = Object.entries(h.spells);
   const spellHTML = spells.map(([n,s])=>`
     <div class="spell">
@@ -3903,6 +4578,10 @@ function viewSheet(){
   ${bar("Ficha")}
   ${nav}
   ${legacyMsg}
+  ${state.ui.ruby != null && h.bag[state.ui.ruby] ? (()=>{ const it = h.bag[state.ui.ruby], dur = /Durabilidade/.test(it.n);
+    const opts = dur ? ARMOR_SLOTS.filter(sl=>h.armor[sl]).map(sl=>`<button class="dbtn" data-act="rubyOn" data-s="${sl}">${esc(h.armor[sl].n.split(" (")[0])}</button>`)
+      : [["weapon", h.weapon], ...offs(h).map((w,k)=>["off"+k, w])].filter(([,w])=>w && !w.unarmed && !w.shield).map(([k,w])=>`<button class="dbtn" data-act="rubyOn" data-s="${k}">${esc(w.n.split(" (")[0])}</button>`);
+    return `<div class="sheet dashed"><p class="small">${dur ? "Rubi da Durabilidade: escolha a peça de armadura que vai ganhar +2 PV." : "Rubi de Encantamento: escolha a arma que vai ganhar +1 de dano."}</p><div class="dlist">${opts.join("")}</div><button class="btn ghost" data-act="rubyCancel">Cancelar</button></div>`; })() : ""}
   <div class="sheet">
     <div class="hero-head">
       <span class="label">${esc(raceName(h))} ${esc(classLabel(h))}</span>
@@ -3951,8 +4630,8 @@ function viewSheet(){
   ${partySheetHTML()}
   <div class="sheet"><h3>Armadura</h3><div class="slots">${armor}</div>${eq && eq!=="weapon" && !/^off/.test(eq) ? eqActs : ""}${wearing(/^Chapéu do Bobo/) ? `<p class="muted small">Com o Chapéu do Bobo você não consegue Mover em Silêncio.</p>` : ""}</div>
   <div class="sheet">
-    ${foldHead("bag", "Mochila", h.bag.length ? bagTools() : "")}
-    ${isFolded("bag") ? "" : `${bag || (bf && h.bag.length ? `<p class="muted small">Nenhum item de ${bf.n.toLowerCase()} na mochila.</p>` : `<p class="muted small">Vazia. Itens encontrados nas masmorras aparecem aqui.</p>`)}
+    ${foldHead("bag", `Mochila <span class="n" style="font-size:12px">${bagN}${isFinite(bagLim) ? "/" + bagLim : ""}</span>`, h.bag.length ? bagTools() : "")}
+    ${isFolded("bag") ? "" : `${pocketHTML}${bag || (bf && h.bag.length ? `<p class="muted small">Nenhum item de ${bf.n.toLowerCase()} na mochila.</p>` : `<p class="muted small">Vazia. Itens encontrados nas masmorras aparecem aqui.</p>`)}
     ${h.provisions ? `<div class="row" style="align-items:center;justify-content:space-between"><p class="small">Provisões: ${N(h.provisions)}</p>${raceT("fungo") ? `<button class="use" data-act="eat">Comer (1d6 PV)</button>` : ""}</div>` : ""}`}
   </div>
   ${spells.length ? `<div class="sheet">${foldHead("spells","Magias")}${isFolded("spells") ? "" : `${state.ui.recharge ? `<div class="sheet dashed" style="padding:10px"><p class="small">Recarregar Mana: escolha a magia que recupera 1 uso.</p><div class="dlist">${rechargeable().map(n=>`<button class="dbtn" data-act="rechargeOut" data-n="${esc(n)}">${n} ${h.spells[n].left}/${h.spells[n].max}</button>`).join("")}</div><button class="btn ghost" data-act="rechargeOutCancel">Cancelar</button></div>` : ""}${state.ui.stonePick ? `<div class="sheet dashed" style="padding:10px"><p class="small">Armadura de Pedra: escolha a peça que a magia vai criar (5 PV).</p><div class="dlist">${freeSlots().map(sl=>`<button class="dbtn" data-act="stoneOut" data-s="${sl}">${sl}</button>`).join("")}</div><button class="btn ghost" data-act="stoneOutCancel">Cancelar</button></div>` : ""}${h.shield ? `<p class="small">Escudo Mágico ativo: absorve ${h.shield} de dano.</p>` : ""}${spellHTML}<p class="muted small">Magias gastas voltam ao descansar na cidade.</p>`}</div>` : ""}
@@ -3983,6 +4662,9 @@ function viewSheet(){
     ${isFolded("adv") ? "" : `<p class="adv"><b>${R(h.race).n}:</b> ${raceAdvHTML(R(h.race))}</p>
     ${h.race2 && R(h.race2) ? `<p class="adv"><b>${R(h.race2).n} (herdada):</b> ${raceAdvHTML(R(h.race2))}</p>` : ""}
     <p class="adv"><b>${CLASSES[h.cls].n}:</b> ${CLASSES[h.cls].adv}</p>
+    ${(h.marks||[]).length ? `<p class="adv"><b>Marcas:</b> ${h.marks.map(esc).join(" ")}</p>` : ""}
+    ${h.zpot ? `<p class="adv"><b>Poção Zumbi:</b> se morrer, volta como zumbi com 1 PV máximo.</p>` : ""}
+    ${h.sunBless ? `<p class="adv"><b>Luz divina:</b> +1 de dano em todos os ataques nesta exploração.</p>` : ""}
     ${(h.adv||[]).map(n=>`<p class="adv"><b>${n}:</b> ${ADV_BY_NAME[n].adv}${ADV_BY_NAME[n].how ? ` <span class="muted small">${ADV_BY_NAME[n].how}</span>` : ""}</p>`).join("")}`}
   </div>
   ${state.ui.confirmDeath ? `
@@ -4123,6 +4805,7 @@ function viewExplore(){
     if(seg.loot) acts.push(`<button class="btn" data-act="loot">Pegar: ${lootText(seg.loot)}</button>`);
     if(seg.stash && seg.stash.length && !state.ui.bagFull) acts.push(`<button class="btn" data-act="takeStash">Itens deixados aqui (${seg.stash.length})</button>`);
     if(seg.chests>0) acts.push(`<button class="btn" data-act="chest">Abrir baú</button>`);
+    if(seg.fx === "k" && !seg.drank) acts.push(`<button class="btn ghost" data-act="cauldron">Beber do caldeirão <small>(role na tabela de Poção)</small></button>`);
     if(seg.secret && !seg.secretTried) acts.push(`<button class="btn ghost" data-act="secret">Procurar passagem secreta <small>(1 tocha)</small></button>`);
     if(seg.k==="room" && !seg.disarmed && !seg.final) acts.push(seg.trapSeen
       ? `<button class="btn ghost" data-act="disarm">Desarmar armadilhas <small>(1 tocha)</small></button>`
@@ -4215,6 +4898,7 @@ function sellValue(it){
   const h = state.hero;
   let v;
   if(/2d6×10/.test(it.n)) v = rollExpr("2d6")*10;
+  else if(/vale 3d6 moedas/.test(it.n)) v = rollExpr("3d6");
   else { const m = it.n.match(/vale (\d+) moedas/); v = m ? +m[1] : it.magic ? Math.max(0, d6()-1) : 1; }
   if(raceT("catSell") && (it.weapon || it.slot)) v *= 2;
   if(hasClass("Colecionador") && it.slot) v = Math.max(v, 5);
@@ -4266,7 +4950,7 @@ function viewCity(){
   ${wc ? worldCityBottom() : ""}
   <div class="sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>Vender</h3>${h.bag.length > 1 ? sortBtn() : ""}</div>
-    ${h.bag.length ? h.bag.map((it,i)=>`<div class="spell"><button class="lockb ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Desbloquear":"Bloquear"} a venda de ${esc(itemName(it))}">${lockIcon(!!it.locked)}</button><div class="txt">${esc(itemName(it))}${descHTML(it)}</div><button class="use" data-act="sell" data-i="${i}" ${it.locked?"disabled":""}>Vender</button></div>`).join("")
+    ${h.bag.length ? h.bag.map((it,i)=>`<div class="spell"><button class="lockb ${it.locked?"on":""}" data-act="lockItem" data-i="${i}" aria-pressed="${!!it.locked}" aria-label="${it.locked?"Desbloquear":"Bloquear"} a venda de ${esc(itemName(it))}">${lockIcon(!!it.locked)}</button><div class="txt">${esc(itemName(it))}${descHTML(it)}</div><button class="use" data-act="sell" data-i="${i}" ${it.locked || isCursed(it) ?"disabled":""}>${isCursed(it) ? "Maldito" : "Vender"}</button></div>`).join("")
       : `<p class="muted small">Nada para vender.</p>`}
     <p class="muted small">Itens comuns valem 1 moeda. Itens mágicos valem 1d6−1. Toque no cadeado para impedir a venda de um item.</p>
   </div>
@@ -4365,6 +5049,7 @@ function heroDamageBonus(u, W){
   const h = state.hero; let b = 0; W = W || h.weapon;
   const wm = (W.n || "").match(/causa \+(\d) de dano(?! contra)/); if(wm) b += +wm[1];
   if(/contra Anjos/.test(W.n) && /Anjo/.test(u.name)) b += 2;
+  b += contraBonus(u, W);
   if(/contra Vampiro e Carniçal/.test(h.bag.map(i=>i.n).join("|")) && /Vampir|Carniçal/.test(u.name)) b += 1;
   ARMOR_SLOTS.forEach(s=>{ const p = h.armor[s]; if(p && /da Força/.test(p.n)) b += +((p.n.match(/causará \+(\d)/)||[])[1] || 1); });
   if(ARMOR_SLOTS.some(s=>h.armor[s] && /Escamas/.test(h.armor[s].n)) && /Serpente/.test(u.name)) b += 1;
@@ -4384,7 +5069,7 @@ async function hitMonster(i, base, opts){
   const W = opts.w || state.hero.weapon;
   if(/Matador de Dragões/.test(W.n) && /Dragão/.test(u.name) && !opts.spell) dmg *= 2;
   if(has(u,"Corpo de Pedra") && dmg <= 3){ cLog(`${u.name} ignora ${dmg} de dano com o corpo de pedra.`); dmg = 0; }
-  if(has(u,"Intangível") && dmg % 2 === 0 && dmg > 0 && !(/Remo do Barqueiro/.test(W.n) && !opts.spell) && !(hasClass("Caça-Fantasma") && opts.firstHit)){ cLog(`O golpe atravessa ${u.name}: dano par não afeta seres intangíveis.`); dmg = 0; }
+  if(has(u,"Intangível") && dmg % 2 === 0 && dmg > 0 && !(/Remo do Barqueiro/.test(W.n) && !opts.spell) && !(wearing(/^Máscara da Coruja/) && !opts.spell) && !(hasClass("Caça-Fantasma") && opts.firstHit)){ cLog(`O golpe atravessa ${u.name}: dano par não afeta seres intangíveis.`); dmg = 0; }
   if(opts.vorpal){ dmg = u.pv; cLog(`Vorpal! ${u.name} morre na hora.`); }
   u.pv = Math.max(0, u.pv - dmg);
   monHit[i] = performance.now() + 300;
@@ -4398,7 +5083,7 @@ async function hitMonster(i, base, opts){
       rollNote(r === 1 ? "Levanta de novo!" : "Fica no chão");
       if(r === 1){ u.pv = 1; cLog(`${u.name} se levanta de novo com 1 PV!`); pop(i, "+1", "#6af06a"); }
     }
-    if(u.pv <= 0 && !u.counted){ u.counted = true; if(!opts.ally) recordKill(u); }
+    if(u.pv <= 0 && !u.counted){ u.counted = true; if(!opts.ally){ recordKill(u); onHeroKill(u, opts.spell ? null : W); } }
   }
 }
 function pickNextTarget(){ const c = C(); if(c.units[c.sel] && c.units[c.sel].pv > 0) return; const i = c.units.findIndex(u=>u.pv>0); if(i>=0) c.sel = i; }
@@ -4414,19 +5099,22 @@ async function heroAttack(kind, wn){
   const c = C(), h = state.hero, u = c.units[c.sel];
   if(!u || u.pv<=0) return;
   busy = true; rollLog = []; lockButtons(); const tr = $("#etray"); if(tr) tr.innerHTML = "";
-  const W = typeof wn === "number" && offs(h)[wn] && !offs(h)[wn].shield ? offs(h)[wn] : h.weapon;
-  const expr = kind === "horn" ? "1d6" : W.d;
-  const [die] = await roll(kind === "horn" ? "Chifre" : "Ataque", 1);
+  let W = typeof wn === "number" && offs(h)[wn] && !offs(h)[wn].shield ? offs(h)[wn] : h.weapon;
+  const bite = kind === "bite" && h.armor.Elmo && h.armor.Elmo.bite ? h.armor.Elmo.bite : null;
+  if(kind === "bite"){ kind = "horn"; if(bite) W = {n:"Capacete de Crocodilo", d:bite}; }
+  const expr = bite || (kind === "horn" ? "1d6" : W.d);
+  const [die] = await roll(bite ? "Mordida" : kind === "horn" ? "Chifre" : "Ataque", 1);
   const mod = +((expr.match(/([+-]\d+)$/)||[])[1] || 0);
   const firstHit = !c.hits; c.hits = (c.hits||0) + 1;
   let base = die + mod + heroDamageBonus(u, W);
   const vorpal = /Vorpal/.test(W.n) && die === 6 && kind !== "horn";
-  cLog(`Você ${kind==="horn" ? "dá uma chifrada" : "ataca com " + W.n.split(" (")[0]}: ${die}${mod?(mod>0?"+":"")+mod:""}${heroDamageBonus(u, W)?" +"+heroDamageBonus(u, W):""} = ${Math.max(0,base)}.`);
+  cLog(`Você ${bite ? "morde com o Capacete de Crocodilo" : kind==="horn" ? "dá uma chifrada" : "ataca com " + W.n.split(" (")[0]}: ${die}${mod?(mod>0?"+":"")+mod:""}${heroDamageBonus(u, W)?" +"+heroDamageBonus(u, W):""} = ${Math.max(0,base)}.`);
   if(firstHit && hasClass("Assassino") && base > 0){ base *= 3; cLog(`Assassino: o primeiro golpe causa o triplo (${base}).`); }
   heroAtk = {t0: performance.now(), i: c.sel, kind: kind === "horn" ? "fist" : W.unarmed ? "fist" : weaponKind(W.n)};
   await new Promise(r=>setTimeout(r, 300));
   await hitMonster(c.sel, base, {die, vorpal, w:W, firstHit});
-  if(/Vampírica/.test(W.n) && kind !== "horn"){ h.pv = Math.min(h.pvMax, h.pv+1); cLog("A arma vampírica te devolve 1 PV."); }
+  if(kind !== "horn" && /Setenta Noites/.test(W.n) && die === 6 && u.pv > 0){ u.frozen = 2; cLog(`${u.name} fica paralisado por 2 turnos!`); }
+  if(/Vampíric[ao]/.test(W.n) && kind !== "horn"){ h.pv = Math.min(h.pvMax, h.pv+1); cLog("A arma vampírica te devolve 1 PV."); }
   if(die === 1 && raceT("goblin")){
     const self = Math.max(0, 5 - (hasClass("Goblinator") ? 2 : 0));
     cLog("Você tirou 1 e explode! 5 de dano em todos da sala.");
@@ -4536,7 +5224,7 @@ async function runMonsterTurn(){
     if(u.doom){ cLog(`${u.name} desfere o golpe de Morte Súbita!`); 
       if(ARMOR_SLOTS.some(s=>h.armor[s] && /dos Deuses/.test(h.armor[s].n))){ cLog("A armadura dos Deuses te protege da Morte Súbita."); u.doom = false; }
       else { finishDeath(`Morte Súbita de ${u.name}`); return; } }
-    let dmg = u.dano;
+    let dmg = Math.max(0, u.dano - monDmgCut(u));
     if(u.fireNext){ u.fireNext = false; if(raceT("fireproof")) cLog(`${u.name} ataca envolto em fogo, mas você é imune.`); else { dmg += 10; cLog(`${u.name} ataca envolto em fogo: +10 de dano!`); } }
     if(u.magicNext){ dmg += u.magicNext; cLog(`A magia de ${u.name} soma ${u.magicNext} ao dano.`); u.magicNext = 0; }
     if(u.paralNext){ const [p] = await roll("Paralisia", 1); c.heroPar = p; u.paralNext = false; cLog(`${u.name} te paralisa por ${p} turno${p>1?"s":""}!`); }
@@ -4557,7 +5245,7 @@ async function runMonsterTurn(){
     }
     if(c.ethereal && dmg > 0) dmg -= 1;
     if(hasShield() && dmg > 0){ dmg = Math.max(0, dmg - shieldVal()); }
-    if(has(u,"Veneno")) poison += dmg; else total += dmg;
+    if(has(u,"Veneno") && !poisonImmune()) poison += dmg; else total += dmg;
     monAtk[i] = performance.now() + 320;
     if(!exploded) cLog(`${u.name} ataca: ${dmg} de dano${has(u,"Veneno") ? " de veneno" : ""}.`);
   }
@@ -4838,6 +5526,7 @@ function viewCombat(){
       ${offWeapons(h).map(({w,i})=>`<button class="btn" data-act="attack" data-w="${i}">Atacar com ${esc(w.n.split(" (")[0])} <small>(${w.d})</small></button>`).join("")}`}
       ${raceT("zumbi") ? `<button class="btn ghost" data-act="playDead">Fingir de morto e fugir</button>` : ""}
       ${raceT("horn") ? `<button class="btn ghost" data-act="horn">Chifrada <small>(1d6)</small></button>` : ""}
+      ${h.armor.Elmo && h.armor.Elmo.bite ? `<button class="btn ghost" data-act="bite">Mordida do Capacete de Crocodilo <small>(${h.armor.Elmo.bite})</small></button>` : ""}
       ${hasItem(/^Apito Goblin/) >= 0 && c.units.some(u=>u.pv > 0 && /^Goblin/.test(u.key)) ? `<button class="btn ghost" data-act="cwhistle">Usar Apito Goblin</button>` : ""}
       ${spells.length ? `<span class="label">Magias</span><div class="dlist">${spells.map(([n,s])=>`<button class="dbtn" data-act="cspell" data-n="${esc(n)}">${n} ×${s.left}</button>`).join("")}</div>` : ""}
       ${items.length ? `<span class="label">Itens</span><div class="dlist">${items.map(({it,i})=>`<button class="dbtn" data-act="citem" data-i="${i}">${esc(/^Pergaminho Mágico \(/.test(it.n) ? "Pergaminho: " + it.n.match(/\((.+)\)/)[1] : it.n.split(" (")[0])}</button>`).join("")}</div>` : ""}
@@ -5015,7 +5704,7 @@ const DG_TYPE = {
   pa:["Cripta","Tumba","Santuário","Templo","Calabouço","Necrópole"],
   de:["Calabouço","Palácio","Santuário","Templo","Pirâmide","Pirâmide"]
 };
-const DG_ID = {"Palácio":1,"Cripta":2,"Tumba":3,"Santuário":4,"Templo":5,"Calabouço":6};
+const DG_ID = {"Palácio":1,"Cripta":2,"Tumba":3,"Santuário":4,"Templo":5,"Calabouço":6,"Cidadela":7,"Pirâmide":8,"Zigurate":9,"Laboratório":10,"Necrópole":11};
 /* nomes elaborados: 3d6 em cada coluna (página 29) */
 const WN2 = {3:["Sagrado","Sagrada"],4:["Opaco","Opaca"],5:["Traiçoeiro","Traiçoeira"],6:["Sangrento","Sangrenta"],7:["Sinistro","Sinistra"],8:["Nebuloso","Nebulosa"],9:["Secreto","Secreta"],10:["Perdido","Perdida"],11:["Amaldiçoado","Amaldiçoada"],12:["Maligno","Maligna"],13:["Abandonado","Abandonada"],14:["Sujo","Suja"],15:["Rachado","Rachada"],16:["Torto","Torta"],17:["Fedorento","Fedorenta"],18:["Demoníaco","Demoníaca"]};
 const WN3 = {3:["do Anjo","m"],4:["da Estátua","f"],5:["da Serpente","f"],6:["da Estrada","f"],7:["do Vale","m"],8:["do Monte","m"],9:["do Segredo","m"],10:["do Rei","m"],11:["da Rainha","f"],12:["do Horror","m"],13:["do Caminho","m"],14:["da Morte","f"],15:["da Feiticeira","f"],16:["do Guerreiro","m"],17:["do Cão","m"],18:["do Inferno","m"]};
@@ -5155,7 +5844,7 @@ function travelCost(k){
   if(t === "de" && (raceIs("Tri-kri-kri") || hasAlly("Camelo"))) c = 1;
   if(t === "mo" && (raceIs("Meio-Cabra") || hasAlly("Llama") || hasAlly("Bode"))) c = Math.min(c, raceIs("Meio-Cabra") ? 1 : 2);
   if(t === "fl" && (wearing(/^Botas Élficas/) || hasAlly("Coruja") || hasAlly("Lobo Gigante"))) c = 1;
-  if(t === "pa" && hasAlly("Raptor")) c = 1;
+  if(t === "pa" && (hasAlly("Raptor") || wearing(/^Botas Emplumadas/))) c = 1;
   if(hasAlly("Grifo")) c = 1;
   if(t === "pl" && hasAlly("Cavalo") && w.horse) c = 0;
   if(raceIs("Pandakhan")) c *= 2;
@@ -5226,8 +5915,29 @@ async function arriveHex(k, fly){
     else { rollNote("Nada"); wLog("Você passa pelos corais sem problemas."); }
     return;
   }
+  if(loc && loc.k === "ruins" && !hx.dg){ await ruinsRoll(k); return; }
   if(loc) return;
   if(fly) return;
+  await travelEvent(k);
+}
+/* ruínas: o tipo de masmorra depende do terreno (página 31) */
+async function ruinsRoll(k){
+  const w = WD(), hx = w.hex[k], tab = RUINS_TABLE[hx.t] || RUINS_TABLE.pl;
+  let type = 0;
+  for(let g=0; g<12 && !type; g++){
+    const v = await roll("Ruínas", 2), sm = v[0]+v[1], t = tab[ruinsRow(sm)];
+    if(t){ type = t; rollNote(DUNGEONS[t].n); } else rollNote(sm >= 12 ? "Masmorra única: em breve, rola de novo" : "Caverna: em breve, rola de novo");
+  }
+  if(!type) type = tab[1];
+  const parts = [];
+  for(const lb of ["Nome (parte 2)","Nome (parte 3)","Nome (parte 4)"]){ const v = await roll(lb, 3); parts.push(v[0]+v[1]+v[2]); }
+  const name = worldDungeonName(type, parts[0], parts[1], parts[2]);
+  hx.dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type, name, dice:parts};
+  wLog(`Nas ruínas você encontra a entrada d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}.`);
+}
+function starOk(){ const h = state.hero; return !!h && hasItem(/^Pedra das Estrelas/) >= 0 && (h.provisions||0) >= 1; }
+async function travelEvent(k){
+  const w = WD(), h = state.hero, hx = w.hex[k];
   const v = await roll("Evento na viagem", 2), s = v[0] + v[1];
   if(s >= 7){ rollNote("Nada acontece"); return; }
   const ev = EVENTS_HOT[hx.t][s === 2 ? 0 : s <= 4 ? 1 : 2];
@@ -5235,7 +5945,7 @@ async function arriveHex(k, fly){
   if(ev.k === "clima"){
     if(raceIs("Aesir")){ wLog(`${ev.n}: como Aesir, você é imune ao clima.`); return; }
     if(ignoresEvents(h)){ wLog(`${ev.n}: você ignora o evento.`); return; }
-    if(camoOk(hx.t)){ w.ev = {...ev}; return; }
+    if(camoOk(hx.t) || starOk()){ w.ev = {...ev}; return; }
     await applyClimate(ev);
     return;
   }
@@ -5606,6 +6316,44 @@ function locSprite(key, f){
     walls(30, B-9, 8, 9, STONE_G); rect(30, B-11, 3, 2, STONE_G[1]); rect(12, B-6, 6, 6, STONE_G[1]); rect(24, B-4, 6, 4, STONE_G[1]);
     for(let i=0;i<14;i++){ const x = 12 + n(i,1)*18, y = B-2 + n(1,i)*3; P(x,y,STONE_G[n(x,y)<.5?0:2]); }
     rect(16, B-3, 10, 4, (i,j)=> j===0 ? "#8a5a2a" : (i%3===0 ? "#4a2e18" : "#6a4424")); rect(20, B-2, 2, 1, "#c8a040"); });
+  if(key === "dg7") cv = pixCanvas(42, 36, ({P,rect,tri,line,n,B})=>{   /* Cidadela: hall esculpido na montanha, estátuas de anões */
+    const ROCK = ["#9a9088","#7a7068","#544c46"];
+    tri(21, B-32, 20, 32, ROCK);
+    for(let i=0;i<14;i++){ const x = 6 + n(i,4)*30, y = B-26 + n(4,i)*22; P(x, y, ROCK[2]); }
+    rect(12, B-17, 18, 17, (i,j)=> i===0||i===17||j===0 ? "#3a3632" : "#4a4640");
+    rect(15, B-14, 12, 14, (i,j)=> i===0 ? "#a8a29a" : i===11 ? "#6a645c" : j%5===4 ? "#7a746c" : "#8e887e"); rect(20, B-14, 2, 14, "#5a544c");
+    rect(14, B-19, 14, 2, "#c8a040");
+    [[7,B],[34,B]].forEach(([x,b],k)=>{ rect(x-1, b-9, 3, 7, (i)=> i===0 ? "#b8b2aa" : "#8a847c"); rect(x-1, b-11, 3, 2, "#c8c2ba"); P(x, b-12, "#c8c2ba"); rect(x-1, b-10, 3, 1, "#e8e0c8");
+      const dx = k ? -1 : 1; line(x+dx*2, b-13, x+dx*2, b-4, "#6a4424"); rect(x+dx*2-(k?1:0), b-14, 2, 3, "#c8ccd4"); rect(x-2, b-2, 5, 2, "#6a645c"); }); });
+  if(key === "dg8") cv = pixCanvas(46, 32, ({P,rect,tri,n,B})=>{   /* Pirâmide: estrutura de pedra, areia e uma pequena entrada */
+    const SA = ["#f0d494","#d4b06c","#a8864a"];
+    tri(23, B-27, 22, 27, SA);
+    for(let j=4;j<27;j+=4){ const hw = Math.round(22*(j+1)/27); for(let i=-hw+1;i<hw-1;i++) if(n(i,j) > .3) P(23+i, B-27+j, i < 0 ? "#c8a464" : "#94763e"); }
+    rect(20, B-5, 6, 5, DOOR); rect(24, B-6, 5, 6, (i)=> i===0 ? "#c8b8a0" : "#9a8a72");
+    for(let i=0;i<46;i++){ const h = Math.round(1.5 + Math.sin(i*.35)*1.2); for(let k=0;k<h;k++) P(i, B-k+1, k===h-1 ? "#f4dca4" : "#e0c080"); } });
+  if(key === "dg9") cv = pixCanvas(44, 36, ({P,rect,walls,n,B})=>{   /* Zigurate: estrutura piramidal com escadaria até um poço */
+    const ZS = ["#a8b498","#7e8c70","#56624a"];
+    walls(3, B-7, 38, 7, ZS); walls(8, B-14, 28, 7, ZS); walls(13, B-21, 18, 7, ZS); walls(17, B-27, 10, 6, ZS);
+    rect(19, B-27, 6, 27, (i,j)=> j%2 ? "#c8d0b8" : "#9aa68a");
+    rect(20, B-29, 4, 2, DOOR); P(26, B-30, "#8a5a2a"); P(26, B-29, "#8a5a2a"); P(26, B-28, "#8a5a2a");
+    for(let i=0;i<34;i++){ const x = 4 + n(i,5)*36, y = B-22 + n(5,i)*21; if(x > 18 && x < 26) continue; P(x, y, "#3a8a3a"); P(x+1, y, "#2a6a2a"); }
+    [[2,B],[41,B]].forEach(([x,b])=>{ rect(x, b-7, 1, 7, "#3a7a2a"); P(x-1,b-8,"#4aa040"); P(x+1,b-8,"#4aa040"); P(x,b-9,"#4aa040"); P(x-2,b-7,"#3a8a3a"); P(x+2,b-7,"#3a8a3a"); }); });
+  if(key === "dg10") cv = pixCanvas(36, 40, ({P,rect,walls,n,B})=>{   /* Laboratório: torre abandonada em ruínas */
+    const cuts = [0,0,2,2,1,1,4,4,4,0,0,3,3];
+    for(let i=0;i<13;i++){ const x = 11+i, hh = 28 - cuts[i]; for(let k=0;k<hh;k++){ const y = B-hh+k; P(x, y, i===0 ? STONE_G[0] : i===12 ? STONE_G[2] : (n(x,y) < .15 ? STONE_G[2] : (y-B)%5===0 ? STONE_G[2] : STONE_G[1])); } }
+    rect(15, B-22, 4, 5, "#1a2414"); rect(16, B-21, 2, 3, "#6af040"); P(16, B-21, "#c8ff90");
+    rect(15, B-12, 4, 4, "#1a2414"); P(16, B-11, "#6af040");
+    rect(14, B-5, 7, 5, DOOR); rect(14, B-6, 7, 1, "#6a4424");
+    for(let i=0;i<12;i++){ const x = 4 + n(i,8)*28, y = B-1 + n(8,i)*2; P(x, y, STONE_G[n(x,y) < .5 ? 1 : 2]); P(x+1, y, STONE_G[2]); }
+    rect(25, B-4, 5, 4, STONE_G[1]); rect(6, B-3, 4, 3, STONE_G[2]);
+    for(let i=0;i<8;i++){ P(12 + n(i,1)*11, B-26 + n(1,i)*24, "#3a7a2a"); } });
+  if(key === "dg11") cv = pixCanvas(46, 32, ({P,rect,walls,tri,n,B})=>{   /* Necrópole: cemitério cercado com um mausoléu de porta dupla */
+    walls(16, B-13, 14, 13, STONE_D); tri(23, B-19, 9, 6, STONE_D);
+    rect(19, B-9, 8, 9, "#3a3e48"); rect(22, B-9, 2, 9, "#1a1c22"); rect(19, B-9, 8, 1, "#61687a"); P(21, B-5, "#9aa2b6"); P(24, B-5, "#9aa2b6");
+    rect(18, B-12, 10, 2, "#c8c0b0");
+    [[5,B-1],[11,B],[34,B-1],[40,B]].forEach(([x,y])=>{ rect(x, y-5, 4, 5, (i)=> i===0 ? "#a8a2b0" : "#7a7484"); P(x+1, y-6, "#a8a2b0"); P(x+2, y-6, "#7a7484"); P(x+1, y-3, "#4a4454"); P(x+2, y-3, "#4a4454"); });
+    for(let x=1;x<45;x+=3){ rect(x, B-4, 1, 5, "#2a2a34"); P(x, B-5, "#61687a"); }
+    rect(1, B-3, 44, 1, "#2a2a34"); }, false);
   /* ruínas */
   if(key === "ruins") cv = pixCanvas(40, 30, ({P,rect,walls,n,B})=>{
     [[6,14],[14,8],[25,17],[33,6]].forEach(([x,h])=>{ walls(x, B-h, 4, h, STONE_L); for(let k=0;k<3;k++) P(x+n(x,k)*3, B-h-1, STONE_L[1]); rect(x-1, B, 6, 1, STONE_L[2]); });
@@ -5676,7 +6424,7 @@ function drawLoc(ctx, hx, cx, cy){
   if(hx.dg){
     const r = dgRec(hx.dg), done = r && r.complete;
     drawGround(ctx, hx.t, cx, by, 17, 6);
-    put(locSprite("dg" + hx.dg.type), done ? .5 : undefined);
+    if(!(loc && loc.k === "ruins")) put(locSprite("dg" + hx.dg.type), done ? .5 : undefined);
     if(done){ const fx = cx+13, fy = by-16;
       ctx.fillStyle = "#1a1410"; ctx.fillRect(fx-1, fy-1, 8, 6); ctx.fillRect(fx-1, fy, 3, 15);
       ctx.fillStyle = "#6a4424"; ctx.fillRect(fx, fy, 1, 14);
@@ -5724,12 +6472,26 @@ function drawWorld(cv){
   if(w.boat) wSpr(ctx, WS.boat, WSP.boat, -5, -1);
   drawHero(ctx, 0, 0, frame/8, "idle");
   ctx.restore();
+  placeHexPop(cv);
 }
 function wmapTap(wx, wy){
   if(busy) return;
   const w = WD(), k = pxHex(wx, wy);
   if(!w.hex[k]) return;
-  w.sel = w.sel === k || k === w.pos ? null : k;
+  if(state.ui.far){
+    const h = state.hero, i = hasItem(/^Poção do Lugar Distante/);
+    state.ui.far = false;
+    if(i >= 0 && k !== w.pos){ h.bag.splice(i,1); w.pos = k; w.sel = null; w.ev = null; worldReveal(k); wcenterOn = true; wLog(`A Poção do Lugar Distante te leva num piscar de olhos para ${hexDesc(k).toLowerCase()}.`); }
+    persist(); render(); return;
+  }
+  if(k === w.pos){
+    const hx = w.hex[k], r = hx.dg && dgRec(hx.dg);
+    w.sel = null;
+    state.ui.wHere = pcMode() && state.ui.wHere !== k && (worldCityHere() || (hx.dg && !(r && r.complete))) ? k : null;
+    render(); return;
+  }
+  state.ui.wHere = null;
+  w.sel = w.sel === k ? null : k;
   render();
 }
 
@@ -5750,7 +6512,7 @@ function hexExtrasHTML(k, here){
     if(hx.banned) out.push(`<p class="small">Você foi expulso desta cidade e não pode mais entrar.</p>`);
     else if(!canEnterCity(loc)) out.push(`<p class="small">Gente da sua raça não é bem-vinda aqui (Afinidade entre Raças).</p>`);
   }
-  if(loc && loc.k === "ruins") out.push(soonNote("Ruínas que podem ser exploradas como masmorra."));
+  if(loc && loc.k === "ruins" && !hx.dg) out.push(`<p class="small">Ruínas que podem ser exploradas como masmorra.</p>`);
   if(loc && loc.k === "volcano") out.push(soonNote("Há uma Caverna Vulcânica aqui."));
   if(loc && loc.k === "portal") out.push(soonNote("Um portal para lugares desconhecidos."));
   if(loc && loc.k === "corals" && hx.cave) out.push(soonNote("Há uma Caverna Subaquática entre os corais."));
@@ -5774,10 +6536,12 @@ function viewWorld(){
       ${traitsHTML(e.tr)}</div>
       <div class="stack"><button class="btn" data-act="wFight">Lutar</button>
       ${ignoresEvents(h) ? `<button class="btn ghost" data-act="wIgnore">Ignorar o encontro <small>(vantagem da raça)</small></button>` : ""}
-      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(${h.spells["Camuflagem"].left} uso${h.spells["Camuflagem"].left>1?"s":""})</small></button>` : ""}</div></div>`;
+      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(${h.spells["Camuflagem"].left} uso${h.spells["Camuflagem"].left>1?"s":""})</small></button>` : ""}
+      ${starOk() ? `<button class="btn ghost" data-act="wStar">Rerrolar com a Pedra das Estrelas <small>(1 provisão)</small></button>` : ""}</div></div>`;
     else evHTML = `<div class="sheet"><h3>${esc(e.n)}</h3><p>${esc(e.txt)}</p><div class="stack">
       <button class="btn" data-act="wClimate">Seguir em frente</button>
-      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(ignora o evento)</small></button>` : ""}</div></div>`;
+      ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(ignora o evento)</small></button>` : ""}
+      ${starOk() ? `<button class="btn ghost" data-act="wStar">Rerrolar com a Pedra das Estrelas <small>(1 provisão)</small></button>` : ""}</div></div>`;
   }
   let selHTML = "";
   if(sel){
@@ -5794,10 +6558,13 @@ function viewWorld(){
   const acts = [];
   if(town) acts.push(`<button class="btn" data-act="go" data-to="city">Entrar na ${esc(locLabel(hereLoc))}</button>`);
   if(here.dg && !(r && r.complete)) acts.push(`<button class="btn" data-act="wEnterDg" ${w.ev?"disabled":""}>${r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra"}</button>`);
+  if(hereLoc && hereLoc.k === "ruins" && !here.dg) acts.push(`<button class="btn" data-act="wRuins" ${w.ev?"disabled":""}>Explorar as ruínas</button>`);
+  if(here.dg && here.dg.type === 9) acts.push(`<button class="btn ghost" data-act="wGods" ${w.ev || (h.provisions||0) < 1 ? "disabled" : ""}>Oferenda aos Deuses Esquecidos <small>(1 provisão)</small></button>`);
   const retire = mustRetire(h) ? `<div class="banner"><b>Fim da jornada de ${esc(h.name)}</b><p class="small">Os ferimentos são irreparáveis. Encontre uma cidade para passar o legado adiante, ou registre o fim na ficha.</p></div>` : "";
+  const far = state.ui.far ? `<div class="banner"><b>Poção do Lugar Distante</b><p class="small">${pcMode() ? "Clique" : "Toque"} no mapa no hexágono já descoberto para onde você quer ir.</p><button class="btn ghost" data-act="farCancel">Cancelar</button></div>` : "";
   return `
   ${bar("Mundo","sheet")}
-  ${retire}
+  ${retire}${far}
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Provisões<b class="${lvc(h.provisions||0,provMax())}">${h.provisions||0}</b></span><span>Moedas<b>${h.coins}</b></span><span>Dia<b>${w.days+1}</b></span></div>
     <canvas id="wmap" data-anim="wmap" aria-label="Mapa do mundo em hexágonos"></canvas>
@@ -5843,7 +6610,7 @@ function worldCityBottom(){
   return `
   <div class="sheet">
     <h3>Cultura ${esc(loc.race === "Humana" ? "humana" : loc.race === "Anã" ? "anã" : loc.race === "Élfica" ? "élfica" : loc.race === "Gnoma" ? "gnoma" : loc.race === "Goblin" ? "goblin" : "orc")}</h3>
-    ${row(`${cul.t} <span class="n">${cul.price}</span> moedas`, culTxt, cul.k === "curse" ? "" : `<button class="use" data-act="wCulture" ${h.coins < cul.price || (cul.item && bagFull) ? "disabled" : ""}>${cul.k === "spell" ? "Aprender" : "Comprar"}</button>`)}
+    ${row(`${cul.t} <span class="n">${cul.price}</span> moedas`, cul.k === "curse" && carryingCursed() ? "Remove um item amaldiçoado que você carrega." : culTxt, cul.k === "curse" ? (carryingCursed() ? `<button class="use" data-act="wCulture" ${h.coins < cul.price ? "disabled" : ""}>Eliminar</button>` : "") : `<button class="use" data-act="wCulture" ${h.coins < cul.price || (cul.item && bagFull) ? "disabled" : ""}>${cul.k === "spell" ? "Aprender" : "Comprar"}</button>`)}
   </div>
   <div class="sheet">
     <h3>Conseguindo dinheiro</h3>
@@ -5934,7 +6701,8 @@ const actionsWorld = {
   },
   async wCulture(){
     const h = state.hero, loc = wHere().loc, cul = CULTURE[loc.race];
-    if(!cul || cul.k === "curse" || h.coins < cul.price) return;
+    if(!cul || h.coins < cul.price) return;
+    if(cul.k === "curse"){ if(!carryingCursed()) return; h.coins -= cul.price; const gone = removeCurse(h); state.ui.cityMsg = `Os sacerdotes eliminam a maldição: ${gone} se desfaz.`; persist(); render(); return; }
     if(cul.item){ if(h.bag.length >= bagMax()) return; h.coins -= cul.price; h.bag.push(fixWearable(cul.item())); state.ui.cityMsg = `Você comprou: ${cul.item().n.split(" (")[0]}.`; persist(); render(); return; }
     if(cul.k === "spell"){
       wBegin(); h.coins -= cul.price;
@@ -6079,6 +6847,9 @@ const BEASTS = {
   "Cachorro":{w:22, h:16, draw:(o,f)=>quad(o,f,{x:10, rx:6, ry:3, leg:5, legW:1, hr:3, hdx:2, hdy:-4, c:["#c89058","#9a6a3a","#6a4424"], belly:"#e8d0a8", snout:[3,2,"#e8d0a8"], hoof:"#3a2418",
     tail:(o,x,y,f)=>{ for(let k=0;k<4;k++) o.P(x-k*.6, y-k-(f?1:0)*(k>1?1:0), "#9a6a3a"); },
     ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r+1, "#6a4424"); o.P(hx-3, hy-r+2, "#6a4424"); o.P(hx-3, hy-r+3, "#6a4424"); o.P(hx-2, hy-r+2, "#6a4424"); }})},
+  "Cão de Pedra":{w:22, h:16, draw:(o,f)=>quad(o,f,{x:10, rx:6, ry:3, leg:5, legW:1, hr:3, hdx:2, hdy:-4, c:["#b0aca4","#8e8a82","#66625c"], belly:"#c8c4bc", snout:[3,2,"#c8c4bc"], hoof:"#403c48",
+    tail:(o,x,y,f)=>{ for(let k=0;k<4;k++) o.P(x-k*.6, y-k-(f?1:0)*(k>1?1:0), "#8e8a82"); },
+    ears:(o,hx,hy,r)=>{ o.P(hx-2, hy-r+1, "#66625c"); o.P(hx-3, hy-r+2, "#66625c"); o.P(hx-2, hy-r+2, "#66625c"); }, eye:"#6ac8f0"})},
   "Lobo":{w:26, h:18, draw:(o,f)=>quad(o,f,{x:12, rx:7, ry:3.5, leg:6, legW:1, hr:3.3, hdx:2, hdy:-4, c:["#b4b4c0","#8a8a98","#5a5a66"], belly:"#d8d8e0", snout:[4,2,"#d8d8e0"], hoof:"#3a3a44",
     tail:(o,x,y,f)=>{ for(let k=0;k<6;k++){ o.P(x-k, y+Math.round(k*.6)+(f?1:0), "#8a8a98"); o.P(x-k, y+1+Math.round(k*.6)+(f?1:0), "#5a5a66"); } },
     ears:(o,hx,hy,r)=>{ o.P(hx-1, hy-r-1, "#5a5a66"); o.P(hx-1, hy-r-2, "#5a5a66"); o.P(hx-2, hy-r-1, "#8a8a98"); o.P(hx+1, hy-r-1, "#5a5a66"); }, eye:"#f8d040",
@@ -6349,7 +7120,7 @@ function tameSpot(k){
   const w = WD(), hx = w.hex[k]; if(!hx || hx.loc || hx.dg) return false;
   return hexNb(k).filter(n=>w.hex[n] && w.hex[n].t === hx.t).length >= 2;
 }
-function animalSlots(h){ return 3 - partyOf("animal", h).length - partyOf("mount", h).length; }
+function animalSlots(h){ return 3 - partyOf("animal", h).filter(p=>!p.free).length - partyOf("mount", h).length; }
 
 /* ---------- telas: cidade, ficha e combate ---------- */
 function mercCityHTML(){
@@ -6902,22 +7673,23 @@ const actionsSlots = {
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden){ if(CLOUD.timer){ clearTimeout(CLOUD.timer); CLOUD.timer = null; } CLOUD.flush(); } });
 
 /* ---------- layout de PC: duas colunas quando a tela é larga ---------- */
-let pcTab = "ficha", pcTabOpen = true;
+let pcTab = "ficha", pcTabOpen = true, pcLastScreen = null, pcTabReset = false;
 const PC_MEM = {};
 const PC_VIS = {world:1, explore:1, combat:1};
-const PC_COLS = {city:1, sheet:1, dungeon:1, cemetery:1, advclass:1};
+const PC_COLS = {city:1, sheet:1, dungeon:1, cemetery:1, advclass:1, magias:1, grupo:1};
+const PC_TOOL = {world:1, city:1, sheet:1, magias:1, grupo:1};
 function pcMode(){ return window.innerWidth >= 1000 && window.innerWidth >= window.innerHeight * 1.1; }
 function pcFine(){ return !!(window.matchMedia && matchMedia("(pointer:fine)").matches); }
 function pcKey(el){
   if(el.querySelector(".hero-head")) return "heroi";
-  const h = el.querySelector("h3"); if(h) return h.textContent.trim();
+  const h = el.querySelector("h3"); if(h) return h.textContent.trim().replace(/\s*[\d/]+$/, "");
   return (el.className || el.tagName) + ":" + (el.textContent || "").trim().slice(0, 24);
 }
-/* abas do painel lateral, montadas a partir da própria ficha */
+/* partes da ficha, separadas por assunto */
 function pcSideTabs(){
   const h = state.hero; if(!h) return null;
   const t = document.createElement("div"); t.innerHTML = viewSheet();
-  const tabs = {ficha:[], mochila:[], magias:[], grupo:[], vant:[]};
+  const tabs = {ficha:[], mochila:[], magias:[], grupo:[]};
   [...t.children].forEach(el=>{
     if(!el.classList.contains("sheet") || el.classList.contains("dashed")) return;
     const k = pcKey(el);
@@ -6925,21 +7697,23 @@ function pcSideTabs(){
     else if(/^Mochila/.test(k)) tabs.mochila.push(el);
     else if(/^Magias/.test(k)) tabs.magias.push(el);
     else if(/^Companheiros/.test(k)) tabs.grupo.push(el);
-    else if(/^Vantagens/.test(k)) tabs.vant.push(el);
   });
   return tabs;
 }
-const PC_TABN = {ficha:"Ficha", mochila:"Mochila", magias:"Magias", grupo:"Grupo", vant:"Vantagens"};
-function pcSide(readOnly){
+const PC_TABN = {mapa:"Mapa", ficha:"Ficha", mochila:"Mochila", magias:"Magias", grupo:"Grupo"};
+function pcSide(sc, mapEls){
   const tabs = pcSideTabs(); if(!tabs) return null;
-  const keys = Object.keys(PC_TABN).filter(k=>tabs[k].length);
+  const world = sc === "world";
+  if(world) tabs.mapa = mapEls;
+  const keys = (world ? ["mapa","mochila","magias","grupo"] : ["ficha","mochila","magias","grupo"]).filter(k=>tabs[k].length || k === "mapa");
   if(!keys.includes(pcTab)) pcTab = keys[0];
-  const box = document.createElement("div"); box.className = "pcside";
-  box.innerHTML = `<div class="pctabs" role="tablist">${keys.map(k=>`<button role="tab" class="${k===pcTab && pcTabOpen ? "on" : ""}" aria-selected="${k===pcTab && pcTabOpen}" data-act="pcTab" data-t="${k}">${PC_TABN[k]}</button>`).join("")}</div>`;
-  if(pcTabOpen){
+  const open = world || pcTabOpen;
+  const box = document.createElement("div"); box.className = "pcside" + (world ? " fill" : "");
+  box.innerHTML = `<div class="pctabs" role="tablist">${keys.map(k=>`<button role="tab" class="${k===pcTab && open ? "on" : ""}" aria-selected="${k===pcTab && open}" data-act="pcTab" data-t="${k}">${PC_TABN[k]}</button>`).join("")}</div>`;
+  if(open){
     const body = document.createElement("div"); body.className = "pcbody";
     tabs[pcTab].forEach(el=>body.appendChild(el));
-    if(readOnly){
+    if(sc === "combat"){
       body.querySelectorAll("button, input").forEach(b=>{ if(!b.classList.contains("foldh")) b.disabled = true; });
       const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Durante o combate, a ficha fica só para consulta.";
       body.appendChild(n);
@@ -6948,53 +7722,110 @@ function pcSide(readOnly){
   }
   return box;
 }
-function pcScrollGet(){ const b = document.querySelector(".pcbody"); return b ? b.scrollTop : 0; }
+function pcScrollGet(){
+  const b = document.querySelector(".pcbody"), r = document.querySelector(".pcR");
+  return {sc: pcLastScreen, b: b ? b.scrollTop : 0, r: r ? r.scrollTop : 0};
+}
 function pcHint(el){
   if(!pcFine()) return;
   el.innerHTML = el.innerHTML.replace("Toque em outro monstro", "Clique em outro monstro");
-  if(/pince para dar zoom/.test(el.textContent)) el.textContent = el.textContent.replace(/^Toque/, "Clique").replace("Arraste para mover e pince para dar zoom.", "Arraste para mover e use a roda do mouse para o zoom.");
+  if(/pince para dar zoom/.test(el.textContent)) el.textContent = el.textContent.replace(/^Toque num hexágono vizinho para ver o terreno e viajar\./, "Clique num hexágono vizinho para viajar, ou no lugar onde você está para ver o que dá para fazer ali.").replace(/^Toque/, "Clique").replace("Arraste para mover e pince para dar zoom.", "Arraste para mover e use a roda do mouse para o zoom.");
 }
-function pcLayout(sc, bodyScroll){
+/* botões de navegação do PC, em cima do mapa do mundo */
+function pcToolHTML(sc){
+  const city = worldCityHere();
+  const b = (to, label, dis) => `<button class="${sc===to?"on":""}" data-act="go" data-to="${to}" ${dis?"disabled":""}>${label}</button>`;
+  return `${b("world","Mapa do mundo")}${b("city", "Cidade", !city)}${b("sheet","Ficha")}${b("magias","Magias")}${b("grupo","Grupo")}`;
+}
+function pcToolOk(sc){ return PC_TOOL[sc] && state.hero && state.world && !(state.dungeon && state.dungeon.inside) && !state.combat; }
+/* balão de ações sobre o mapa do mundo */
+function pcHexPopHTML(){
+  const w = WD(); if(!w || w.ev) return "";
+  const sel = w.sel && w.hex[w.sel] && w.sel !== w.pos ? w.sel : null;
+  if(sel){
+    const ct = canTravel(sel);
+    return `<div class="hexpop" id="hexpop" data-k="${sel}"><span class="lbl">${esc(hexDesc(sel))}</span>${ct.ok ? `<button class="pbtn" data-act="wTravel" data-k="${sel}">Viajar para cá</button>` : `<span class="why">${esc(ct.why)}</span>`}</div>`;
+  }
+  if(state.ui.wHere && state.ui.wHere === w.pos){
+    const here = w.hex[w.pos], acts = [], r = here.dg && dgRec(here.dg);
+    if(worldCityHere()) acts.push(`<button class="pbtn" data-act="go" data-to="city">Entrar na ${esc(locLabel(here.loc))}</button>`);
+    if(here.dg && !(r && r.complete)) acts.push(`<button class="pbtn" data-act="wEnterDg">${r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra"}</button>`);
+    if(!acts.length) return "";
+    return `<div class="hexpop" id="hexpop" data-k="${w.pos}" data-here="1"><span class="lbl">${esc(here.dg && !here.loc ? here.dg.name : hexDesc(w.pos).split(" · ")[0])}</span>${acts.join("")}</div>`;
+  }
+  return "";
+}
+function placeHexPop(cv){
+  const pop = document.getElementById("hexpop"); if(!pop) return;
+  const k = pop.dataset.k, p = hexPx(k), z = wcam.z, W = cv.clientWidth, H = cv.clientHeight;
+  /* o balão fica do lado oposto ao aventureiro, para não cobri-lo */
+  const below = !pop.dataset.here && hexPx(WD().pos).y < p.y;
+  const sx = (p.x - wcam.x)*z + W/2, sy = (p.y + (below ? 30 : (pop.dataset.here ? -22 : -12)) - wcam.y)*z + H/2;
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.round(sx - pw/2), top = Math.round(below ? sy : sy - ph);
+  left = Math.max(6, Math.min(W - pw - 54, left)); top = Math.max(50, Math.min(H - ph - 6, top));
+  pop.style.transform = `translate(${left}px, ${top}px)`;
+}
+function pcLayout(sc, saved){
   const app = $("#app"), root = document.documentElement;
   const on = pcMode();
   root.classList.toggle("pc", on);
-  app.classList.remove("pcv", "pcc");
+  root.classList.remove("pcfix");
+  app.className = "";
+  const same = saved && saved.sc === sc && !pcTabReset;
+  pcLastScreen = sc; pcTabReset = false;
   if(!on) return;
   const kids = [...app.children].filter(el=>!el.classList.contains("lastbox"));
   const bar = kids.find(el=>el.classList.contains("bar"));
+  const tool = pcToolOk(sc) ? Object.assign(document.createElement("div"), {className:"pctool", innerHTML:pcToolHTML(sc)}) : null;
   if(PC_VIS[sc] && kids.some(el=>el.classList.contains("mapbox") || el.id === "arena")){
-    app.classList.add("pcv");
+    app.classList.add("pcv", "pcv-" + sc); root.classList.add("pcfix");
     const L = document.createElement("div"); L.className = "pcL pc-" + sc;
     const R = document.createElement("div"); R.className = "pcR";
     const firstSheet = kids.findIndex(el=>el.classList.contains("sheet"));
+    const isHint = el => el.tagName === "P" && /pince para dar zoom/.test(el.textContent);
     kids.forEach((el, i)=>{
       if(el === bar) return;
-      let left;
-      if(sc === "combat") left = firstSheet < 0 || i < firstSheet;
-      else left = el.classList.contains("mapbox") || el.id === "etray" || (el.tagName === "P" && /pince para dar zoom/.test(el.textContent));
-      if(left && el.tagName === "P" && /pince para dar zoom/.test(el.textContent)) pcHint(el);
+      const left = sc === "combat" ? (firstSheet < 0 || i < firstSheet) : (el.classList.contains("mapbox") || el.id === "etray" || isHint(el));
+      if(isHint(el)) pcHint(el);
       (left ? L : R).appendChild(el);
     });
-    /* a dica do mapa fica logo abaixo dele */
     const hint = [...L.children].find(el=>el.tagName === "P" && /dar zoom|roda do mouse/.test(el.textContent));
     if(hint) L.appendChild(hint);
-    const side = pcSide(sc === "combat");
-    if(side){ if(sc === "combat") R.appendChild(side); else R.prepend(side); }
-    if(sc === "combat") R.querySelectorAll("p.small, p.muted").forEach(pcHint);
+    if(tool) L.prepend(tool);
+    if(sc === "world"){
+      if(bar){ const bk = bar.querySelector(".back"); if(bk){ bk.dataset.to = "title"; bk.setAttribute("aria-label", "Menu inicial"); } }
+      const mb = L.querySelector(".mapbox"); if(mb) mb.insertAdjacentHTML("beforeend", pcHexPopHTML());
+      /* eventos e avisos ficam sempre à vista; o resto vai para a aba Mapa */
+      const urgent = [], mapEls = [];
+      [...R.children].forEach(el=>{ (el.classList.contains("banner") || el.querySelector("[data-act=wFight],[data-act=wClimate]") ? urgent : mapEls).push(el); });
+      const side = pcSide(sc, mapEls);
+      R.innerHTML = ""; urgent.forEach(el=>R.appendChild(el)); if(side) R.appendChild(side);
+    } else {
+      const side = pcSide(sc, []);
+      if(side){ if(sc === "combat") R.appendChild(side); else R.prepend(side); }
+      if(sc === "combat") R.querySelectorAll("p.small, p.muted").forEach(pcHint);
+    }
     if(bar) app.insertBefore(bar, app.firstChild);
     app.insertBefore(L, bar ? bar.nextSibling : app.firstChild);
     app.insertBefore(R, L.nextSibling);
-    const pb = R.querySelector(".pcbody"); if(pb && bodyScroll) pb.scrollTop = bodyScroll;
+    if(same){ const pb = R.querySelector(".pcbody"); if(pb) pb.scrollTop = saved.b; R.scrollTop = saved.r; }
     return;
   }
   if(PC_COLS[sc]){
     app.classList.add("pcc");
+    if(tool){
+      /* a navegação do topo substitui os botões de ir para a cidade e o mapa */
+      for(const el of kids){ if(el.classList.contains("sheet") || el.classList.contains("banner")) break; if(el !== bar && el.querySelector && el.querySelector("[data-to=world]") && !el.classList.contains("bar")) el.remove(); }
+      if(bar) bar.after(tool); else app.prepend(tool);
+    }
+    const rest0 = [...app.children].filter(el=>!el.classList.contains("lastbox"));
     const mem = PC_MEM[sc] || (PC_MEM[sc] = {});
     const A = document.createElement("div"); A.className = "pcA";
     const B = document.createElement("div"); B.className = "pcB";
     let i = 0;
-    while(i < kids.length && !kids[i].classList.contains("sheet") && !kids[i].classList.contains("banner")) i++;
-    const rest = kids.slice(i);
+    while(i < rest0.length && !rest0[i].classList.contains("sheet") && !rest0[i].classList.contains("banner")) i++;
+    const rest = rest0.slice(i);
     app.insertBefore(A, rest[0] || null); app.insertBefore(B, A.nextSibling);
     rest.forEach(el=>{
       const k = pcKey(el);
@@ -7005,20 +7836,34 @@ function pcLayout(sc, bodyScroll){
   }
 }
 function pcReset(sc){ delete PC_MEM[sc]; }
+/* telas de PC: magias e grupo em tela cheia */
+function viewPcPart(kind){
+  const h = state.hero; if(!h) return viewTitle();
+  const tabs = pcSideTabs();
+  const els = tabs ? tabs[kind] : [];
+  const empty = kind === "magias" ? "Você ainda não conhece nenhuma magia." : "Ninguém viaja com você por enquanto. Mercenários, animais e montarias aparecem aqui.";
+  return `${bar(kind === "magias" ? "Magias" : "Grupo", state.world ? "world" : "sheet")}
+  ${els.length ? els.map(el=>el.outerHTML).join("") : `<div class="sheet"><p class="muted">${empty}</p></div>`}`;
+}
 let pcWas = null, pcRT = 0;
 window.addEventListener("resize", ()=>{
   clearTimeout(pcRT);
   pcRT = setTimeout(()=>{ const on = pcMode(); if(on !== pcWas){ pcWas = on; if(typeof state !== "undefined" && state) render(); } }, 150);
 });
 const actionsPC = {
-  pcTab(b){ const t = b.dataset.t; if(t === pcTab && pcTabOpen) pcTabOpen = false; else { pcTab = t; pcTabOpen = true; } render(); }
+  pcTab(b){
+    const t = b.dataset.t;
+    if(t === pcTab && pcTabOpen && state.screen !== "world") pcTabOpen = false;
+    else { pcTab = t; pcTabOpen = true; }
+    pcTabReset = true; render();
+  }
 };
 
-const VIEWS = {slots:viewSlots, guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
+const VIEWS = {magias:()=>viewPcPart("magias"), grupo:()=>viewPcPart("grupo"), slots:viewSlots, guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
 function render(){
   normalizeHands();
   if(state.screen==="create" && !state.draft) state.screen = "title";
-  if(["sheet","dungeon","explore","city","advclass","world"].includes(state.screen) && !state.hero) state.screen = "title";
+  if(["sheet","dungeon","explore","city","advclass","world","magias","grupo"].includes(state.screen) && !state.hero) state.screen = "title";
   if(state.screen==="world" && !state.world) state.screen = "sheet";
   if(state.world && state.hero && !(state.dungeon && state.dungeon.inside) && (state.screen==="dungeon" || (state.screen==="city" && !worldCityHere()))) state.screen = "world";
   if(state.screen==="explore" && !(state.dungeon && state.dungeon.inside)) state.screen = "sheet";
@@ -7549,7 +8394,7 @@ async function runMonsterTurnCoop(){
     if(u.frozen){ u.frozen--; cLog(`${u.name} está congelado e não ataca.`); continue; }
     if(u.doom){ const t = pickT(); cLog(`${u.name} desfere o golpe de Morte Súbita em ${nameOf(t)}!`);
       if(hasDeuses(t)){ cLog("A armadura dos Deuses protege da Morte Súbita."); u.doom = false; } else { c.kill[t] = `Morte Súbita de ${u.name}`; u.doom = false; } }
-    let dmg = u.dano;
+    let dmg = Math.max(0, u.dano - monDmgCut(u));
     if(u.fireNext){ u.fireNext = false; dmg += 10; cLog(`${u.name} ataca envolto em fogo: +10 de dano!`); }
     if(u.magicNext){ dmg += u.magicNext; cLog(`A magia de ${u.name} soma ${u.magicNext} ao dano.`); u.magicNext = 0; }
     if(u.paralNext){ const [p] = await roll("Paralisia", 1); const t = pickT(); c.par[t] = p; u.paralNext = false; cLog(`${u.name} paralisa ${nameOf(t)} por ${p} turno${p>1?"s":""}!`); }
@@ -7568,7 +8413,7 @@ async function runMonsterTurnCoop(){
         if(has(u,"Paralisar")){ u.paralNext = true; cLog(`${u.name} prepara um golpe paralisante para o próximo ataque.`); }
       }
     }
-    if(has(u,"Veneno")) poison += dmg; else total += dmg;
+    if(has(u,"Veneno") && !poisonImmune()) poison += dmg; else total += dmg;
     monAtk[i] = performance.now() + 320;
     if(!exploded) cLog(`${u.name} ataca: ${dmg} de dano${has(u,"Veneno") ? " de veneno" : ""}.`);
   }
@@ -7789,7 +8634,7 @@ const actions = {
   bagSel(b){ const i = +b.dataset.i; state.ui.bagSel = state.ui.bagSel===i ? null : i; render(); },
   equip(b){
     const h = state.hero, i = +b.dataset.i, it = h.bag[i];
-    if(raceT("noArmor") || raceT("ogro")) return;
+    if(raceT("noArmor") || raceT("ogro") || (it.slot === "Botas" && mutated("dedo")) || cursedOn(/^Anel do Morto/)) return;
     const old = h.armor[it.slot];
     h.armor[it.slot] = it; h.bag.splice(i,1);
     if(old) h.bag.push(old);
@@ -7832,7 +8677,18 @@ const actions = {
     if(/^Pergaminho/.test(it.n)) H().magic++;
     if(/^Poção de Vida/.test(it.n)) h.pv = h.pvMax;
     if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3) h.pv = h.pvMax; state.ui.armsMsg = v >= 3 ? `Poção Verdosa (dado ${v}): você recuperou todos os PV.` : `Poção Verdosa (dado ${v}): nada além de uma coceira que dura o dia inteiro.`; }
-    if(/^Poção de Magia/.test(it.n)) Object.values(h.spells).forEach(s=>s.left=s.max);
+    if(/^Poção de Magia|^Poção de Mana/.test(it.n)) Object.values(h.spells).forEach(s=>s.left=s.max);
+    if(/^Poção do Lugar Distante/.test(it.n)){ if(!state.world || (state.dungeon && state.dungeon.inside)) return; state.ui = {far:true}; go("world"); return; }
+    if(/^Rubi/.test(it.n)){ state.ui.ruby = i; render(); return; }
+    let extra = "";
+    if(/^Barril de Cerveja Anã/.test(it.n)){ const b0 = h.pv; h.pv = Math.min(h.pvMax, h.pv+5); extra = `Você bebeu a cerveja anã e recuperou ${h.pv-b0} PV.`; }
+    if(/^Bebida Doce Viciante/.test(it.n)){ const b0 = h.pv; h.pv = Math.min(h.pvMax, h.pv+1); extra = `A bebida doce te devolve ${h.pv-b0} PV. Dá vontade de tomar outra.`; }
+    if(/^Fruta Estranha/.test(it.n)){ const sp = Object.entries(h.spells).find(([,x])=>x.left < x.max); if(sp){ sp[1].left++; extra = `A fruta estranha devolve 1 uso de ${sp[0]}.`; } else extra = "Você comeu a fruta estranha, mas nenhuma magia estava gasta."; }
+    if(/^Poção da Purificação|^Poção Abençoada/.test(it.n)){ const gone = removeCurse(h); extra = gone ? `A maldição some: ${gone} se desfaz.` : "Nenhum item amaldiçoado com você. A poção não fez nada."; }
+    if(/^Poção do Louco/.test(it.n)){ const got = []; for(let k=0;k<3;k++){ const n = SPELLS[d6()].n; got.push(n); h.spells[n] = h.spells[n] ? {max:h.spells[n].max+1, left:h.spells[n].left+1} : {max:1,left:1}; } extra = `Sua cabeça gira e você aprende: ${got.join(", ")}.`; }
+    if(/^Poção Zumbi/.test(it.n)){ h.zpot = true; extra = "Você bebeu a Poção Zumbi. Se morrer, volta como zumbi com 1 PV máximo."; }
+    if(/^Poção do Goblin/.test(it.n)){ (h.marks = h.marks || []).push("Tem a aparência de um goblin."); extra = "Sua pele fica verde e suas orelhas crescem: agora você parece um goblin."; }
+    if(/^Poção da Mutação/.test(it.n)){ h.bag.splice(i,1); state.ui.bagSel = null; persist(); render(); labMutation("Poção da Mutação"); return; }
     if(/^Poção da Luminescência/.test(it.n)) h.torches = Math.min(10, h.torches+2);
     if(/^Poção da Salamandra/.test(it.n)) h.arms = Math.max(h.arms||2, raceStart(h).arms);
     if(/^Poção Mão na Roda/.test(it.n)){ h.arms = (h.arms||2) + 1; state.ui.armsMsg = `Um braço novo brota! Agora você tem ${h.arms} braços.`; }
@@ -7846,11 +8702,57 @@ const actions = {
     if(/^Poção da Fúria/.test(it.n)) return;
     if(/^Vela dos Protetores/.test(it.n)){ h.velas = (h.velas||0) + 1; msg = `Você acendeu a Vela dos Protetores. ${velaTxt(h.velas)}.`; }
     if(/^Safira da Magia/.test(it.n)){ const s = SPELLS[d6()].n; h.spells[s] = h.spells[s] ? {max:h.spells[s].max+1, left:h.spells[s].left+1} : {max:1,left:1}; }
-    h.bag.splice(i,1);
+    { const ix = h.bag.indexOf(it); if(ix >= 0) h.bag.splice(ix,1); }
+    if(extra){ msg = extra; state.ui.armsMsg = extra; }
     if(state.dungeon && state.dungeon.inside) log(msg);
     state.ui.bagSel = null; persist(); render();
   },
-  drop(b){ const h = state.hero; h.bag.splice(+b.dataset.i,1); state.ui.bagSel = null; persist(); render(); },
+  rubyOn(b){
+    const h = state.hero, i = state.ui.ruby, it = h.bag[i]; if(!it || !/^Rubi/.test(it.n)) return;
+    const s = b.dataset.s;
+    if(/Durabilidade/.test(it.n)){ const p = h.armor[s]; if(!p) return; p.pv += 2; if(!/ com Rubi/.test(p.n)) p.n = / \(/.test(p.n) ? p.n.replace(/ \(/, " com Rubi (") : p.n + " com Rubi"; p.n = p.n.replace(/\((\d+) PV/, `(${p.pv} PV`); state.ui.armsMsg = `O Rubi da Durabilidade se encaixa: ${p.n.split(" (")[0]} ganha +2 PV.`; }
+    else { const W = s === "weapon" ? h.weapon : offs(h)[+s.slice(3)]; if(!W || W.unarmed || W.shield) return; W.d = bumpDmg(W.d, 1); if(!/ com Rubi/.test(W.n)) W.n = W.n.replace(/( \(|$)/, " com Rubi$1"); state.ui.armsMsg = `O Rubi de Encantamento brilha: ${W.n.split(" (")[0]} agora causa ${W.d}.`; }
+    h.bag.splice(i,1); state.ui.ruby = null; state.ui.bagSel = null; persist(); render();
+  },
+  rubyCancel(){ state.ui.ruby = null; render(); },
+  cauldron(){
+    const seg = curSeg(); if(!seg || seg.fx !== "k" || seg.drank || busy) return;
+    startAction();
+    (async()=>{
+      seg.drank = true;
+      const [v] = await roll("Poção do caldeirão", 1), txt = DUNGEONS[10].pot[v-1], nm = txt.split(" (")[0];
+      rollNote(nm);
+      const h = state.hero;
+      log(`Você bebe do caldeirão. Era ${nm}!`);
+      if(/Mutação/.test(nm)){ endAction(); await labMutation("Mutação (caldeirão)"); return; }
+      if(/Goblin/.test(nm)) (h.marks = h.marks || []).push("Tem a aparência de um goblin.");
+      if(/Zumbi/.test(nm)) h.zpot = true;
+      if(/Luminescência/.test(nm)) h.torches = Math.min(10, h.torches+2);
+      if(/Mão na Roda/.test(nm)){ h.arms = (h.arms||2) + 1; log(`Um braço novo brota! Agora você tem ${h.arms} braços.`); }
+      if(/Louco/.test(nm)){ const got = []; for(let k=0;k<3;k++){ const n = SPELLS[d6()].n; got.push(n); h.spells[n] = h.spells[n] ? {max:h.spells[n].max+1, left:h.spells[n].left+1} : {max:1,left:1}; } log(`Você aprende: ${got.join(", ")}.`); }
+      endAction();
+    })();
+  },
+  async wRuins(){ const w = WD(), hx = wHere(); if(!hx || !hx.loc || hx.loc.k !== "ruins" || hx.dg || w.ev) return; wBegin(); await ruinsRoll(w.pos); wEnd(); },
+  async wGods(){
+    const w = WD(), h = state.hero, hx = wHere(); if(!hx || !hx.dg || hx.dg.type !== 9 || w.ev || (h.provisions||0) < 1) return;
+    wBegin(); h.provisions--;
+    const [v] = await roll("Deuses Esquecidos", 1);
+    if(v === 1){ rollNote("Raio!"); const r = await roll("Dano do raio", 3), dmg = r[0]+r[1]+r[2]; wLog(`Uma grande tempestade cai e um raio te acerta: ${dmg} de dano.`); if(!hurt(dmg, "Atingido por um raio dos Deuses Esquecidos")){ busy = false; persist(); render(); return; } }
+    else if(v <= 3){ rollNote("Nada"); wLog("Você faz a oferenda. Nada acontece."); }
+    else if(v === 4){ rollNote("Coruja"); party(h).push({id:newPid(), kind:"animal", n:"Coruja", pv:ANIMALS.Coruja.pv, max:ANIMALS.Coruja.pv, d:ANIMALS.Coruja.d, key:"Coruja", free:true}); wLog("Uma coruja pousa no seu ombro e passa a te seguir. Ela não conta no limite de animais."); }
+    else if(v === 5){ rollNote("Luz divina"); h.sunBless = 1; wLog("Uma luz divina te ilumina: +1 de dano em todos os ataques na próxima masmorra que você explorar."); }
+    else { rollNote("+4 PV"); h.pvMax += 4; h.pv += 4; wLog("Uma luz desce dos céus: você ganha +4 PV máximos para sempre."); }
+    wEnd();
+  },
+  async wStar(){
+    const w = WD(), h = state.hero, e = w.ev; if(!e || !starOk()) return;
+    wBegin(); h.provisions--;
+    w.ev = null; wLog("Você gasta 1 provisão e a Pedra das Estrelas brilha: o evento é rolado de novo.");
+    await travelEvent(w.pos); wEnd();
+  },
+  farCancel(){ state.ui.far = false; render(); },
+  drop(b){ const h = state.hero; if(isCursed(h.bag[+b.dataset.i])) return; h.bag.splice(+b.dataset.i,1); state.ui.bagSel = null; persist(); render(); },
 
   async rollDungeon(){
     busy = true; lockButtons();
@@ -7901,7 +8803,7 @@ const actions = {
   climb(){ doClimb(); },
   corpse(){ doCorpse(); },
   lastFinal(){ const lv = LV(); const s = lv.segs[lv.last]; moveTo(s.id); doBoss(s); },
-  leave(){ leaveDungeon(); state.ui = {}; persist(); render(); window.scrollTo(0,0); },
+  leave(){ const lab = state.dungeon && state.dungeon.type === 10; leaveDungeon(); state.ui = {}; persist(); render(); window.scrollTo(0,0); if(lab && state.hero) setTimeout(()=>labMutation("Mutação (Laboratório)"), 250); },
   zoom(b){ cam.z = clampZ(cam.z * +b.dataset.z); },
   center(){ centerOn = true; },
   noop(){},
@@ -7945,6 +8847,7 @@ const actions = {
   },
   playDead(){ if(!raceT("zumbi")) return; cLog("Você se faz de morto... e escapa quando os monstros se distraem."); fleeCombat(); },
   horn(){ heroAttack("horn"); },
+  bite(){ const e = state.hero.armor.Elmo; if(e && e.bite) heroAttack("bite"); },
   cspell(b){ heroSpell(b.dataset.n); },
   citem(b){ heroItem(+b.dataset.i); },
   alloc(b){ const c = C(); const s = b.dataset.s; c.alloc[s] = Math.max(0, (c.alloc[s]||0) + +b.dataset.d); render(); },
@@ -8063,7 +8966,7 @@ const actions = {
   lockItem(b){ const it = state.hero.bag[+b.dataset.i]; if(!it) return; it.locked = !it.locked; persist(); render(); },
   sell(b){
     const h = state.hero, i = +b.dataset.i, it = h.bag[i];
-    if(!it || it.locked) return;
+    if(!it || it.locked || isCursed(it)) return;
     const v = sellValue(it);
     h.coins += v; h.bag.splice(i,1); H(h).sold++;
     state.ui.cityMsg = `Você vendeu ${it.n.split(" (")[0]} por ${v} moeda${v===1?"":"s"}.`;
