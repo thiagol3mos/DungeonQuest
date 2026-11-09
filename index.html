@@ -332,6 +332,32 @@ b,strong{font-weight:400 !important}
 .slotrow .txt{display:flex;flex-direction:column;gap:3px;flex:1}
 .slotrow.cur b{text-decoration:underline;text-underline-offset:3px}
 .slotbtns{display:flex;gap:6px;flex-shrink:0}
+/* ---------- layout de PC ---------- */
+html.pc #app{max-width:1120px}
+html.pc #app.pcv{max-width:none;display:grid;grid-template-columns:minmax(0,1fr) 440px;column-gap:24px;row-gap:12px;align-items:start;padding-left:24px;padding-right:24px}
+#app.pcv > .bar{grid-column:1/3}
+#app.pcv .pcL{grid-column:1;position:sticky;top:12px;height:calc(100vh - 104px);display:flex;flex-direction:column;gap:10px;min-width:0}
+#app.pcv .pcL.pc-combat{height:auto}
+#app.pcv .pcL .mapbox{flex:1;height:auto;min-height:320px}
+#app.pcv .pcL .etray:empty{display:none}
+#app.pcv .pcL > p{margin:0}
+#app.pcv .pcR{grid-column:2;display:flex;flex-direction:column;gap:16px;min-width:0}
+#app.pcv .pcL .arena{width:min(100%, calc((100vh - 330px) * 1.5));align-self:center}
+#app.pcv .pcL .tgts{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pcside{display:flex;flex-direction:column;gap:8px}
+.pctabs{display:flex;gap:6px}
+.pctabs button{flex:1;min-width:0;font-family:var(--display);font-size:12px;letter-spacing:.02em;text-transform:uppercase;padding:8px 2px;border:2px solid var(--ink);background:transparent;color:var(--ink);opacity:.65;cursor:pointer}
+.pctabs button.on{opacity:1;background:var(--ink);color:var(--paper)}
+.pctabs button:hover{opacity:1}
+.pcbody{display:flex;flex-direction:column;gap:12px;max-height:40vh;overflow-y:auto;padding-right:4px}
+.pcbody > .sheet{margin:0}
+#app.pcc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px;row-gap:16px;align-items:start}
+#app.pcc > *{grid-column:1/3}
+#app.pcc > .pcA{grid-column:1}
+#app.pcc > .pcB{grid-column:2}
+#app.pcc > .pcA, #app.pcc > .pcB{display:flex;flex-direction:column;gap:16px;min-width:0}
+html.pc #app:not(.pcv):not(.pcc){max-width:560px}
+.spell .txt span.small + span.small{display:block}
 </style>
 </head>
 <body>
@@ -816,7 +842,7 @@ function persist(){
   CLOUD.schedule();
   if(typeof COOP !== "undefined" && COOP.on()) COOP.sync();
 }
-function go(screen){ state.screen = screen; toastMsg=""; rollLog = []; persist(); render(); window.scrollTo(0,0); if(["title","city","world"].includes(screen)) CLOUD.flush(); }
+function go(screen){ pcReset(screen); state.screen = screen; toastMsg=""; rollLog = []; persist(); render(); window.scrollTo(0,0); if(["title","city","world"].includes(screen)) CLOUD.flush(); }
 
 function encodeSave(){
   const json = JSON.stringify({...state, screen:"title", ui:{}});
@@ -6875,6 +6901,119 @@ const actionsSlots = {
 };
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden){ if(CLOUD.timer){ clearTimeout(CLOUD.timer); CLOUD.timer = null; } CLOUD.flush(); } });
 
+/* ---------- layout de PC: duas colunas quando a tela é larga ---------- */
+let pcTab = "ficha", pcTabOpen = true;
+const PC_MEM = {};
+const PC_VIS = {world:1, explore:1, combat:1};
+const PC_COLS = {city:1, sheet:1, dungeon:1, cemetery:1, advclass:1};
+function pcMode(){ return window.innerWidth >= 1000 && window.innerWidth >= window.innerHeight * 1.1; }
+function pcFine(){ return !!(window.matchMedia && matchMedia("(pointer:fine)").matches); }
+function pcKey(el){
+  if(el.querySelector(".hero-head")) return "heroi";
+  const h = el.querySelector("h3"); if(h) return h.textContent.trim();
+  return (el.className || el.tagName) + ":" + (el.textContent || "").trim().slice(0, 24);
+}
+/* abas do painel lateral, montadas a partir da própria ficha */
+function pcSideTabs(){
+  const h = state.hero; if(!h) return null;
+  const t = document.createElement("div"); t.innerHTML = viewSheet();
+  const tabs = {ficha:[], mochila:[], magias:[], grupo:[], vant:[]};
+  [...t.children].forEach(el=>{
+    if(!el.classList.contains("sheet") || el.classList.contains("dashed")) return;
+    const k = pcKey(el);
+    if(k === "heroi" || /^Mãos/.test(k) || /^Armadura/.test(k)) tabs.ficha.push(el);
+    else if(/^Mochila/.test(k)) tabs.mochila.push(el);
+    else if(/^Magias/.test(k)) tabs.magias.push(el);
+    else if(/^Companheiros/.test(k)) tabs.grupo.push(el);
+    else if(/^Vantagens/.test(k)) tabs.vant.push(el);
+  });
+  return tabs;
+}
+const PC_TABN = {ficha:"Ficha", mochila:"Mochila", magias:"Magias", grupo:"Grupo", vant:"Vantagens"};
+function pcSide(readOnly){
+  const tabs = pcSideTabs(); if(!tabs) return null;
+  const keys = Object.keys(PC_TABN).filter(k=>tabs[k].length);
+  if(!keys.includes(pcTab)) pcTab = keys[0];
+  const box = document.createElement("div"); box.className = "pcside";
+  box.innerHTML = `<div class="pctabs" role="tablist">${keys.map(k=>`<button role="tab" class="${k===pcTab && pcTabOpen ? "on" : ""}" aria-selected="${k===pcTab && pcTabOpen}" data-act="pcTab" data-t="${k}">${PC_TABN[k]}</button>`).join("")}</div>`;
+  if(pcTabOpen){
+    const body = document.createElement("div"); body.className = "pcbody";
+    tabs[pcTab].forEach(el=>body.appendChild(el));
+    if(readOnly){
+      body.querySelectorAll("button, input").forEach(b=>{ if(!b.classList.contains("foldh")) b.disabled = true; });
+      const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Durante o combate, a ficha fica só para consulta.";
+      body.appendChild(n);
+    }
+    box.appendChild(body);
+  }
+  return box;
+}
+function pcScrollGet(){ const b = document.querySelector(".pcbody"); return b ? b.scrollTop : 0; }
+function pcHint(el){
+  if(!pcFine()) return;
+  el.innerHTML = el.innerHTML.replace("Toque em outro monstro", "Clique em outro monstro");
+  if(/pince para dar zoom/.test(el.textContent)) el.textContent = el.textContent.replace(/^Toque/, "Clique").replace("Arraste para mover e pince para dar zoom.", "Arraste para mover e use a roda do mouse para o zoom.");
+}
+function pcLayout(sc, bodyScroll){
+  const app = $("#app"), root = document.documentElement;
+  const on = pcMode();
+  root.classList.toggle("pc", on);
+  app.classList.remove("pcv", "pcc");
+  if(!on) return;
+  const kids = [...app.children].filter(el=>!el.classList.contains("lastbox"));
+  const bar = kids.find(el=>el.classList.contains("bar"));
+  if(PC_VIS[sc] && kids.some(el=>el.classList.contains("mapbox") || el.id === "arena")){
+    app.classList.add("pcv");
+    const L = document.createElement("div"); L.className = "pcL pc-" + sc;
+    const R = document.createElement("div"); R.className = "pcR";
+    const firstSheet = kids.findIndex(el=>el.classList.contains("sheet"));
+    kids.forEach((el, i)=>{
+      if(el === bar) return;
+      let left;
+      if(sc === "combat") left = firstSheet < 0 || i < firstSheet;
+      else left = el.classList.contains("mapbox") || el.id === "etray" || (el.tagName === "P" && /pince para dar zoom/.test(el.textContent));
+      if(left && el.tagName === "P" && /pince para dar zoom/.test(el.textContent)) pcHint(el);
+      (left ? L : R).appendChild(el);
+    });
+    /* a dica do mapa fica logo abaixo dele */
+    const hint = [...L.children].find(el=>el.tagName === "P" && /dar zoom|roda do mouse/.test(el.textContent));
+    if(hint) L.appendChild(hint);
+    const side = pcSide(sc === "combat");
+    if(side){ if(sc === "combat") R.appendChild(side); else R.prepend(side); }
+    if(sc === "combat") R.querySelectorAll("p.small, p.muted").forEach(pcHint);
+    if(bar) app.insertBefore(bar, app.firstChild);
+    app.insertBefore(L, bar ? bar.nextSibling : app.firstChild);
+    app.insertBefore(R, L.nextSibling);
+    const pb = R.querySelector(".pcbody"); if(pb && bodyScroll) pb.scrollTop = bodyScroll;
+    return;
+  }
+  if(PC_COLS[sc]){
+    app.classList.add("pcc");
+    const mem = PC_MEM[sc] || (PC_MEM[sc] = {});
+    const A = document.createElement("div"); A.className = "pcA";
+    const B = document.createElement("div"); B.className = "pcB";
+    let i = 0;
+    while(i < kids.length && !kids[i].classList.contains("sheet") && !kids[i].classList.contains("banner")) i++;
+    const rest = kids.slice(i);
+    app.insertBefore(A, rest[0] || null); app.insertBefore(B, A.nextSibling);
+    rest.forEach(el=>{
+      const k = pcKey(el);
+      let side = mem[k];
+      if(side == null){ side = A.offsetHeight <= B.offsetHeight ? 0 : 1; mem[k] = side; }
+      (side ? B : A).appendChild(el);
+    });
+  }
+}
+function pcReset(sc){ delete PC_MEM[sc]; }
+let pcWas = null, pcRT = 0;
+window.addEventListener("resize", ()=>{
+  clearTimeout(pcRT);
+  pcRT = setTimeout(()=>{ const on = pcMode(); if(on !== pcWas){ pcWas = on; if(typeof state !== "undefined" && state) render(); } }, 150);
+});
+const actionsPC = {
+  pcTab(b){ const t = b.dataset.t; if(t === pcTab && pcTabOpen) pcTabOpen = false; else { pcTab = t; pcTabOpen = true; } render(); }
+};
+
 const VIEWS = {slots:viewSlots, guide:viewGuide, world:viewWorld, advclass:viewAdvClass, combat:viewCombat, settings:viewSettings, title:viewTitle, create:viewCreate, sheet:viewSheet, dungeon:viewDungeon, explore:viewExplore, city:viewCity, cemetery:viewCemetery, save:viewSave};
 function render(){
   normalizeHands();
@@ -6884,9 +7023,11 @@ function render(){
   if(state.world && state.hero && !(state.dungeon && state.dungeon.inside) && (state.screen==="dungeon" || (state.screen==="city" && !worldCityHere()))) state.screen = "world";
   if(state.screen==="explore" && !(state.dungeon && state.dungeon.inside)) state.screen = "sheet";
   if(state.screen==="combat" && !(state.combat && state.hero)) state.screen = state.hero && state.dungeon && state.dungeon.inside ? "explore" : "title";
+  const pcScroll = pcScrollGet();
   $("#app").innerHTML = (VIEWS[state.screen]||viewTitle)() + (state.ui.cult ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Armadilha!</h3><p>${esc(state.ui.cult.txt)}</p><p>Descartar um item do Cultista para ignorar a armadilha?</p>
     ${state.ui.cult.list.map((o,k)=>`<button class="btn" data-act="cultUse" data-k="${k}">Descartar ${esc(o.n.split(" (")[0])}${o.where === "armor" ? " (equipado)" : ""}</button>`).join("")}
     <button class="btn ghost" data-act="cultNo">Não, enfrentar a armadilha</button></div></div>` : "") + (COOP.on() && COOP.paused() ? `<div class="lastbox"><div class="sheet" role="alertdialog"><h3>Jogo pausado</h3><p>Aguardando ${esc(COOP.partner().name)} se reconectar. Nada se perde enquanto isso.</p></div></div>` : "");
+  pcLayout(state.screen, pcScroll); pcWas = pcMode();
   const dr = state.draft;
   if(state.screen==="create" && dr){
     const tray = $("#tray");
@@ -8030,6 +8171,7 @@ const COOP_LOCKED = new Set(["whistle","cwhistle","coopTake","attack","cspell","
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-act]");
   if(b && (b.dataset.act === "cultUse" || b.dataset.act === "cultNo") && !b.disabled){ cultAnswer(b.dataset.act === "cultUse" ? +b.dataset.k : null); return; }
+  if(b && b.dataset.act === "pcTab"){ actionsPC.pcTab(b); return; }
   if(!b || busy || b.disabled) return;
   if(COOP.on() && COOP.paused()){ return; }
   if(COOP.on() && COOP_LOCKED.has(b.dataset.act)){
