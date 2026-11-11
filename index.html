@@ -518,7 +518,7 @@ const SPELL_INFO = {
   "Invocar Elemental":{e:"Invoca um Elemental (3 PV; Dano 2) para te ajudar até o final do combate.",use:"combat"},
   "Armadura de Pedra":{e:"Cria uma peça de armadura com 5 PV. Se destrói depois que sair da masmorra.",use:"dg"},
   "Desmoronamento":{e:"Uma sala de uma masmorra é completamente destruída com tudo dentro.",use:"soon"},
-  "Abrir Portal":{e:"Pode abrir um Portal temporário. Você não sabe para onde ele vai dar.",use:"soon"},
+  "Abrir Portal":{e:"Pode abrir um Portal temporário. Você não sabe para onde ele vai dar.",use:"world"},
   "Paralisar":{e:"Deixa todos monstros de uma sala sem atacar por 2 turnos.",use:"combat"},
   "Voar":{e:"Pode se mover por um terreno qualquer sem gastar qualquer Provisão e ativar Evento.",use:"world"},
   "Recarregar Mana":{e:"Recupera 1 uso de uma outra magia.",use:"any"},
@@ -560,7 +560,7 @@ const ADV_CLASSES = [
   {n:"Sobrevivente",cost:100,req:"Ter andado por dois desertos.",pv:4,adv:"Nenhuma.",goal:(h,H)=>[H.deserts,2]},
   {n:"Ladrão",cost:120,req:"Ter aberto pelo menos 4 fechaduras.",pv:0,adv:"Não gasta tochas quando Abrir Fechaduras.",goal:(h,H)=>[H.locks,4]},
   {n:"Multidestro",cost:200,req:"Ser Ambidestro",pv:0,adv:"Pode atacar com cada arma que estiver usando",ok:(h)=>hasClass("Ambidestro",h)},
-  {n:"Nobre",cost:200,req:"Falar com o Rei de uma Fortaleza.",pv:0,adv:"Pode construir um castelo em uma região vazia.",how:"No app: as construções ainda vão chegar.",ok:(h,H)=>H.king>0},
+  {n:"Nobre",cost:200,req:"Falar com o Rei de uma Fortaleza.",pv:0,adv:"Pode construir um castelo em uma região vazia.",ok:(h,H)=>H.king>0},
   {n:"Clérigo",cost:200,req:"Ter enfrentado um Morto-Vivo.",pv:1,adv:"Ganha 2 usos da magia Cura.",ok:(h,H)=>H.undead>0,fixed:{"Cura":2}},
   {n:"Druida",cost:200,req:"Ter passado por 6 florestas.",pv:0,adv:"Ganha 4 Magias da Natureza aleatórias.",goal:(h,H)=>[H.forests,6],give:[["natureza",4]]},
   {n:"Necromante",cost:200,req:"Saber usar Raio de Gelo.",pv:0,adv:"Ganha 4 Magias da Morte aleatórias.",ok:(h)=>knownSpells(h).includes("Raio de Gelo"),give:[["morte",4]]},
@@ -575,8 +575,8 @@ const ADV_CLASSES = [
   {n:"Alquimista",cost:400,req:"Conhecer 4 magias quaisquer.",pv:2,adv:"Gastando 50 moedas faz 1 Poção de Vida.",goal:(h)=>[knownSpells(h).length,4]},
   {n:"Arcano",cost:500,req:"Saber 6 Magias diferentes.",pv:3,adv:"Ganha 4 Magias Avançadas aleatórias.",goal:(h)=>[knownSpells(h).length,6],give:[["avancada",4]]},
   {n:"Lich",cost:500,req:"Ser Necromestre e ter morrido.",pv:6,adv:"Ganha 4 Magias da Morte aleatórias.",soon:true,give:[["morte",4]]},
-  {n:"Lorde",cost:600,req:"Ter construído um castelo.",pv:0,adv:"Pode construir uma Cidade.",soon:true},
-  {n:"Rei",cost:1000,req:"Ter construído uma cidade.",pv:0,adv:"Pode construir uma Fortaleza.",soon:true},
+  {n:"Lorde",cost:600,req:"Ter construído um castelo.",pv:0,adv:"Pode construir uma Cidade.",how:"No app: construa um Castelo no mapa.",ok:(h,H)=>H.castle>0},
+  {n:"Rei",cost:1000,req:"Ter construído uma cidade.",pv:0,adv:"Pode construir uma Fortaleza.",how:"No app: construa uma Cidade no mapa.",ok:(h,H)=>H.cityb>0},
   {n:"Imperador",cost:6000,req:"Ter 1 Fortaleza e 3 vassalos.",pv:0,adv:"Governar o mundo.",soon:true}
 ];
 const ADV_BY_NAME = Object.fromEntries(ADV_CLASSES.map(a=>[a.n,a]));
@@ -587,7 +587,7 @@ function H(h){
   h = h || state.hero;
   if(!h.hist) h.hist = {};
   const x = h.hist;
-  ["total","bosses","dungeons","locks","sold","magic","armorLost","undead","avenged","forests","deserts","boat","provSpent","arena","king"].forEach(k=>{ if(x[k]===undefined) x[k] = 0; });
+  ["total","bosses","dungeons","locks","sold","magic","armorLost","undead","avenged","forests","deserts","boat","provSpent","arena","king","castle","cityb"].forEach(k=>{ if(x[k]===undefined) x[k] = 0; });
   if(!x.cities) x.cities = [];
   if(!x.kills) x.kills = {}; if(!x.tags) x.tags = {}; if(!x.sets) x.sets = {};
   return x;
@@ -2239,6 +2239,7 @@ function killHero(cause){
 /* existe caminho até a saída sem atravessar salas com monstros acordados? (sobe os níveis pelas escadas) */
 function exitRoute(){
   const d = D(); let level = d.pos.level, cur = d.pos.seg; const by = [];
+  if(d.noExit) return {ok:false, by};
   for(let guard=0; guard<6; guard++){
     const lv = d.levels[level]; if(!lv) return {ok:false, by};
     const target = Object.values(lv.segs).find(s => level===1 ? s.exit : s.up);
@@ -2713,6 +2714,7 @@ async function doDefeat(){
     rollNote(`${v[0]+v[1]} tesouros`);
     seg.loot = {tres: v[0]+v[1]};
     d.complete = true;
+    if(d.noExit){ seg.bossRoom = true; log("Na parede do fundo da sala do Chefe, um Portal se abre."); }
     log(`Atrás do chefe você encontra ${v[0]+v[1]} Tesouros. Masmorra completada!`);
     if(DT().relic){
       const [r] = await roll(DT().relic.n, 1), txt = DT().relic.list[r-1];
@@ -3097,6 +3099,8 @@ const SPR = {
 "..o.....o..","..oo...oo..","..ooooooo..",".ooooooooo.",".oyooooyoo.",".oooopoooo.","..oowwwoo..","...ooooo..o","..ooooooo.o","..ooooooooo","..oo.o.oo.."]},
 "Vigia":{base:"Gárgula",pal:{g:"#a8a294",G:"#8a8476",h:"#c8c2b0",w:"#76705e",r:"#4ac8f8",c:"#5a5648"},fx:"none"},
 "Lorde Demônio":{base:"Gárgula",pal:{g:"#b02a1a",G:"#7a1a10",h:"#2a1a1a",w:"#4a1010",r:"#f8e040",c:"#2a1010"},fx:"fire"},
+"Demônio":{base:"Gárgula",pal:{g:"#c8502a",G:"#8a2e1a",h:"#3a1a1a",w:"#5a1a14",r:"#f8c040",c:"#3a1210"},fx:"none"},
+"Alma Penada":{base:"Fantasma do Príncipe",pal:{g:"#b8e8d8",G:"#78b0a0",k:"#1a3a3a",y:"#ffffff",Y:"#ffffff"},alpha:.6,fly:3},
 "Deus Serpente":{base:"Serpente",pal:{g:"#c89a30",G:"#9a6a18",y:"#e02828"},crown:true,crownAt:[8,0]},
 "Serpente de Fogo":{base:"Serpente",pal:{g:"#e05020",G:"#a82a10",y:"#fce870",t:"#f8e040"},fx:"fire"},
 "Vespa Gigante do Ferrão Mortal":{pal:{h:"#3a2a1a",r:"#e02828",w:"#d8e8f4",b:"#2a2a20",y:"#f0c020",s:"#e8e0c8"},fx:"wings",fly:6,rows:[
@@ -3113,6 +3117,11 @@ const SPR = {
 const SPR_ALIAS = {"Gárgula Profana":"Gárgula Profana","Cão Infernal":"Cão Infernal","Guardião Etéreo":"Guardião Etéreo","Rei Necrótico":"Rei Necrótico","Vigia":"Vigia"};
 /* chefes redesenhados (maiores e mais detalhados) */
 Object.assign(SPR, {
+"Dracolich":{base:"Dragão",pal:{r:"#d8d4bc",R:"#8a8670",l:"#f2eedc",w:"#3a2a52",b:"#7a4aa8",B:"#4e2a78",k:"#0e0a18",S:"#e8e0f0",y:"#62ff9a"},fx:""},
+"Bolorde":{pal:{c:"#f8d840",f:"#fff4f0",g:"#6a9a3a",y:"#f8e040",k:"#2a1a20",p:"#f08aa8",P:"#c0587a",s:"#d8a060",S:"#a8703a",W:"#e8e8f0"},head:[8,0],rows:["....c..c..c.....", "....cccccccc....", "..ffffffffffff..", ".ffgfffffffgffff", ".ffykfffffykfff.", ".ffffkkkkkkffff.", "pppppppppppppppp", "PpPpPpPpPpPpPpPp", "ssssssssssssssss", "sSsSsSgsSsSsSsSs", "ssssssggsssssssS", "pppppppppppppppp", "ssssssssssssssss", "SSSSSSSSSSSSSSSS", "WWWWWWWWWWWWWWWW"]},
+"Maçã de Armor":{pal:{t:"#6a4a2a",g:"#4aa03a",m:"#9aa2b6",M:"#61687a",L:"#d0d6e4",r:"#d82a2a",w:"#ffffff",k:"#1a1018",l:"#f07060",s:"#8c5628",Q:"#c8ccd8"},head:[7,2],rows:["......tg......", "......tgg.....", "...mmmmmmmm...", "..mLLmmmmMMM..", "..rrrrrrrrrrQ.", "..rwkrrrrwkrs.", "..rlrrrrrrrrs.", "..rrrkkkkrrrs.", "...rrrrrrrr.s.", "..mmmmmmmmmms.", ".mmMLmmmmMLmms", ".mmmmmmmmmmmms", "..mmMMmmMMmm.s", "...mm....mm..s", "...mM....Mm...", "..kkk....kkk.."]},
+"Marshminion":{pal:{w:"#f8f4ee",W:"#d8d0c8",G:"#8a8490",e:"#ffffff",k:"#2a1a20",p:"#f0a0b8"},head:[6,0],rows:["...w..w.w...", "..wwwwwwww..", ".wwwwwwwwww.", "GGGGGGGGGGGG", "GGGekGGkeGGG", "GGGeeGGeeGGG", ".wwwwwwwwww.", ".wwkwwwwkww.", ".wwwkkkkwww.", ".wwwwwwwwww.", "wwwwwwwwwwww", "W.wwwwwwww.W", "..WWWWWWWW..", "..pp....pp.."]},
+"Barão Infernal":{base:"Lorde Demônio",pal:{g:"#5a1a4a",G:"#34102e",L:"#8a3a78",c:"#180818",w:"#d8b848",k:"#0a040a",y:"#40f0ff",f:"#c040ff"},crown:true,crownAt:[18,1]},
 "Anjo da Vingança":{"pal": {"w": "#2e2a34", "W": "#4a4452", "a": "#6a2a3a", "A": "#4a1a28", "q": "#f0f4ff", "s": "#e8d8d0", "S": "#b8a8a0", "h": "#f0f0f0", "e": "#ff2a2a", "y": "#c83a1a", "f": "#ff8a30"}, "rows": ["..................yyyy...yyyy", ".................y...........y", "....w..................h..................w", "....ww................hhh................ww", "....Www..............hhhhh..............wwW", "...wwWww............hhhshhh............wwWww", "...wwwWWw.........hhhhssshhhh.......qfwWWwww", "..wwwwwwWw........hhhhssshhhh......eqwWwwwwww", "..wwwwwwwWww......hhhesssehhh......wqWfwwwwww", "..wwwwwwwwWww.....hhssssssshh.....weqwwwwwwww", ".wwwwwwwwwWWww....hhssssssshh....wwWqfwwwwwwww", ".wwwwwwwwwwwWww...h.ssSSSss.h...wwWeqwwwwwwwww", "....wwwwwwwwwWww..h..sssss..h..wwWwwqwfwwww", "..WWwwwwwwwwwwWWw.h..aasaa..h.wWWwweqwwwwwwWW", "...wWWWwwwwwwwwwWwAaaaaaaaaaAwWwwwwwqfwwWWWw", "...wwwwWWWwwwwwwwWAaaaaaaaaaAWwwwwweqWWWwwww", "...wwwwwwWWWwwwwwssqqqqqqqqqsswwwwwWqWfwwwww", "..wwwwwwwwwwWWWwsssqqqqqqqqqssswWWWeqwwwwwwww", "..www.wwwwwwwwwsssaqqqqqqqqqassswwwwqfwww.www", "..w...wwwwwwwwsssAaqqqqqqqqqaAssswweqwwww...w", "....WWWWWWWWWsssWAaqqqqqqqqqaAWsssWWqWfWWWW", ".....wwwwwwwsssw.AaqqqqqqqqqaA.wssseqwwwww", ".....wwwwwwwsswWWAaqqqqqqqqqaAWWwsswqfwwww", ".....www..wwWWWw.AaaaaaaaaaaaA.wWWWeq..www", "....www...wWwwwwAaaaaaaaaaaaaaAwwwwWq.f.www", "....ww..WWWwwww.AaaaaaaaaaaaaaA.wwweqWW..ww", "....w.WW..wwww..AaaaaaaaaaaaaaA.yyyyyyyyy.w", "..........www...AaaaaaaaaaaaaaA...wwq", "..........ww....AaaaaaaaaaaaaaA....wq", "..........w....AaaaaaaaaaaaaaaaA....q", "...............AaaaaaaaaaaaaaaaA....q", "...............AaaaaaaaaaaaaaaaA....q", "...............AaaaaaaaaaaaaaaaA....q", "...............AaaaaaaaaaaaaaaaA....q", "...............AaaaaaaaaaaaaaaaA....q", "..............AaaaaaaaaaaaaaaaaaA", "..............AaaaaaaaaaaaaaaaaaA", "..............AaaaaaaaaaaaaaaaaaA", "..............A.................A"], "fx": "none"},
 "Barqueiro da Morte":{"pal": {"k": "#1a1a24", "K": "#34344a", "X": "#0a0a10", "w": "#ece4cc", "o": "#6a4424", "O": "#8c5a30", "r": "#ff3030", "f": "#9af0a0", "m": "#6a7a8a"}, "rows": ["....................K", "..................KKKKK", "...............KKKKKKKKKKK", "................KKKKKKKKK", "................KKXXXXXKK....oo", "................KKXXXXXKK....oo", "................KKrXXXrKK....oo", "................KKXXXXXKK....oo", "................KKXwXwXKK....oo", "................KKXXwXXKK...ooo", "..............KkkkkkkkkkkkK.oo", "..............KkkkkkkkkkkkK.oo", "..............KkkkkkkkkkkkK.oo", "..............KkkkkkkkkkkkK.oo", "....OO.......Kkkkkkkkkkkkkwwww", "..kkkkO......Kkkkkkkkkkkkkwwww", "..kffk.OO....Kkkkkkkkkkkkkwwww", "..kffk..O....Kkkkkkkkkkkkkwwww", "..kffk..O....Kkkkkkkkkkkkkkoo", "..kkkk..O....Kkkkkkkkkkkkkkoo", "........O...KKkkkkkkkkkkkkkoo", "........O...Kkkkkkkkkkkkkkooo", "........O...KkkkkkkkkkkkkkooK", "........O...KkkkkkkkkkkkkkooK", "........O...KkkkkkkkkkkkkkooK", "........O...KkkkkkkkkkkkkkooK", "........O...KkkkkkkkkkkkkkooK", "........O...KkkkkkkkkkkkkoooK", "........O..KkkkkkkkkkkkkkookkK", "........O..KkkkkkkkkkkkkkookkK", "..OOOOOOOOOKkkkkkkkkkkkkkookkKOOOOOOOOO", "...ooooooooKoooooooooooooooooKoooooooo", "....ooooooooooooooooooooooooooooooooo", "....ooookkooookkooookooooooooookkoooo", ".....ooooooooooooooooooOOOOOoooooooo", ".....ooooooooooooooooooOOOOooooooooo", "......oooooooooooooooooOOOOoooooooo", "......kkkkkkkkkkkkkkkkkOOOOkkkkkkkk", "..m...m...m...m...m...mOOOm...m...m...m", "m...m...m...m...m...m..OmOO.m...m...m...m"], "fx": "none"},
 "Barão Zumbi":{"pal": {"g": "#7a9a72", "G": "#55704e", "L": "#9ab890", "k": "#1e1a28", "K": "#3a2a52", "r": "#7a1c24", "R": "#4a1018", "y": "#e0b038", "w": "#e8e0cc", "W": "#b0a890", "X": "#1a1014", "Y": "#f0f070", "p": "#2a2434", "P": "#14101a", "h": "#3a2210"}, "rows": [".......................www", "......................wW", "............kkkkkkkkwwkkk", "............kkkkkkkkkkkkk", "............kkkkkkkkkkkkk", "............kkkkkkkkkkkkk", ".........kkkkkyyyyyyyyykkkkk", "..........yyyyykkkkGkkyyyyy", ".............LLLggggGLLL", ".............LXXggggXXLL", ".............LYYggggXXLL", ".............ggggggggwgg", ".............Ggggggggggg", "..............gXwXwXXgg........yyy", "............wwgggggwgggww.......h", ".............wgggg.ggggw........h", ".........kKKKKwwww.wwwwKKKKk....h", ".....KKKKKKKKKrwww.wwwrKKKKKKKKKh", ".KKKKKKKKKKKKKrywR.RwyrKKKKKKKKKhKKK", "gggKKKKKKKKKKKrrRW.WRrrKKKKKKKKKhKgg", "gggKKKKKKKkKKKrrRR.XXXXKKKKKKKKKhKgg", "ggg.....kKKKKKryRR.wwwwKKKKKKKK.h.gg", "g.G.....kKKKKKrrRR.XXXXKKKKKKKK.h.G", "........kKkKKKrrRR.wwwwKKKKKKKK.h", "........kKKKKKryRR.XXXXKKKKKKKK.h", "........kKKKKKrrRR.RRrrKKKKKKKgggg", "........kKkKKKrrRR.RRrrKKKKggggggg", "........kKKKKKryRR.RRyrKKKKggggggg", "........kKKKKKrrrr.rrrrKKKKgggg.h", "........kKkKKKKKK...KKKKKKkKk...h", ".......k.KKKKKKKK...KKKKKKKK.k..h", ".......k.KKKKKKKK...KKKKKKKK.k..h", ".......k.KkKKKKKK...KKKKKKkK.k..h", ".......k.KKKKKKKK...KKKKKKKK.k..h", ".......k.....pppp...pppp.....k..h", ".............pppp...pppp........h", ".............PPPP...PPPP........h", ".............PPPP...PPPP........h", "............PPPPP...PPPPP.......h"], "fx": "none"},
@@ -5184,6 +5193,7 @@ function viewExplore(){
     const er = exitRoute();
     popHTML = isBlocked ? `<span class="pwarn">Monstros bloqueiam a saída</span>`
       : er.ok ? `<button class="pbtn" data-act="leave">Sair da masmorra</button>`
+      : D().noExit ? `<span class="pwarn">Sem porta para sair. O portal está na sala do Chefe.</span>`
       : `<span class="pwarn">Monstros em ${esc(er.by.map(n=>n.toLowerCase()).join(" ou "))} bloqueiam o caminho</span>`;
   } else if(selObj === "stairs" && !isBlocked && (seg.down || seg.up)){
     popHTML = (seg.down ? `<button class="pbtn" data-act="descend">${descLabel(seg)}</button>` : "")
@@ -5191,6 +5201,7 @@ function viewExplore(){
   } else if(selObj){ state.ui.selObj = null; }
   if(isBlocked && DT().mine && /^(CW|CWN)$/.test(seg.code) && !seg.cart) acts.push(`<button class="btn" data-act="cart">Descer o trilho no carrinho <small>(1d6+3 em cada monstro no caminho)</small></button>`);
   if(!isBlocked){
+    if(D().noExit && seg.bossRoom) acts.push(`<button class="btn" data-act="bossPortal">Atravessar o Portal da sala do Chefe</button>`);
     if(seg.loot) acts.push(`<button class="btn" data-act="loot">Pegar: ${lootText(seg.loot)}</button>`);
     if(seg.stash && seg.stash.length && !state.ui.bagFull) acts.push(`<button class="btn" data-act="takeStash">Itens deixados aqui (${seg.stash.length})</button>`);
     if(seg.chests>0) acts.push(`<button class="btn" data-act="chest">Abrir baú</button>`);
@@ -5590,6 +5601,7 @@ async function heroItem(idx){
   if(/^Pó da Fuga/.test(it.n)){ h.bag.splice(idx,1); cLog("Você joga o Pó da Fuga e foge da batalha!"); fleeCombat(); return; }
   busy = true; lockButtons();
   if(/^Poção de Vida/.test(it.n)){ h.pv = h.pvMax; cLog("Você bebe a Poção de Vida e recupera todos os PV."); }
+  else if(/^Poção dos Sonhos/.test(it.n)){ cLog(drinkDream(h)); }
   else if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3){ h.pv = h.pvMax; cLog(`Poção Verdosa (${v}): você recupera todos os PV.`); } else cLog(`Poção Verdosa (${v}): só te deu coceira.`); }
   else if(/^Poção da Fúria/.test(it.n)){ c.fury = 2; cLog("Você bebe a Poção da Fúria: +2 de dano até o fim do combate."); }
   else if(/^Poção de Magia|^Poção de Mana/.test(it.n)){ Object.values(h.spells).forEach(s=>s.left=s.max); cLog("Você bebe a poção e recupera todas as magias."); }
@@ -6061,7 +6073,9 @@ function viewSave(){
    Hexágonos com a face reta em cima (o lado 1 é o de cima, contando em sentido horário).
    Por enquanto só existem as regiões quentes.
    ========================================================= */
-const TERR = {pl:{n:"Planície", a:"a", cost:1}, mo:{n:"Montanha", a:"a", cost:3}, fl:{n:"Floresta", a:"a", cost:2}, pa:{n:"Pântano", a:"o", cost:2}, de:{n:"Deserto", a:"o", cost:2}, ag:{n:"Água", a:"a", cost:2}};
+const TERR = {mm:{n:"Mar de Magma", a:"o", cost:0}, pl:{n:"Planície", a:"a", cost:1}, mo:{n:"Montanha", a:"a", cost:3}, fl:{n:"Floresta", a:"a", cost:2}, pa:{n:"Pântano", a:"o", cost:2}, de:{n:"Deserto", a:"o", cost:2}, ag:{n:"Água", a:"a", cost:2},
+  ms:{n:"Mar de Sangue", a:"o", cost:0}, fe:{n:"Floresta de Empalados", a:"a", cost:2}, pe:{n:"Planície de Espinhos", a:"a", cost:1},
+  mk:{n:"Mar de Milk Shake", a:"o", cost:2}, fp:{n:"Floresta de Pirulito", a:"a", cost:2}, mh:{n:"Montanha de Marshmallow", a:"a", cost:3}, pc:{n:"Planície de Caramelo", a:"a", cost:1}};
 /* Tabela: Terreno (Região Quente). Coluna = terreno atual, linha = 1d6 */
 const TERR_HOT = {
   pl:["ag","mo","fl","pl","pl","pl"],
@@ -6091,6 +6105,27 @@ const EVENTS_HOT = {
   pa:[WM("Gigante de Musgo","Gigantes de Musgo",20,2,"","1","Fungóide"), WC("Chuva pesada","A chuva estraga 1 provisão.","prov",1), WC("Tempestade","A tempestade estraga 2 provisões.","prov",2)],
   de:[WM("Verme Gigante","Vermes Gigantes",30,10,"","1","Sangue Suga Gigante"), WC("Tempestade de Areia","A tempestade de areia estraga 2 provisões.","prov",2), WC("Tempestade de Areia","A tempestade de areia estraga 2 provisões.","prov",2)]
 };
+/* ---------- Outros mundos (página 32) ---------- */
+const WMD = (spec, drop) => Object.assign(spec, {drop});
+const REALMS = {
+  inferno:{n:"Inferno", start:"pl", terr:["mm","mm","mo","pl","pl","pl"],
+    loc:[["city","Orc","Cidade Demoníaca"],["city","Orc","Cidade Demoníaca"],["city","Orc","Cidade Demoníaca"],["portal"],["portal"],["city","Humana","Cidade dos Sobreviventes"]],
+    ev:[WMD(WM("Barão Infernal","Barões Infernais",60,9,"","1","Barão Infernal"),"mag"), WMD(WM("Lorde Demônio","Lordes Demônios",30,8,"","1","Lorde Demônio"),"mag"), WM("Demônio","Demônios",10,3,"","1","Demônio"), WM("Imp","Imps",2,1,"","2d6","Imp"), WC("Chuva de fogo","Uma chuva de fogo cai do céu: você perde 3 PV.","pv",3)]},
+  mortos:{n:"Mundo dos Mortos", start:"pa", terr:["ag","ag","mo","pa","pa","pa"],
+    loc:[["fog"],["fog"],["fog"],["fog"],["portal"],["portal"]],
+    ev:[WMD(WM("A Morte","A Morte",30,3,"Morte Súbita","1","A Morte"),"death"), WM("Alma Penada","Almas Penadas",4,3,"Intangível","1","Alma Penada"), WM("Alma Penada","Almas Penadas",2,2,"Intangível","1","Alma Penada"), WC("Névoa sinistra","A névoa sinistra estraga 1 provisão.","prov",1),
+      {k:"alma", n:"Alma de um aventureiro", txt:"Você encontrou a alma de um antigo aventureiro morto. Se quiser ajudá-lo, role 1d6. Com 6, a alma passa a te seguir e ressuscita quando você voltar ao mundo dos vivos. Com 5 ou menos, ela vai para o Inferno."}]},
+  pesadelum:{n:"Pesadelum", start:"pe", terr:["ms","fe","pe","pe","mo","mo"],
+    loc:[["fort","Goblin","Fortaleza Goblin"],["city","Goblin","Cidade Goblin"],["ruins"],["house"],["portal"],["city","Humana","Cidade dos Sobreviventes"]],
+    ev:[WM("Dracolich","Dracolichs",30,8,"Necromancia","1","Dracolich"), WMD(WM("Tentáculo","Tentáculos",20,6,"Regeneração","1","Deus Tentáculo"),"sonhos"), WM("Goblin","Goblins",3,1,"Explosivo","1d6","Goblin"),
+      WC("Distorção temporal","O tempo se dobra e você reaparece em outro lugar.","drift",0), WC("Distorção temporal","O tempo se dobra e você reaparece em outro lugar.","drift",0)]},
+  doces:{n:"Mundo dos Doces", start:"pc", terr:["mk","mk","fp","mh","pc","pc"],
+    loc:[["fort","Mandolate","Fortaleza do Rei Mandolate"],["city","Chocolate","Cidade de Chocolate"],["city","Chocolate","Cidade de Chocolate"],["nothing"],["nothing"],["portal"]],
+    ev:[WMD(WM("Bolorde","Bolordes",10,4,"Regeneração","1","Bolorde"),"doce"), WMD(WM("Soldado Maçã de Armor","Soldados Maçã de Armor",10,2,"","1","Maçã de Armor"),"doce"), WMD(WM("Marshminion","Marshminions",4,2,"","1","Marshminion"),"doce"), WMD(WM("Marshminion","Marshminions",4,2,"","2","Marshminion"),"doce"),
+      WC("Chuva de Glacê","A chuva de glacê gruda nas suas coisas e estraga 1 provisão.","prov",1)]}
+};
+const rfl = n => { const w = WD(); return !!(w && w.rf && w.rf[(w.realm||"home") + ":" + n]); };
+const rset = n => { const w = WD(); w.rf = w.rf || {}; w.rf[(w.realm||"home") + ":" + n] = 1; };
 /* Tabela: Tipo de Masmorra (página 29). Tipos que ainda não existem no jogo são rolados de novo */
 const DG_TYPE = {
   pl:["Palácio","Cripta","Tumba","Santuário","Templo","Calabouço"],
@@ -6173,9 +6208,10 @@ function raceIs(n, h){ h = h || state.hero; return !!h && [R(h.race), R(h.race2)
 function wLog(m){ const w = WD(); if(!w) return; w.log.unshift(m); if(w.log.length > 40) w.log.length = 40; }
 function locLabel(loc){
   if(!loc) return "";
+  if(loc.nm) return loc.nm;
   if(loc.k === "city") return `Cidade ${loc.race}`;
   if(loc.k === "fort") return `Fortaleza ${loc.race}`;
-  return {ruins:"Ruínas", volcano:"Vulcão", portal:"Portal", oasis:"Oásis", corals:"Corais", rocks:"Rochas"}[loc.k] || "";
+  return {house:"Casa Abandonada", fog:"Neblina densa", ruins:"Ruínas", volcano:"Vulcão", portal:"Portal", oasis:"Oásis", corals:"Corais", rocks:"Rochas"}[loc.k] || "";
 }
 function isTown(loc){ return !!loc && (loc.k === "city" || loc.k === "fort"); }
 /* cidade onde o aventureiro está e pode entrar (ou null) */
@@ -6191,9 +6227,13 @@ function worldStartSpec(h){
   return {t:"pl", loc:{k:"city", race:"Humana"}};
 }
 function worldGen(t){
-  const nt = TERR_HOT[t][d6()-1];
+  const wd = WD(), rl = wd && wd.realm && REALMS[wd.realm];
+  let nt = rl ? rl.terr[d6()-1] : TERR_HOT[t][d6()-1];
+  if(nt === "pl" && rfl("pw")) nt = "ag";
   let loc = null;
-  if(d6() === 6){ const [k, race] = LOC_HOT[nt][d6()-1]; if(k !== "nothing") loc = race ? {k, race} : {k}; }
+  if(rl){ if(nt !== "mm" && nt !== "ms" && nt !== "mk" && d6() === 6){ const [k, race, nm] = rl.loc[d6()-1]; if(k !== "nothing"){ loc = {k}; if(race){ loc.race = race; loc.nm = nm; } } } }
+  else if(d6() === 6){ const [k, race] = LOC_HOT[nt][d6()-1]; if(k !== "nothing") loc = race ? {k, race} : {k}; }
+  if(loc && isTown(loc) && rfl("fut")) loc = {k:"ruins"};
   return {t:nt, loc};
 }
 function worldReveal(k){
@@ -6216,9 +6256,26 @@ function worldInit(){
   }
   wLog(sp.water ? "Sua jornada começa num barco, no meio do mar." : `Sua jornada pelo mundo começa na ${locLabel(sp.loc)}.`);
 }
+/* guarda o mapa do mundo atual e carrega outro (home = mundo dos vivos) */
+function realmSwitch(id){
+  const w = WD(), cur = w.realm || "home"; if(cur === id) return;
+  w.maps = w.maps || {};
+  w.maps[cur] = {hex:w.hex, pos:w.pos, boat:w.boat};
+  const m = w.maps[id]; delete w.maps[id];
+  w.realm = id === "home" ? undefined : id;
+  if(m){ w.hex = m.hex; w.pos = m.pos; w.boat = m.boat; }
+  else { w.hex = {}; w.pos = "0,0"; w.boat = false; w.hex["0,0"] = {t:REALMS[id].start, loc:null}; worldReveal("0,0"); }
+  w.sel = null; w.ev = null; wcenterOn = true; state.ui.wHere = null;
+  const h = state.hero;
+  if(id === "home" && h && h.soul){
+    delete h.soul; party(h).push({id:newPid(), kind:"animal", n:"Aventureiro Ressuscitado", pv:8, max:8, d:"2", key:"Cultista", free:true});
+    wLog("De volta ao mundo dos vivos, a alma que te seguia ressuscita e passa a lutar ao seu lado.");
+  }
+}
 /* novo aventureiro num mundo que já existe: começa na cidade mais próxima onde pode entrar */
 function worldPlaceNew(h){
   const w = WD(); if(!w) return;
+  if(w.realm) realmSwitch("home");
   h.provisions = 20; w.boat = false; w.ev = null; w.sel = null;
   const towns = Object.keys(w.hex).filter(k=>isTown(w.hex[k].loc) && canEnterCity(w.hex[k].loc, h) && !w.hex[k].banned);
   towns.sort((a,b)=>hexDist(a,"0,0")-hexDist(b,"0,0"));
@@ -6252,7 +6309,8 @@ function canTravel(k){
   if(w.ev) return {ok:false, why:"Resolva o encontro antes de seguir viagem."};
   if(!hexNb(w.pos).includes(k)) return {ok:false, why:`Fica a ${hexDist(w.pos,k)} hexágonos daqui. Viaje um hexágono por vez.`};
   if(hx.loc && hx.loc.k === "rocks") return {ok:false, why:"Rochas: não é possível passar por aqui."};
-  if(hx.t === "ag" && !w.boat && !canSwim() && hasItem(/^Barco Dobrável/) < 0) return {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
+  if(hx.loc && hx.loc.k === "fog") return {ok:false, fog:true, why:"Neblina densa: não dá para atravessar. Gaste 1 provisão para esperar ela dissipar."};
+  if(hx.t === "ag" && !w.boat && !canSwim() && hasItem(/^Barco Dobrável/) < 0) return w.realm === "mortos" ? {ok:false, charon:true, why:"Deseja chamar o Barqueiro?"} : {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
   return {ok:true};
 }
 function dgRec(m){ const w = WD(), d = state.dungeon; return d && d.uid === m.uid ? d : (w.recs[m.uid] || null); }
@@ -6276,7 +6334,7 @@ async function doTravel(k, how){
   const cost = fly ? 0 : travelCost(k);
   const have = h.provisions||0, use = Math.min(have, cost), miss = cost - use;
   h.provisions = have - use; H().provSpent += use;
-  w.trips++; w.days += fly ? 1 : TERR[hx.t].cost;
+  w.trips++; w.days += fly ? 1 : Math.max(1, TERR[hx.t].cost);
   const prev = w.pos;
   if(hx.t === "pl" && hasAlly("Cavalo") && !fly) w.horse = !w.horse;
   w.pos = k; w.sel = null; wcenterOn = true;
@@ -6298,6 +6356,34 @@ async function doTravel(k, how){
 }
 async function arriveHex(k, fly){
   const w = WD(), h = state.hero, hx = w.hex[k], loc = hx.loc;
+  if(hx.t === "mm" && !fly){
+    const v = await roll("Mar de Magma", 2), dm = v[0] + v[1];
+    rollNote(`${dm} de dano`); wLog(`O Mar de Magma queima você: ${dm} de dano.`);
+    if(!hurt(dm, "Queimado no Mar de Magma")) return;
+  }
+  if(!fly && hx.t === "ms"){
+    const [dv] = await roll("Correnteza de sangue", 1);
+    wLog("O Mar de Sangue te engole: 3 de dano."); rollNote("3 de dano");
+    if(!hurt(3, "Afogado no Mar de Sangue")) return;
+    const n = hexNb(w.pos)[dv-1], nx = w.hex[n];
+    if(nx && !(nx.loc && nx.loc.k === "rocks")){
+      w.pos = n; wcenterOn = true; worldReveal(n);
+      if(isTown(nx.loc)){ const x = H(); if(!x.cities.includes(n)) x.cities.push(n); }
+      wLog(`A correnteza te joga para ${nx.loc ? "a " + locLabel(nx.loc) : TERR[nx.t].a + " " + TERR[nx.t].n}.`);
+    } else wLog("A correnteza te joga contra as rochas e você fica onde está.");
+    return;
+  }
+  if(!fly && hx.t === "pe"){ wLog("Os espinhos ferem você: 1 de dano."); if(!hurt(1, "Empalado nos espinhos da Planície")) return; }
+  if(!fly && hx.t === "fe"){
+    const [v] = await roll("Floresta de Empalados", 1);
+    if(v === 1){ rollNote("Catatônico"); h.provisions = Math.max(0, (h.provisions||0)-1); w.days++; wLog("Horripilante! Você fica catatônico: perde o turno, 1 dia e 1 provisão."); }
+    else rollNote("Você segue em frente");
+  }
+  if(loc && loc.k === "house"){
+    if(!hx.looted){ hx.looted = true; const [v] = await roll("Casa Abandonada", 1), c = v-1; rollNote(c ? `${c} moeda${c>1?"s":""}` : "Nada"); if(c){ h.coins += c; wLog(`Na casa abandonada você acha ${c} moeda${c>1?"s":""}.`); } else wLog("A casa abandonada está vazia."); }
+    else wLog("Você já vasculhou esta casa.");
+    return;
+  }
   if(loc && loc.k === "oasis"){
     if(hx.oasis === undefined){ const [v] = await roll("Oásis", 1); hx.oasis = v >= 5; rollNote(hx.oasis ? "É de verdade!" : "Miragem"); }
     if(hx.oasis){ h.pv = h.pvMax; wLog("Você achou um Oásis e recuperou todos os PV."); } else wLog("Era só uma miragem.");
@@ -6311,7 +6397,7 @@ async function arriveHex(k, fly){
     return;
   }
   if(loc && loc.k === "ruins" && !hx.dg){ await ruinsRoll(k); return; }
-  if(loc) return;
+  if(loc || hx.bld) return;
   if(fly) return;
   await travelEvent(k);
 }
@@ -6330,13 +6416,116 @@ async function ruinsRoll(k){
   hx.dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type, name, dice:parts};
   wLog(`Nas ruínas você encontra a entrada d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}.`);
 }
+/* ---------- Portais (página 31): só os resultados deste mundo ---------- */
+const PORTAL_OK = [3,4,5,6,7,8,9,10,11,13,14,15,16,17,18];
+const PORTAL_NAME = {5:"Pesadelum",16:"Pesadelum",17:"Mundo dos Doces",4:"Inferno",8:"Mundo dos Mortos",18:"Inferno",3:"Desapareceu",6:"Futuro",7:"Masmorra sem saída",9:"Cidade mais próxima",10:"Cidade humana",11:"Qualquer hexágono",13:"Planícies com água",14:"Homens-Gosma",15:"Sala dourada"};
+async function portalRoll(){
+  for(let g=0; g<60; g++){
+    const v = await roll("Portal", 3), sm = v[0]+v[1]+v[2];
+    if(PORTAL_OK.includes(sm)){ rollNote(PORTAL_NAME[sm]); return sm; }
+    rollNote("Outro mundo: em breve, rola de novo");
+  }
+  return 9;
+}
+function portalTown(onlyHuman){
+  const w = WD(); let best = null, bd = 1e9;
+  Object.keys(w.hex).forEach(k=>{
+    const x = w.hex[k]; if(k === w.pos || !isTown(x.loc) || (onlyHuman && x.loc.race !== "Humana")) return;
+    const dd = hexDist(w.pos, k); if(dd < bd){ bd = dd; best = k; }
+  });
+  return best;
+}
+function portalMove(k, txt){
+  const w = WD(), h = state.hero, hx = w.hex[k];
+  w.pos = k; w.sel = null; w.ev = null; wcenterOn = true;
+  if(hx.t !== "ag") w.boat = false;
+  if(isTown(hx.loc)){ const x = H(); if(!x.cities.includes(k)) x.cities.push(k); }
+  worldReveal(k);
+  wLog(txt);
+}
+/* devolve "dg" quando o portal levou a uma masmorra recém-criada */
+async function portalEffect(sm, hx, temp){
+  const w = WD(), h = state.hero;
+  if(sm === 3){ wLog("Você atravessa o portal e desaparece da existência."); killHero("Desapareceu da existência ao atravessar um portal"); return; }
+  if([4,5,8,16,17,18].includes(sm)){
+    const id = ({4:"inferno",18:"inferno",8:"mortos",5:"pesadelum",16:"pesadelum",17:"doces"})[sm], nm = REALMS[id].n;
+    if((w.realm || "home") === id){ wLog(`Você atravessa o portal e continua no ${nm}.`); return; }
+    realmSwitch(id);
+    wLog(`Você atravessa o portal e vai para o ${nm}.`);
+    return;
+  }
+  if(sm === 6){
+    if(rfl("fut")){ wLog("Você atravessa o portal e continua no futuro, onde só restam ruínas."); return; }
+    rset("fut");
+    Object.keys(w.hex).forEach(k=>{ const x = w.hex[k]; if(isTown(x.loc)){ x.loc = {k:"ruins"}; x.banned = false; } });
+    wLog("Você atravessa o portal e vai para o futuro: todas as cidades e fortalezas viraram ruínas.");
+    return;
+  }
+  if(sm === 7){
+    if(hx && hx.dg){
+      if(temp) return portalEffect(await portalRoll(), hx, temp);
+      const r = dgRec(hx.dg);
+      if(r && r.complete){ wLog("O portal leva à masmorra sem saída que você já completou."); return; }
+      return "dg";
+    }
+    const tab = DG_TYPE[hx.t] || DG_TYPE.pl; let type = 0;
+    for(let g=0; g<20 && !type; g++) type = DG_ID[tab[d6()-1]] || 0;
+    if(!type) type = 6;
+    const parts = [];
+    for(const lb of ["Nome (parte 2)","Nome (parte 3)","Nome (parte 4)"]){ const v = await roll(lb, 3); parts.push(v[0]+v[1]+v[2]); }
+    const name = worldDungeonName(type, parts[0], parts[1], parts[2]);
+    hx.dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type, name, dice:parts, noExit:true};
+    wLog(`Você atravessa o portal e para no início d${name.startsWith("A ")?"a":"o"} ${name.slice(2)}, sem porta para sair. Só a sala do Chefe tem um portal.`);
+    return "dg";
+  }
+  if(sm === 9 || sm === 10){
+    const k = sm === 10 ? (portalTown(true) || portalTown(false)) : portalTown(false);
+    if(!k){ wLog("O portal te devolve ao mesmo lugar: não há nenhuma cidade conhecida."); return; }
+    const lc = w.hex[k].loc;
+    portalMove(k, `Você atravessa o portal e para no meio d${lc.k === "fort" ? "a" : "a"} ${locLabel(lc)}.`);
+    if(!canEnterCity(lc)) wLog(AFF_COLS.includes(lc.race) ? "Gente da sua raça não é bem-vinda aqui. Você está no meio da cidade, mas não pode entrar nela." : "Território inimigo: você está no meio da cidade, mas não pode entrar nela.");
+    return;
+  }
+  if(sm === 11 || sm === 14){
+    state.ui.far = true; state.ui.farKind = sm; state.ui.farOrigin = w.realm || "home";
+    wLog(sm === 14 ? "Você parou numa cidade nas nuvens, onde vivem os Homens-Gosma. Eles se oferecem para abrir um novo portal." : "O portal te deixa escolher o destino: qualquer hexágono.");
+    return;
+  }
+  if(sm === 13){
+    if(rfl("pw")){ wLog("Você atravessa o portal e nada muda: as planícies que você abrir continuam com água."); return; }
+    rset("pw");
+    wLog("Você continua no mesmo lugar, mas agora sempre que abrir uma Planície você encontra Água.");
+    return;
+  }
+  if(sm === 15){
+    if(!temp && hx && hx.pgold) wLog("Você volta à sala dourada, já sem as moedas.");
+    else { h.coins += 300; if(hx && !temp) hx.pgold = true; wLog("Você chegou a uma sala dourada sem portas. No centro, 300 moedas."); }
+    wLog("Na parede dos fundos há um outro Portal.");
+    let s2 = !temp && hx && hx.pdest2 ? hx.pdest2 : await portalRoll();
+    if(!temp && hx) hx.pdest2 = s2;
+    return portalEffect(s2, hx, temp);
+  }
+}
+async function portalCross(hx, temp){
+  let sm = !temp && hx && hx.pdest ? hx.pdest : await portalRoll();
+  if(!temp && hx) hx.pdest = sm;
+  return portalEffect(sm, hx, temp);
+}
+async function portalRun(hx, temp){
+  wBegin();
+  const r = await portalCross(hx, temp);
+  if(state.hero) wEnd(); else { busy = false; persist(); render(); }
+  if(r === "dg" && state.hero) actions.wEnterDg();
+}
 function starOk(){ const h = state.hero; return !!h && hasItem(/^Pedra das Estrelas/) >= 0 && (h.provisions||0) >= 1; }
 async function travelEvent(k){
   const w = WD(), h = state.hero, hx = w.hex[k];
   const v = await roll("Evento na viagem", 2), s = v[0] + v[1];
   if(s >= 7){ rollNote("Nada acontece"); return; }
-  const ev = EVENTS_HOT[hx.t][s === 2 ? 0 : s <= 4 ? 1 : 2];
+  const rl = w.realm && REALMS[w.realm];
+  const ev = rl ? rl.ev[s-2] : EVENTS_HOT[hx.t][s === 2 ? 0 : s <= 4 ? 1 : 2];
   rollNote(ev.n);
+  if(ev.k === "alma"){ w.ev = {...ev}; wLog("Você encontrou a alma de um antigo aventureiro."); return; }
   if(ev.k === "clima"){
     if(raceIs("Aesir")){ wLog(`${ev.n}: como Aesir, você é imune ao clima.`); return; }
     if(ignoresEvents(h)){ wLog(`${ev.n}: você ignora o evento.`); return; }
@@ -6346,6 +6535,7 @@ async function travelEvent(k){
   }
   let q = +ev.q || 1;
   if(ev.q === "1d6"){ const [n] = await roll(ev.pl, 1); q = n; }
+  else if(ev.q === "2d6"){ const nn = await roll(ev.pl, 2); q = nn[0] + nn[1]; }
   w.ev = {...ev, qty:q};
   wLog(`Encontro: ${q > 1 ? q + " " + ev.pl : ev.n}!`);
 }
@@ -6368,14 +6558,28 @@ async function applyClimate(ev){
 function startWorldCombat(spec, qty, opts){
   opts = opts || {};
   const units = [];
-  for(let i=0;i<qty;i++) units.push({key:spec.key, name:spec.n, pv:spec.pv, max:spec.pv, dano:spec.dano, tr:spec.tr||"", boss:false, g:0});
+  for(let i=0;i<qty;i++) units.push({key:spec.key, name:spec.n, pv:spec.pv, max:spec.pv, dano:spec.dano, tr:spec.tr||"", boss:false, g:0, drop:spec.drop||""});
   const hx = wHere();
-  state.combat = {world:true, arena:!!opts.arena, terr:hx ? hx.t : "pl", units, sel:0, phase:"hero", round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
+  state.combat = {world:true, arena:!!opts.arena, realm:(WD() && WD().realm) || "", terr:hx ? hx.t : "pl", units, sel:0, phase:"hero", round:1, log:[], fury:0, heroPar:0, pending:null, alloc:{}, hits:0};
   state.combat.allies = buildAllies(true, !!opts.arena);
   if(units.some(u=>has(u,"Morto-Vivo"))) H().undead++;
   fxPops = []; monHit = {}; monAtk = {}; monDie = {}; heroAtk = null; heroDieAt = 0;
   cLog(opts.arena ? `A multidão grita! ${spec.n} entra na arena. Você ataca primeiro.` : "O combate começa. Você ataca primeiro.");
   go("combat");
+}
+/* Poção dos Sonhos: troca a dezena com a unidade dos PV (pode passar do máximo) */
+function dreamPv(pv){ const t = String(Math.max(0, pv)), n = t.length; return n < 2 ? pv*10 : +(t.slice(0, n-2) + t[n-1] + t[n-2]); }
+function drinkDream(h){ const a = h.pv; h.pv = Math.max(1, dreamPv(a)); return `Poção dos Sonhos: seus PV passam de ${a} para ${h.pv}.`; }
+/* Tesouro do Mundo dos Doces (página 33) */
+function doceTreasure(){
+  const h = state.hero, v = d6(); let it = null;
+  if(v === 1){ h.coins += 1; wLog("Tesouro (1): 100 moedas de chocolate, que valem 1 moeda."); }
+  else if(v === 2){ it = {n:"Poção de Vida Sabor Morango (recupera todos os PV)", magic:true}; wLog("Tesouro (2): uma Poção de Vida Sabor Morango."); }
+  else if(v === 3){ it = rollTreasure(DUNGEONS[1]); wLog(`Tesouro (3): um Ovo da Páscoa! Dentro dele há ${it.n.split(" (")[0]}.`); }
+  else if(v === 4){ it = itemFrom("Botas de Marshmellow (5 PV)", true); wLog("Tesouro (4): Botas de Marshmellow."); }
+  else if(v === 5){ it = itemFrom("Elmo de Bala de Goma (9 PV)", true); wLog("Tesouro (5): um Elmo de Bala de Goma."); }
+  else { it = itemFrom("Pirulito Gigante (Dano 1d6+2)", true); wLog("Tesouro (6): um Pirulito Gigante."); }
+  if(it) wAddItem(it);
 }
 async function winWorldCombat(){
   const c = C(), h = state.hero, w = WD();
@@ -6386,6 +6590,20 @@ async function winWorldCombat(){
   dead.filter(u=>has(u,"Espólios")).forEach(()=>{ coins += Math.max(0, d6()-1); });
   if(coins){ h.coins += coins; wLog(`Espólios: ${coins} moeda${coins>1?"s":""}.`); }
   if(hasClass("Cozinheiro")){ const p = dead.filter(u=>!has(u,"Morto-Vivo")).length; if(p){ h.provisions = Math.min(provMax(), (h.provisions||0) + p); wLog(`Como Cozinheiro, você preparou ${p} provisões.`); } }
+  if(dead.some(u=>u.drop === "mag")){
+    const n = d6(); for(let i=0;i<n;i++) wAddItem(itemFrom(DUNGEONS[6].mag[d6()-1], true));
+    wLog(`Entre os restos você encontra ${n} ${n>1 ? "itens mágicos" : "item mágico"}.`);
+  }
+  if(dead.some(u=>u.drop === "charon")){
+    const k = w.charonTo; w.charonTo = null;
+    if(k && w.hex[k]){ portalMove(k, "Caronte, derrotado, leva você em seu barco pela água. Siga até uma terra firme."); w.boat = true; }
+  }
+  if(dead.some(u=>u.drop === "sonhos")){ wAddItem({n:"Poção dos Sonhos (inverte a dezena e a unidade dos seus PV)", magic:true}); wLog("Entre os restos do Tentáculo você encontra uma Poção dos Sonhos."); }
+  if(dead.length && w.realm === "doces" && !c.arena) doceTreasure();
+  if(dead.some(u=>u.drop === "death")){
+    state.ui.far = true; state.ui.farKind = 11; state.ui.farTitle = "A Morte foi derrotada"; state.ui.farOrigin = w.realm || "home";
+    wLog("Você derrotou A Morte: pode voltar para qualquer mundo, em qualquer hexágono.");
+  }
   if(c.arena){ h.coins += 20; wLog("Você venceu na arena e recebeu 20 moedas!"); state.ui.cityMsg = "Você venceu na arena e recebeu 20 moedas!"; }
   else wLog("Você venceu o combate.");
   const arena = c.arena;
@@ -6399,18 +6617,19 @@ function fleeWorldCombat(){
   go(arena ? "city" : "world");
 }
 /* cenário ao ar livre da arena de combate */
-const WGROUND = {pl:["#3e8a3a","#4ea444","#62b852"], fl:["#2a6a32","#347a3a","#448c48"], mo:["#6a6460","#827a74","#9a928a"], pa:["#3e5a3a","#4a6a44","#5a7a50"], de:["#c8a050","#d8b464","#e8c878"], ag:["#5a3a1e","#6a4424","#7a5030"], arena:["#b89a64","#c8aa74","#d8ba84"]};
+const WGROUND = {mm:["#4a1a12","#6a2616","#843420"], pl:["#3e8a3a","#4ea444","#62b852"], fl:["#2a6a32","#347a3a","#448c48"], mo:["#6a6460","#827a74","#9a928a"], pa:["#3e5a3a","#4a6a44","#5a7a50"], de:["#c8a050","#d8b464","#e8c878"], ag:["#5a3a1e","#6a4424","#7a5030"], ms:["#5a1018","#6a1820","#7a2028"], fe:["#2a1a3a","#3a2450","#4a3066"], pe:["#2a1a3a","#3a2450","#4a3066"], mk:["#e8a8c0","#f0b8d0","#f8c8dc"], fp:["#c8843c","#d89850","#e8ac64"], mh:["#c8843c","#d89850","#e8ac64"], pc:["#c8843c","#d89850","#e8ac64"], arena:["#b89a64","#c8aa74","#d8ba84"]};
 function drawOutdoor(ctx, W, H, c){
-  const k = c.arena ? "arena" : (c.terr || "pl"), G = WGROUND[k];
+  const rlm = c.realm, k0 = c.arena ? "arena" : (c.terr || "pl"), k = TALIAS[k0] || k0;
+  const G = rlm === "inferno" ? ["#4a1a12","#6a2616","#843420"] : rlm === "mortos" ? ["#343c44","#404a54","#4e5a66"] : rlm === "pesadelum" ? ["#2a1a3a","#3a2450","#4a3066"] : rlm === "doces" ? ["#c8843c","#d89850","#e8ac64"] : (WGROUND[k] || WGROUND.pl);
   if(c.arena){
     ctx.fillStyle = "#3a3444"; ctx.fillRect(0,0,W,40);
     for(let x=0;x<W;x+=8) for(let y=4;y<36;y+=6){ ctx.fillStyle = zh(x,y) < .5 ? "#8a6a5a" : zh(y,x) < .5 ? "#6a5a7a" : "#9a7a4a"; ctx.fillRect(x + (y%12?0:4), y, 3, 3); }
     ctx.fillStyle = "#6a6070"; ctx.fillRect(0,36,W,6);
   } else {
-    for(let y=0;y<40;y++){ const k2 = y/40; ctx.fillStyle = `rgb(${Math.round(70+60*k2)},${Math.round(110+70*k2)},${Math.round(190+40*k2)})`; ctx.fillRect(0,y,W,1); }
-    if(k === "mo" || k === "de"){ ctx.fillStyle = k === "mo" ? "#4a4650" : "#c09048"; for(let x=0;x<W;x++){ const hgt = 10 + Math.abs(((x*0.7) % 40) - 20) * (k==="mo"?.9:.3); ctx.fillRect(x, 40-hgt, 1, hgt); } }
-    if(k === "fl"){ for(let x=0;x<W;x+=10){ ctx.fillStyle = "#1e4a24"; ctx.fillRect(x, 22 + (x%20?4:0), 9, 18); ctx.fillStyle = "#2a5a2e"; ctx.fillRect(x+2, 18 + (x%20?4:0), 5, 6); } }
-    if(k === "ag"){ ctx.fillStyle = "#2a5ab0"; ctx.fillRect(0, 30, W, 10); }
+    for(let y=0;y<40;y++){ const k2 = y/40; ctx.fillStyle = rlm === "inferno" ? `rgb(${Math.round(90+90*k2)},${Math.round(20+40*k2)},${Math.round(10+10*k2)})` : rlm === "mortos" ? `rgb(${Math.round(40+40*k2)},${Math.round(52+50*k2)},${Math.round(72+50*k2)})` : rlm === "pesadelum" ? `rgb(${Math.round(40+40*k2)},${Math.round(14+20*k2)},${Math.round(60+50*k2)})` : rlm === "doces" ? `rgb(${Math.round(250-10*k2)},${Math.round(170+40*k2)},${Math.round(200+20*k2)})` : `rgb(${Math.round(70+60*k2)},${Math.round(110+70*k2)},${Math.round(190+40*k2)})`; ctx.fillRect(0,y,W,1); }
+    if(k === "mo" || k === "de"){ ctx.fillStyle = k === "mo" ? (rlm === "doces" ? "#f0d0dc" : rlm === "pesadelum" ? "#2a1e3a" : "#4a4650") : "#c09048"; for(let x=0;x<W;x++){ const hgt = 10 + Math.abs(((x*0.7) % 40) - 20) * (k==="mo"?.9:.3); ctx.fillRect(x, 40-hgt, 1, hgt); } }
+    if(k === "fl"){ for(let x=0;x<W;x+=10){ ctx.fillStyle = rlm === "doces" ? "#d85a98" : rlm === "pesadelum" ? "#241830" : "#1e4a24"; ctx.fillRect(x, 22 + (x%20?4:0), 9, 18); ctx.fillStyle = rlm === "doces" ? "#f08ab8" : rlm === "pesadelum" ? "#32204a" : "#2a5a2e"; ctx.fillRect(x+2, 18 + (x%20?4:0), 5, 6); } }
+    if(k === "ag"){ ctx.fillStyle = rlm === "pesadelum" ? "#8a1420" : rlm === "doces" ? "#f0b8d0" : "#2a5ab0"; ctx.fillRect(0, 30, W, 10); }
   }
   for(let y=40;y<H;y++) for(let x=0;x<W;x+=2){ const n = zh(x,y); ctx.fillStyle = n < .15 ? G[0] : n > .85 ? G[2] : G[1]; ctx.fillRect(x,y,2,1); }
   if(k === "ag"){ ctx.fillStyle = "#3a2410"; for(let y=48;y<H;y+=10) ctx.fillRect(0,y,W,1); }
@@ -6437,8 +6656,53 @@ function hexMask(){
   return hexMask.m = m;
 }
 /* cor da borda (lateral) de cada terreno: [clara, escura] */
-const WSIDE = {pl:["#6a4424","#4a2e18"], fl:["#6a4424","#4a2e18"], mo:["#4a4652","#302c38"], pa:["#4a3a24","#30261a"], de:["#b07a3a","#86582a"], ag:["#1a3a7a","#10265a"]};
+const WSIDE = {mm:["#4a1208","#2a0a04"], pl:["#6a4424","#4a2e18"], fl:["#6a4424","#4a2e18"], mo:["#4a4652","#302c38"], pa:["#4a3a24","#30261a"], de:["#b07a3a","#86582a"], ag:["#1a3a7a","#10265a"], ms:["#5a0a14","#34060c"], fe:["#3a2a4a","#241a30"], pe:["#3a2a4a","#241a30"], mk:["#c88aa4","#a06a84"], fp:["#a8682a","#7a4a1c"], mh:["#d8b0c0","#a88090"], pc:["#a8682a","#7a4a1c"]};
 const wTiles = {};
+/* mesmo tile, com as cores do mundo (Inferno avermelhado, Mundo dos Mortos cinza azulado) */
+function wTileR(t, v, f, realm){
+  if(TALIAS[t]) return wTileX(t, v, f);
+  if(!realm || t === "mm") return wTile(t, v, f);
+  const key = realm + "|" + t + v + "_" + (f||0);
+  if(wTiles[key]) return wTiles[key];
+  const src = wTile(t, v, f), cv = document.createElement("canvas"); cv.width = src.width; cv.height = src.height;
+  const g = cv.getContext("2d"); g.drawImage(src, 0, 0);
+  const im = g.getImageData(0, 0, cv.width, cv.height), d = im.data;
+  for(let i=0;i<d.length;i+=4){
+    if(!d[i+3]) continue;
+    const L = .3*d[i] + .59*d[i+1] + .11*d[i+2];
+    if(realm === "inferno"){ d[i] = Math.min(255, L*1.05 + 38); d[i+1] = L*.42; d[i+2] = L*.26; }
+    else if(realm === "pesadelum"){ d[i] = L*.6 + 30; d[i+1] = L*.38 + 18; d[i+2] = L*.78 + 44; }
+    else if(realm === "doces"){ d[i] = L*.55 + 165; d[i+1] = L*.45 + 150; d[i+2] = L*.5 + 160; }
+    else { d[i] = L*.62 + 10; d[i+1] = L*.78 + 14; d[i+2] = L*.74 + 26; }
+  }
+  g.putImageData(im, 0, 0);
+  return wTiles[key] = cv;
+}
+/* terrenos de Pesadelum e do Mundo dos Doces: um terreno comum pintado de outra cor, com enfeites */
+const TALIAS = {pe:"pl", fe:"fl", ms:"ag", mk:"ag", pc:"pl", mh:"mo", fp:"fl"};
+function wTileX(t, v, f){
+  const key = "x|" + t + v + "_" + (f||0); if(wTiles[key]) return wTiles[key];
+  const src = wTile(TALIAS[t], v, f), cv = document.createElement("canvas"); cv.width = src.width; cv.height = src.height;
+  const g = cv.getContext("2d"); g.drawImage(src, 0, 0);
+  const im = g.getImageData(0, 0, cv.width, cv.height), d = im.data;
+  const TN = {pe:[.62,30,.4,18,.78,44], fe:[.5,22,.38,14,.62,34], ms:[1.25,52,.22,4,.26,8], mk:[.9,150,.55,100,.7,120], pc:[.9,90,.55,60,.2,10], mh:[.55,165,.45,150,.5,160], fp:[.6,90,1.1,70,.6,100]}[t];
+  for(let i=0;i<d.length;i+=4){ if(!d[i+3]) continue; const L = .3*d[i] + .59*d[i+1] + .11*d[i+2]; d[i] = Math.min(255, L*TN[0]+TN[1]); d[i+1] = Math.min(255, L*TN[2]+TN[3]); d[i+2] = Math.min(255, L*TN[4]+TN[5]); }
+  g.putImageData(im, 0, 0);
+  const M = hexMask(), P = (x,y,c)=>{ x = Math.round(x); y = Math.round(y); if(x<0||x>=TW||y<0||y>=TH||!M[y*TW+x]) return; g.fillStyle = c; g.fillRect(x,y,1,1); };
+  const R = i => zh(v*13.7 + i*7.31 + t.charCodeAt(0)*3.3, i*3.17 + v*1.9);
+  const at = i => [7 + R(i)*(TW-14), 9 + R(i+50)*(TH-18)];
+  if(t === "pe") for(let i=0;i<9;i++){ const [x,y] = at(i); P(x,y,"#f0ecf8"); P(x,y+1,"#c4bed4"); P(x-1,y+2,"#9a94b0"); P(x,y+2,"#9a94b0"); P(x+1,y+2,"#7a7490"); P(x-1,y+3,"#5a5470"); P(x,y+3,"#7a7490"); P(x+1,y+3,"#5a5470"); }
+  if(t === "fe") for(let i=0;i<5;i++){ const [x,y] = at(i); for(let j=0;j<9;j++) P(x,y+j,"#4a2e22"); P(x,y-1,"#8a6a50"); P(x-1,y+3,"#d8cfc0"); P(x,y+3,"#d8cfc0"); P(x+1,y+3,"#d8cfc0"); P(x-1,y+4,"#b0a898"); P(x+1,y+4,"#b0a898"); P(x,y+4,"#a01818"); P(x,y+5,"#a01818"); P(x,y+6,"#781010"); }
+  if(t === "ms") for(let i=0;i<8;i++){ const [x,y] = at(i); P(x,y,"#40060c"); P(x+1,y,"#40060c"); P(x+2,y,"#5a0a12"); P(x+1,y-1,"#e03a3a"); }
+  if(t === "mk"){
+    for(let i=0;i<3;i++){ const [x,y] = at(i+20); for(let dy=-3;dy<=3;dy++) for(let dx=-4;dx<=4;dx++) if((dx*dx)/16 + (dy*dy)/9 <= 1) P(x+dx,y+dy, dy < 0 && dx < 1 ? "#ffffff" : "#f6dce8"); P(x,y-4,"#ffffff"); P(x+1,y-4,"#f6dce8"); }
+    const C = ["#ffe03a","#6ae0ff","#a0ff8a","#ff5a8a"]; for(let i=0;i<14;i++){ const [x,y] = at(i+60); const c = C[i%4]; P(x,y,c); P(x+1,y,c); }
+  }
+  if(t === "pc"){ for(let i=0;i<7;i++){ const [x,y] = at(i); for(let j=0;j<5;j++) P(x+j,y,"#f6c880"); for(let j=1;j<6;j++) P(x+j,y+1,"#8a4a10"); } for(let i=0;i<8;i++){ const [x,y] = at(i+40); P(x,y,"#fff4e0"); } }
+  if(t === "mh") for(let i=0;i<6;i++){ const [x,y] = at(i); for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) if(dx*dx+dy*dy <= 9) P(x+dx,y+dy, dy > 1 ? "#e0a8c0" : dy < 0 && dx < 1 ? "#ffffff" : "#f6d0e0"); }
+  if(t === "fp"){ const C = ["#e83a5a","#ffd23a","#3ac8e8","#a850e8"]; for(let i=0;i<5;i++){ const [x,y] = at(i); for(let j=2;j<9;j++) P(x,y+j,"#f4f4f4"); for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) if(dx*dx+dy*dy <= 9) P(x+dx,y+dy,C[i%4]); P(x,y,"#ffffff"); P(x+1,y-1,"#ffffff"); P(x-1,y+1,"#ffffff"); P(x+2,y,"#ffffff"); } }
+  return wTiles[key] = cv;
+}
 function wTile(t, v, f){
   const key = t + v + "_" + (f||0);
   if(wTiles[key]) return wTiles[key];
@@ -6500,6 +6764,11 @@ function wTile(t, v, f){
       }
     });
     for(let i=0;i<8;i++){ const x = 4 + R(i+60)*(TW-8), y = 36 + R(i+70)*10; P(x,y,"#3a5a2a"); P(x+1,y,"#4a7034"); P(x,y-1,"#4a7034"); }
+  }
+  if(t === "mm"){
+    fill((x,y)=>{ const n = zh(Math.floor((x + (f||0)*3)/5) + v*5, Math.floor(y/2) + v); return n < .25 ? "#6a1608" : n < .6 ? "#b8300c" : n < .88 ? "#e85a14" : "#fcb030"; });
+    for(let i=0;i<7;i++){ const cx = 6 + R(i)*(TW-12), cy = 8 + R(i+30)*(TH-16), r = 3 + R(i+50)*3; disc(cx, cy, r, (x,y,dx,dy,d)=>{ P(x,y, d > r-1 ? "#3a0e06" : zh(x*3,y*5) < .5 ? "#2a0a06" : "#1e0804"); }); }
+    for(let i=0;i<12;i++){ const x = 4 + R(i+70)*(TW-8) + (f ? 1 : 0), y = 6 + R(i+90)*(TH-12); P(x,y,"#fff0a0"); P(x+1,y,"#fcc040"); }
   }
   if(t === "ag"){
     fill((x,y)=>{ const n = zh(Math.floor((x + (f||0)*3)/6) + v*5, y*1.1 + v); const deep = y > sy(34) ? 0 : 1; return n < .3 ? (deep ? "#2458b0" : "#1e4c9e") : n > .82 ? (deep ? "#3a74cc" : "#3268bc") : (deep ? "#2a62ba" : "#2456a8"); });
@@ -6583,7 +6852,10 @@ const TOWN_STYLE = {
   "Élfica":{wall:["#f4f4ec","#dcdcd0","#b8b8a8"], roof:["#5ac070","#3a9a54","#26703c"], stone:["#e8e8e0","#c8c8bc","#a0a094"], flag:"#e8e070", wood:"#8a6a3a"},
   "Gnoma":{wall:["#f4ecd8","#e0d4b8","#c0b090"], roof:["#b860e0","#8a40b8","#5e2a88"], stone:["#c0b8c8","#a098aa","#7a7286"], flag:"#40c8e0", wood:"#8a5a2a"},
   "Goblin":{wall:["#a07a4a","#86643a","#664a2a"], roof:["#c8a44a","#a8843a","#7a5e2a"], stone:["#8a7a5a","#6e6046","#504430"], flag:"#7ad040", wood:"#6a4a2a"},
-  "Orc":{wall:["#6a5a50","#54463e","#3e322c"], roof:["#9a3a2a","#7a2a1e","#561c14"], stone:["#5e5660","#48424c","#34303a"], flag:"#d02a1a", wood:"#4a3020"}
+  "Orc":{wall:["#6a5a50","#54463e","#3e322c"], roof:["#9a3a2a","#7a2a1e","#561c14"], stone:["#5e5660","#48424c","#34303a"], flag:"#d02a1a", wood:"#4a3020"},
+  "Jogador":{wall:["#e8e8f4","#c8c8dc","#a0a0bc"], roof:["#4a6ad8","#3a52b0","#2a3a80"], stone:["#b8b4ac","#9a968e","#76726c"], flag:"#e8c040", wood:"#6a4424"},
+  "Chocolate":{wall:["#8a5a3a","#6e4428","#4e2e1a"], roof:["#f0a0c0","#d07898","#a05474"], stone:["#c89a6a","#a87c50","#805a36"], flag:"#f8e040", wood:"#4a2a18"},
+  "Mandolate":{wall:["#5a3a28","#402818","#2a1a10"], roof:["#e8c840","#c0a028","#8a7014"], stone:["#7a5a44","#5e4430","#40291c"], flag:"#e03050", wood:"#34200f"}
 };
 const townCache = {};
 function townSprite(kind, race){
@@ -6645,7 +6917,7 @@ function townSprite(kind, race){
   return townCache[key] = cv;
 }
 /* chão batido embaixo da construção */
-const CLEARING = {pl:["#b08a54","#9a7646"], fl:["#a08050","#86683e"], mo:["#8a8478","#6e6a62"], pa:["#6a5a3a","#54482e"], de:["#e8c47a","#c8a05a"], ag:["#b08a54","#9a7646"]};
+const CLEARING = {mm:["#5a2010","#3a1208"], pl:["#b08a54","#9a7646"], fl:["#a08050","#86683e"], mo:["#8a8478","#6e6a62"], pa:["#6a5a3a","#54482e"], de:["#e8c47a","#c8a05a"], ag:["#b08a54","#9a7646"], ms:["#5a1a20","#3a1014"], fe:["#4a3a5a","#34283f"], pe:["#4a3a5a","#34283f"], mk:["#d8a0b8","#b88098"], fp:["#d8a050","#b88038"], mh:["#e8c8d4","#c8a0b0"], pc:["#d8a050","#b88038"]};
 function drawTown(ctx, loc, t, cx, cy){
   const sp = townSprite(loc.k, loc.race), C = CLEARING[t] || CLEARING.pl;
   const rx = loc.k === "fort" ? 22 : 18, ry = loc.k === "fort" ? 9 : 7, by = cy + 3;
@@ -6781,6 +7053,25 @@ function locSprite(key, f){
     [[23+sm,B-27,4],[20+sm,B-32,5],[25-sm,B-36,4]].forEach(([cx,cy,r])=>disc(cx,cy,r,r*.8,(x,y,e,dx,dy)=>P(x,y, dx+dy < -1 ? "#d0ccd0" : e > .7 ? "#7a767e" : "#a8a4ac")));
   }, true);
   /* portal: arco de pedra com redemoinho (3 quadros) */
+  if(key === "b0") cv = pixCanvas(30, 28, ({P,rect,walls,tri,B})=>{   /* Casa */
+    walls(5, B-12, 20, 12, ["#f0e4c8","#d8c8a4","#b8a47c"]); rect(20, B-21, 3, 6, "#9a968e"); tri(15, B-20, 13, 8, ["#e0684a","#c04a34","#8a2e22"]);
+    rect(7, B-9, 4, 4, "#6ab0e8"); rect(19, B-9, 4, 4, "#6ab0e8"); rect(13, B-8, 5, 8, "#6a4424"); P(16, B-4, "#e8c050"); rect(4, B, 22, 1, "#6a9a3a"); });
+  if(key === "b1") cv = pixCanvas(24, 50, ({P,rect,walls,B})=>{   /* Torre */
+    walls(6, B-30, 12, 30, STONE_G); rect(4, B-34, 16, 4, STONE_G[1]); for(let x=4;x<20;x+=4) rect(x, B-37, 3, 3, STONE_G[0]);
+    rect(10, B-8, 4, 8, DOOR); rect(10, B-24, 4, 5, "#1a1218"); rect(10, B-15, 4, 4, "#1a1218"); rect(12, B-46, 1, 9, "#6a4424"); rect(13, B-46, 6, 3, "#3a6ad8"); });
+  if(key === "b2") cv = pixCanvas(44, 38, ({P,rect,walls,disc,B})=>{   /* Palácio */
+    walls(4, B-16, 36, 16, ["#f8f0dc","#e0d4b4","#b8a884"]); walls(15, B-24, 14, 10, ["#fffaf0","#e8dcc0","#c0b090"]);
+    disc(22, B-28, 7, 6, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(8, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(36, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040"));
+    [8,13,29,34].forEach(x=>rect(x, B-14, 2, 12, "#fffaf0")); rect(19, B-11, 6, 11, "#6a2a3a"); rect(19, B-12, 6, 1, "#c8a040"); rect(3, B, 38, 2, "#e0d4b4"); });
+  if(key === "b3") cv = pixCanvas(46, 44, ({P,rect,walls,tri,B})=>{   /* Castelo */
+    walls(8, B-18, 30, 18, STONE_G); walls(2, B-26, 10, 26, STONE_G); walls(34, B-26, 10, 26, STONE_G); walls(17, B-30, 12, 30, STONE_G);
+    tri(7, B-33, 7, 7, ["#4a6ad8","#3a52b0","#2a3a80"]); tri(39, B-33, 7, 7, ["#4a6ad8","#3a52b0","#2a3a80"]);
+    for(let i=0;i<12;i+=4) rect(17+i, B-33, 3, 3, STONE_G[0]); rect(23, B-39, 1, 6, "#6a4424"); rect(24, B-39, 5, 3, "#d8302a");
+    rect(19, B-10, 8, 10, DOOR); rect(19, B-11, 8, 1, STONE_G[2]); rect(5, B-18, 2, 4, "#1a1218"); rect(39, B-18, 2, 4, "#1a1218"); rect(22, B-22, 2, 4, "#1a1218"); });
+  if(key === "house") cv = pixCanvas(30, 28, ({P,rect,walls,tri,line,B})=>{   /* Casa Abandonada: torta, com janelas quebradas e porta tapada */
+    walls(5, B-12, 20, 12, ["#a8946c","#86744e","#5e4e34"]); rect(20, B-21, 3, 6, "#5e5a54"); tri(15, B-20, 13, 8, ["#6a4a3a","#4e3428","#34221a"]);
+    rect(7, B-9, 4, 4, "#1a1218"); rect(19, B-9, 4, 4, "#1a1218"); line(7, B-9, 10, B-6, "#a8946c"); line(22, B-9, 19, B-6, "#86744e");
+    rect(13, B-8, 5, 8, DOOR); line(12, B-7, 18, B-2, "#7a5a3a"); line(12, B-2, 18, B-7, "#7a5a3a"); rect(4, B, 22, 1, "#5e4e34"); });
   if(key === "portal") cv = pixCanvas(34, 38, ({P,disc,rect,B})=>{
     const cx = 17, cy = B-15;
     disc(cx, cy, 12, 15, (x,y,e)=>{ if(e > .62) P(x,y, x < cx ? (e > .9 ? "#6a6474" : "#9a94a4") : "#5a5464"); });
@@ -6819,14 +7110,26 @@ function drawGround(ctx, t, cx, cy, rx, ry){
   const C = CLEARING[t] || CLEARING.pl;
   for(let y=-ry;y<=ry;y++) for(let x=-rx;x<=rx;x++){ const e = (x/rx)**2 + (y/ry)**2; if(e <= 1){ ctx.fillStyle = e > .75 ? C[1] : C[0]; if(zh(x+cx,y+cy) < .18) ctx.fillStyle = C[1]; ctx.fillRect(cx+x, cy+y, 1, 1); } }
 }
+function drawBld(ctx, hx, cx, cy){
+  const lv = hx.bld.lv;
+  if(lv >= 4) return drawTown(ctx, {k:lv === 5 ? "fort" : "city", race:"Jogador"}, hx.t, cx, cy);
+  const by = cy + 3, sp = locSprite("b" + lv);
+  drawGround(ctx, hx.t, cx, by, 15, 5); ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - sp.height));
+}
 function drawLoc(ctx, hx, cx, cy){
   const loc = hx.loc, by = cy + 3;
   const put = (sp, alpha) => { if(alpha !== undefined){ ctx.save(); ctx.globalAlpha = alpha; } ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - sp.height)); if(alpha !== undefined) ctx.restore(); };
   if(loc){
     const k = loc.k, wf = Math.floor(frame/4);
     if(k === "ruins"){ drawGround(ctx, hx.t, cx, by, 17, 6); put(locSprite("ruins")); }
+    else if(k === "house"){ drawGround(ctx, hx.t, cx, by, 15, 5); put(locSprite("house"), hx.looted ? .6 : undefined); }
     else if(k === "volcano") put(locSprite("volcano", wf % 2));
     else if(k === "portal"){ drawGround(ctx, hx.t, cx, by, 13, 5); put(locSprite("portal", wf % 3)); }
+    else if(k === "fog"){
+      ctx.save(); ctx.globalAlpha = .62;
+      for(let i=0;i<7;i++){ const ox = ((i*13 + Math.floor(frame/8)) % 36) - 18, oy = ((i*7) % 18) - 9; ctx.fillStyle = i%2 ? "#dde1e8" : "#b6bcc8"; ctx.beginPath(); ctx.ellipse(cx + ox*.8, cy + oy*.6, 13, 6, 0, 0, 7); ctx.fill(); }
+      ctx.restore();
+    }
     else if(k === "oasis"){ drawGround(ctx, hx.t, cx, by, 19, 6); put(locSprite("oasis"), hx.oasis === false ? .35 : undefined); }
     else if(k === "corals") put(locSprite(hx.cave ? "cave" : "corals"));
     else if(k === "rocks") put(locSprite("rocks"));
@@ -6860,10 +7163,11 @@ function drawWorld(cv){
   const keys = Object.keys(w.hex), wf = Math.floor(frame/6) % 2;
   const vx = bw/(2*z) + 40, vy = bh/(2*z) + 40;
   const vis = keys.filter(k=>{ const p = hexPx(k); return Math.abs(p.x - wcam.x) < vx && Math.abs(p.y - wcam.y) < vy; }).sort((a,b)=>hexPx(a).y - hexPx(b).y);
-  vis.forEach(k=>{ const hx = w.hex[k], p = hexPx(k), v = Math.floor(zh(p.x*.37, p.y*.53)*3); ctx.drawImage(wTile(hx.t, v, hx.t === "ag" ? wf : 0), p.x-TCX, p.y-TCY); });
+  vis.forEach(k=>{ const hx = w.hex[k], p = hexPx(k), v = Math.floor(zh(p.x*.37, p.y*.53)*3); ctx.drawImage(wTileR(hx.t, v, hx.t === "ag" || hx.t === "mm" || hx.t === "ms" || hx.t === "mk" ? wf : 0, w.realm), p.x-TCX, p.y-TCY); });
   vis.sort((a,b)=>hexPx(a).y - hexPx(b).y).forEach(k=>{
     const hx = w.hex[k], p0 = hexPx(k), loc = hx.loc, p = p0;
-    if(isTown(loc)) drawTown(ctx, loc, hx.t, p0.x, p0.y);
+    if(hx.bld) drawBld(ctx, hx, p0.x, p0.y);
+    else if(isTown(loc)) drawTown(ctx, loc, hx.t, p0.x, p0.y);
     else drawLoc(ctx, hx, p0.x, p0.y);
     if((hx.corpses||[]).length) wSpr(ctx, WS.grave, WSP.grave, p0.x + 16, p0.y + 8);
   });
@@ -6888,6 +7192,12 @@ function wmapTap(wx, wy){
   if(busy) return;
   const w = WD(), k = pxHex(wx, wy);
   if(!w.hex[k]) return;
+  if(state.ui.far && state.ui.farKind){
+    if(w.hex[k].loc && w.hex[k].loc.k === "fog") return;
+    state.ui.far = false; state.ui.farKind = 0; state.ui.farTitle = ""; state.ui.farOrigin = "";
+    if(k !== w.pos) portalMove(k, `O portal te leva para ${hexDesc(k).toLowerCase()}.`);
+    persist(); render(); return;
+  }
   if(state.ui.far){
     const h = state.hero, i = hasItem(/^Poção do Lugar Distante/);
     state.ui.far = false;
@@ -6897,7 +7207,7 @@ function wmapTap(wx, wy){
   if(k === w.pos){
     const hx = w.hex[k], r = hx.dg && dgRec(hx.dg);
     w.sel = null;
-    state.ui.wHere = pcMode() && state.ui.wHere !== k && (worldCityHere() || (hx.dg && !(r && r.complete))) ? k : null;
+    state.ui.wHere = pcMode() && state.ui.wHere !== k && (worldCityHere() || (hx.dg && !(r && r.complete)) || (hx.loc && hx.loc.k === "portal") || hx.bld || bldCan(hx)) ? k : null;
     render(); return;
   }
   state.ui.wHere = null;
@@ -6910,6 +7220,7 @@ function hexDesc(k){
   const w = WD(), hx = w.hex[k]; if(!hx) return "";
   const parts = [];
   if(hx.loc) parts.push(hx.loc.k === "oasis" && hx.oasis === false ? "Miragem" : hx.loc.k === "oasis" && hx.oasis === undefined ? "Oásis (será?)" : locLabel(hx.loc));
+  if(hx.bld) parts.push("Construção: " + BLD[hx.bld.lv].n);
   parts.push(TERR[hx.t].n);
   return parts.join(" · ");
 }
@@ -6918,20 +7229,87 @@ function hexExtrasHTML(k, here){
   const w = WD(), hx = w.hex[k], loc = hx.loc, out = [];
   if(hx.dg){ const r = dgRec(hx.dg); out.push(`<p><b>${esc(hx.dg.name)}</b>${r && r.complete ? " · completada" : ""}</p>`);
     if(r && r.corpses && r.corpses.length) out.push(`<p class="note">Há ${r.corpses.length===1?"um cadáver":r.corpses.length+" cadáveres"} de aventureiros seus lá dentro.</p>`); }
+  if(hx.bld) out.push(`<p>Sua construção: <b>${BLD[hx.bld.lv].n}</b> · Defesa ${BLD[hx.bld.lv].def} · ${hx.bld.imp.length} melhoria${hx.bld.imp.length===1?"":"s"}${hx.bld.troop ? " · 1 tropa" : ""}</p>`);
   if(isTown(loc)){
     if(hx.banned) out.push(`<p class="small">Você foi expulso desta cidade e não pode mais entrar.</p>`);
-    else if(!canEnterCity(loc)) out.push(`<p class="small">Gente da sua raça não é bem-vinda aqui (Afinidade entre Raças).</p>`);
+    else if(!canEnterCity(loc)) out.push(`<p class="small">${AFF_COLS.includes(loc.race) ? "Gente da sua raça não é bem-vinda aqui (Afinidade entre Raças)." : "Território inimigo: ninguém entra aqui."}</p>`);
   }
   if(loc && loc.k === "ruins" && !hx.dg) out.push(`<p class="small">Ruínas que podem ser exploradas como masmorra.</p>`);
   if(loc && loc.k === "volcano" && !hx.dg) out.push(`<p class="small">Há uma Caverna Vulcânica aqui.</p>`);
   if(loc && loc.k === "fort" && !hx.dg) out.push(`<p class="small">Toda fortaleza tem esgotos embaixo.</p>`);
-  if(loc && loc.k === "portal") out.push(soonNote("Um portal para lugares desconhecidos."));
+  if(loc && loc.k === "portal") out.push(`<p class="small">Um portal para lugares desconhecidos. Ao atravessar, não há volta.${hx.pdest ? " Você já sabe para onde ele leva." : ""}</p>`);
   if(loc && loc.k === "corals" && hx.cave && !hx.dg) out.push(`<p class="small">Há uma Caverna Aquática entre os corais.</p>`);
   if(loc && loc.k === "oasis" && hx.oasis) out.push(`<p class="small">Um oásis de verdade: entrar aqui recupera todos os PV.</p>`);
   if(here && (hx.corpses||[]).length) hx.corpses.forEach((c,i)=>out.push(`<div class="spell"><div class="txt"><b>Corpo de ${esc(c.name)}</b><span class="small">${c.coins} moedas e ${c.bag.length} itens.</span></div><button class="use" data-act="wCorpse" data-i="${i}">Revistar</button></div>`));
   else if((hx.corpses||[]).length) out.push(`<p class="small">O corpo de ${esc(hx.corpses.map(c=>c.name).join(", "))} está aqui.</p>`);
   if(here && (hx.ground||[]).length) hx.ground.forEach((it,i)=>out.push(`<div class="spell"><div class="txt">${esc(itemName(it))}</div><button class="use" data-act="wPick" data-i="${i}" ${state.hero.bag.length>=bagMax()?"disabled":""}>Pegar</button></div>`));
   return out.join("");
+}
+/* ---------- Construções ---------- */
+const BLD = [
+  {n:"Casa", cost:200, def:2, slots:1}, {n:"Torre", cost:400, def:4, slots:2},
+  {n:"Palácio", cost:600, def:4, slots:3, req:"Nobre"}, {n:"Castelo", cost:600, def:5, slots:4, req:"Nobre"},
+  {n:"Cidade", cost:1000, def:6, slots:5, req:"Lorde"}, {n:"Fortaleza", cost:3000, def:12, slots:6, req:"Rei"}];
+/* as melhorias só podem ser feitas nesta ordem */
+const BIMP = [
+  {id:"fonte", n:"Fonte", cost:100, txt:"Recupera todos os PV, de graça."},
+  {id:"forja", n:"Ferreiro", cost:200, txt:"Conserta todas as armaduras, de graça."},
+  {id:"cofre", n:"Sala Cofre", cost:500, txt:"Guarda os espólios (só desta construção)."},
+  {id:"rota", n:"Rota de Comércio", cost:1000, txt:"Liga as Salas Cofre: o mesmo cofre em todas as construções com Rota."},
+  {id:"carro", n:"Casa de Carruagens", cost:1200, txt:"Viaja entre as suas construções sem gastar provisões."},
+  {id:"quartel", n:"Quartel General", cost:2500, txt:"Recruta 1 tropa por 200 moedas."}];
+const bldHas = (b, id) => !!b && b.imp.includes(id);
+function bldMult(t, h){
+  h = h || state.hero;
+  if(t === "pl" || t === "pe" || t === "pc") return 1;
+  if((t === "mo" || t === "mh") && raceIs("Anão", h)) return 1;
+  if((t === "fl" || t === "fe" || t === "fp") && raceIs("Elfo", h)) return 1;
+  return 2;
+}
+const bldCan = hx => !!hx && !hx.bld && !hx.loc && !hx.dg && !["ag","ms","mk","mm"].includes(hx.t);
+const bldPrice = (lv, hx) => (BLD[lv].cost - (hx.bld ? BLD[hx.bld.lv].cost : 0)) * bldMult(hx.t);
+function bldChest(b){ if(bldHas(b, "rota")){ const w = WD(); w.trade = w.trade || []; return w.trade; } b.chest = b.chest || []; return b.chest; }
+function bldHTML(){
+  const w = WD(), h = state.hero; if(!w || !h) return "";
+  const hx = w.hex[w.pos], b = hx && hx.bld;
+  if(!hx || w.ev || (state.dungeon && state.dungeon.inside) || (!b && !bldCan(hx))) return "";
+  const row = (t, sub, btn) => `<div class="spell"><div class="txt"><b>${t}</b><span class="small" style="display:block">${sub}</span></div>${btn}</div>`;
+  const out = [], cur = b ? b.lv : -1;
+  out.push(`<span class="label" style="margin-top:6px">${b ? "Melhorar a construção" : "Construir aqui"}</span>`);
+  if(bldMult(hx.t) > 1) out.push(`<p class="small">Fora da Planície o custo é o dobro.</p>`);
+  BLD.forEach((d,i)=>{
+    if(i <= cur) return;
+    const price = bldPrice(i, hx), ok = !d.req || hasClass(d.req);
+    out.push(row(d.n, `${N(price)} moedas · Defesa ${d.def} · ${d.slots} melhoria${d.slots>1?"s":""}${d.req ? ` · precisa ser ${d.req}` : ""}`, `<button class="use" data-act="wBuild" data-i="${i}" ${h.coins < price || !ok ? "disabled" : ""}>${b ? "Melhorar" : "Construir"}</button>`));
+  });
+  if(b){
+    const d = BLD[b.lv], used = b.imp.length;
+    out.push(`<span class="label" style="margin-top:6px">${d.n}: melhorias ${used} de ${d.slots}</span>`);
+    BIMP.forEach((m,i)=>{
+      const have = i < used, next = i === used && used < d.slots;
+      const why = have ? "" : i > used ? ` · vem depois de ${BIMP[i-1].n}` : used >= d.slots ? " · suba o nível da construção" : "";
+      out.push(row(m.n, `${m.txt} · ${N(m.cost)} moedas${why}`, have ? `<span class="chip solid">Pronta</span>` : `<button class="use" data-act="wImp" ${next && h.coins >= m.cost ? "" : "disabled"}>Construir</button>`));
+    });
+    const sv = [];
+    if(bldHas(b, "fonte")) sv.push(`<button class="btn ghost" data-act="wFonte" ${h.pv >= h.pvMax ? "disabled" : ""}>Beber da Fonte <small>(todos os PV, de graça)</small></button>`);
+    if(bldHas(b, "forja")){ const br = ARMOR_SLOTS.some(sl=>h.armor[sl] && armorCur(h.armor[sl]) < h.armor[sl].pv); sv.push(`<button class="btn ghost" data-act="wForja" ${br ? "" : "disabled"}>Ferreiro <small>(conserta todas as armaduras, de graça)</small></button>`); }
+    if(bldHas(b, "quartel")) sv.push(b.troop ? `<p class="small">Uma tropa está pronta para a guerra.</p>` : `<button class="btn ghost" data-act="wTroop" ${h.coins < 200 ? "disabled" : ""}>Recrutar tropa <small>(200 moedas)</small></button>`);
+    if(sv.length) out.push(`<span class="label" style="margin-top:6px">Serviços</span><div class="stack">${sv.join("")}</div>`);
+    if(bldHas(b, "carro")){
+      const dest = Object.keys(w.hex).filter(k=>k !== w.pos && w.hex[k].bld);
+      out.push(`<span class="label" style="margin-top:6px">Casa de Carruagens</span>`);
+      if(!dest.length) out.push(`<p class="small">Você não tem outra construção neste mundo.</p>`);
+      dest.forEach(k=>out.push(row(esc(hexDesc(k)), `A ${hexDist(w.pos, k)} hexágonos. Gasta 1 dia, nenhuma provisão.`, `<button class="use" data-act="wCarro" data-k="${k}">Ir</button>`)));
+    }
+    if(bldHas(b, "cofre")){
+      const ch = bldChest(b);
+      out.push(`<span class="label" style="margin-top:6px">Sala Cofre${bldHas(b, "rota") ? " (ligada pela Rota de Comércio)" : ""}: ${ch.length} ${ch.length === 1 ? "item" : "itens"}</span>`);
+      ch.forEach((it,i)=>out.push(row(esc(itemName(it)), "guardado", `<button class="use" data-act="wTake" data-i="${i}" ${h.bag.length >= bagMax() ? "disabled" : ""}>Retirar</button>`)));
+      if(h.bag.length) out.push(`<p class="small" style="margin:4px 0 0">Na mochila:</p>`);
+      h.bag.forEach((it,i)=>out.push(row(esc(itemName(it)), "na mochila", `<button class="use" data-act="wStore" data-i="${i}">Guardar</button>`)));
+    }
+  }
+  return `<div class="bldbox" style="margin-top:8px">${out.join("")}</div>`;
 }
 function viewWorld(){
   const h = state.hero, w = WD();
@@ -6949,6 +7327,9 @@ function viewWorld(){
       ${ignoresEvents(h) ? `<button class="btn ghost" data-act="wIgnore">Ignorar o encontro <small>(vantagem da raça)</small></button>` : ""}
       ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(${h.spells["Camuflagem"].left} uso${h.spells["Camuflagem"].left>1?"s":""})</small></button>` : ""}
       ${starOk() ? `<button class="btn ghost" data-act="wStar">Rerrolar com a Pedra das Estrelas <small>(1 provisão)</small></button>` : ""}</div></div>`;
+    else if(e.k === "alma") evHTML = `<div class="sheet"><h3>${esc(e.n)}</h3><p>${esc(e.txt)}</p><div class="stack">
+      <button class="btn" data-act="wSoul">Ajudar a alma <small>(role 1d6)</small></button>
+      <button class="btn ghost" data-act="wSoulSkip">Seguir em frente</button></div></div>`;
     else evHTML = `<div class="sheet"><h3>${esc(e.n)}</h3><p>${esc(e.txt)}</p><div class="stack">
       <button class="btn" data-act="wClimate">Seguir em frente</button>
       ${camo ? `<button class="btn ghost" data-act="wCamo">Usar Camuflagem <small>(ignora o evento)</small></button>` : ""}
@@ -6959,10 +7340,10 @@ function viewWorld(){
     const ct = canTravel(sel), cost = travelCost(sel), hx = w.hex[sel], voar = h.spells["Voar"];
     const water = hx.t === "ag" && !w.boat && canSwim();
     selHTML = `<div class="sheet"><h3>${esc(hexDesc(sel))}</h3>${hexExtrasHTML(sel, false)}
-      ${ct.ok ? `<p class="small">Viagem: ${N(TERR[hx.t].cost)} dia${TERR[hx.t].cost>1?"s":""}, gasta ${N(cost)} provis${cost===1?"ão":"ões"}. Você tem ${N(h.provisions||0)}.${(h.provisions||0) < cost ? " Faltando provisões, cada uma vira 1 PV perdido." : ""}${water ? " Você atravessa a água a nado." : ""}</p>
+      ${ct.ok ? `<p class="small">Viagem: ${N(Math.max(1, TERR[hx.t].cost))} dia${TERR[hx.t].cost>1?"s":""}, gasta ${N(cost)} provis${cost===1?"ão":"ões"}. Você tem ${N(h.provisions||0)}.${(h.provisions||0) < cost ? " Faltando provisões, cada uma vira 1 PV perdido." : ""}${water ? " Você atravessa a água a nado." : ""}</p>
         <button class="btn" data-act="wTravel" data-k="${sel}">Viajar para cá</button>
         ${voar && voar.left > 0 ? `<button class="btn ghost" data-act="wTravel" data-k="${sel}" data-how="fly">Voar até lá <small>(sem provisões e sem eventos)</small></button>` : ""}`
-      : `<p class="small muted">${esc(ct.why)}</p>`}</div>`;
+      : `<p class="small muted">${esc(ct.why)}</p>${ct.charon ? `<div class="row"><button class="btn" data-act="wCharon" data-k="${sel}">Sim</button><button class="btn ghost" data-act="wCharonNo">Não</button></div>` : ""}${ct.fog ? `<button class="btn ghost" data-act="wFog" data-k="${sel}" ${(h.provisions||0) < 1 ? "disabled" : ""}>Esperar a neblina dissipar <small>(1 provisão)</small></button>` : ""}`}</div>`;
   }
   const hereLoc = here.loc, town = isTown(hereLoc) && canEnterCity(hereLoc) && !here.banned;
   const r = here.dg && dgRec(here.dg);
@@ -6973,11 +7354,14 @@ function viewWorld(){
   if(hereLoc && hereLoc.k === "fort" && !here.dg) acts.push(`<button class="btn ghost" data-act="wCaveIn" data-t="12" ${w.ev?"disabled":""}>Descer aos esgotos da fortaleza</button>`);
   if(hereLoc && hereLoc.k === "volcano" && !here.dg) acts.push(`<button class="btn" data-act="wCaveIn" data-t="15" ${w.ev?"disabled":""}>Entrar na Caverna Vulcânica</button>`);
   if(hereLoc && hereLoc.k === "corals" && here.cave && !here.dg) acts.push(`<button class="btn" data-act="wCaveIn" data-t="16" ${w.ev?"disabled":""}>Entrar na Caverna Aquática</button>`);
+  if(hereLoc && hereLoc.k === "portal") acts.push(`<button class="btn" data-act="wPortal" ${w.ev?"disabled":""}>Atravessar o Portal <small>(não há volta)</small></button>`);
+  { const ap = h.spells["Abrir Portal"]; if(ap) acts.push(`<button class="btn ghost" data-act="wOpenPortal" ${w.ev || ap.left <= 0 ? "disabled" : ""}>Abrir Portal <small>(magia, ${ap.left} uso${ap.left===1?"":"s"})</small></button>`); }
   if(here.dg && here.dg.type === 9) acts.push(`<button class="btn ghost" data-act="wGods" ${w.ev || (h.provisions||0) < 1 ? "disabled" : ""}>Oferenda aos Deuses Esquecidos <small>(1 provisão)</small></button>`);
   const retire = mustRetire(h) ? `<div class="banner"><b>Fim da jornada de ${esc(h.name)}</b><p class="small">Os ferimentos são irreparáveis. Encontre uma cidade para passar o legado adiante, ou registre o fim na ficha.</p></div>` : "";
-  const far = state.ui.far ? `<div class="banner"><b>Poção do Lugar Distante</b><p class="small">${pcMode() ? "Clique" : "Toque"} no mapa no hexágono já descoberto para onde você quer ir.</p><button class="btn ghost" data-act="farCancel">Cancelar</button></div>` : "";
+  const farRealms = state.ui.far && state.ui.farKind ? ["home", ...Object.keys(REALMS)].filter(r=>r !== (w.realm || "home") && w.maps && w.maps[r]) : [];
+  const far = state.ui.far ? `<div class="banner"><b>${state.ui.farTitle || (state.ui.farKind === 14 ? "Homens-Gosma" : state.ui.farKind === 11 ? "Portal" : "Poção do Lugar Distante")}</b><p class="small">${pcMode() ? "Clique" : "Toque"} no mapa no hexágono já descoberto para onde você quer ir.</p>${farRealms.map(r=>`<button class="btn ghost" data-act="wFarRealm" data-r="${r}">Ir para ${r === "home" ? "o mundo dos vivos" : esc(REALMS[r].n)}</button>`).join("")}<button class="btn ghost" data-act="farCancel">Cancelar</button></div>` : "";
   return `
-  ${bar("Mundo","sheet")}
+  ${bar(w.realm && REALMS[w.realm] ? REALMS[w.realm].n : "Mundo","sheet")}
   ${retire}${far}
   <div class="mapbox">
     <div class="maphud"><span>PV<b class="${lvc(h.pv,h.pvMax)}">${h.pv}/${h.pvMax}</b></span><span>Provisões<b class="${lvc(h.provisions||0,provMax())}">${h.provisions||0}</b></span><span>Moedas<b>${h.coins}</b></span><span>Dia<b>${w.days+1}</b></span></div>
@@ -6990,6 +7374,7 @@ function viewWorld(){
   ${selHTML}
   <div class="sheet"><h3>${esc(hexDesc(w.pos))}${w.boat ? " · de barco" : ""}</h3>
     ${hexExtrasHTML(w.pos, true)}
+    ${bldHTML()}
     ${acts.length ? `<div class="stack">${acts.join("")}</div>` : ""}
   </div>
   ${tameHTML()}
@@ -7068,12 +7453,47 @@ const actionsWorld = {
     let d = state.dungeon;
     if(!d || d.uid !== m.uid){
       if(d && !d.inside && d.hex) w.recs[d.uid] = d;
-      d = w.recs[m.uid] || Object.assign(newDungeonRecord(m.type, m.name, m.dice), {uid:m.uid, hex:w.pos});
+      d = w.recs[m.uid] || Object.assign(newDungeonRecord(m.type, m.name, m.dice), {uid:m.uid, hex:w.pos, noExit:!!m.noExit});
       delete w.recs[m.uid];
       state.dungeon = d;
     }
     if(d.complete) return;
     actions.enter();
+  },
+  wCharonNo(){ const w = WD(); w.sel = null; render(); },
+  wCharon(b){
+    const w = WD(), k = b.dataset.k, hx = w.hex[k], c = canTravel(k);
+    if(busy || w.ev || w.realm !== "mortos" || !hx || hx.t !== "ag" || !c.charon) return;
+    w.sel = null; w.charonTo = k;
+    wLog("Você chama o Barqueiro. Caronte surge da neblina.");
+    startWorldCombat(WMD(WM("Caronte","Caronte",60,3,"Morto-Vivo","1","Barqueiro da Morte"), "charon"), 1);
+  },
+  wFog(b){
+    const w = WD(), h = state.hero, k = b.dataset.k, hx = w.hex[k];
+    if(busy || w.ev || !hx || !hx.loc || hx.loc.k !== "fog" || !hexNb(w.pos).includes(k) || (h.provisions||0) < 1) return;
+    h.provisions--; H().provSpent++; w.days++; hx.loc = null; w.sel = k;
+    wLog("Você gasta 1 provisão esperando e a neblina se dissipa."); persist(); render();
+  },
+  async wSoul(){
+    const w = WD(), h = state.hero; if(busy || !w.ev || w.ev.k !== "alma") return;
+    wBegin(); const [v] = await roll("Alma", 1); w.ev = null;
+    if(v === 6){ rollNote("Ela te segue"); h.soul = true; wLog("A alma do aventureiro passa a te seguir. Ela ressuscita quando você voltar ao mundo dos vivos."); }
+    else { rollNote("Vai para o Inferno"); wLog("Você não consegue ajudar: a alma do aventureiro vai para o Inferno."); }
+    wEnd();
+  },
+  wSoulSkip(){ const w = WD(); if(!w.ev || w.ev.k !== "alma") return; w.ev = null; wLog("Você deixa a alma para trás."); persist(); render(); },
+  wFarRealm(b){ if(!state.ui.far) return; realmSwitch(b.dataset.r); persist(); render(); },
+  wPortal(){ const w = WD(), hx = wHere(); if(busy || !hx || !hx.loc || hx.loc.k !== "portal" || w.ev) return; portalRun(hx, false); },
+  wOpenPortal(){
+    const w = WD(), s = state.hero.spells["Abrir Portal"], hx = wHere();
+    if(busy || !s || s.left <= 0 || !hx || w.ev || (state.dungeon && state.dungeon.inside)) return;
+    s.left--; H().magic++; wLog("Você abre um Portal temporário.");
+    portalRun(hx, true);
+  },
+  async bossPortal(){
+    const d = D(); if(busy || !d || !d.noExit || !d.complete) return;
+    leaveDungeon(); state.ui = {}; persist(); render(); window.scrollTo(0,0);
+    portalRun(wHere(), true);
   },
   wCorpse(b){
     const hx = wHere(), i = +b.dataset.i, c = hx.corpses && hx.corpses[i], h = state.hero; if(!c) return;
@@ -7081,6 +7501,37 @@ const actionsWorld = {
     if(c.name !== h.name) H(h).avenged++;
     wLog(`Você revistou o corpo de ${c.name}: ${c.coins} moedas e ${c.bag.length} itens.`);
     hx.corpses.splice(i,1); persist(); render();
+  },
+  wBuild(b){
+    const h = state.hero, w = WD(), hx = w.hex[w.pos], i = +b.dataset.i, d = BLD[i];
+    if(!d || w.ev || !(bldCan(hx) || hx.bld) || (hx.bld && i <= hx.bld.lv)) return;
+    if(d.req && !hasClass(d.req)) return;
+    const price = bldPrice(i, hx); if(h.coins < price) return;
+    h.coins -= price; const old = hx.bld;
+    hx.bld = {lv:i, imp:old ? old.imp : [], chest:old ? old.chest : [], troop:old ? !!old.troop : false};
+    if(i >= 3) H().castle = 1; if(i >= 4) H().cityb = 1;
+    wLog(`${old ? "Você melhorou a construção" : "Você construiu"}: ${d.n} (${price} moedas).`);
+    persist(); render();
+  },
+  wImp(){
+    const h = state.hero, w = WD(), b = w.hex[w.pos].bld; if(!b || w.ev) return;
+    const m = BIMP[b.imp.length]; if(!m || b.imp.length >= BLD[b.lv].slots || h.coins < m.cost) return;
+    h.coins -= m.cost; b.imp.push(m.id);
+    if(m.id === "rota"){ const ch = b.chest || []; b.chest = []; w.trade = (w.trade || []).concat(ch); }
+    wLog(`Melhoria pronta: ${m.n} (${m.cost} moedas).`);
+    persist(); render();
+  },
+  wFonte(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "fonte") || h.pv >= h.pvMax) return; h.pv = h.pvMax; party(h).forEach(p=>{ p.pv = p.max; }); wLog("Você bebe da Fonte e recupera todos os PV."); persist(); render(); },
+  wForja(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "forja")) return; let n = 0; ARMOR_SLOTS.forEach(sl=>{ const p = h.armor[sl]; if(p && armorCur(p) < p.pv){ p.cur = p.pv; n++; } }); if(n){ wLog(`O Ferreiro conserta ${n} peça${n>1?"s":""} de armadura, de graça.`); persist(); render(); } },
+  wTroop(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "quartel") || b.troop || h.coins < 200) return; h.coins -= 200; b.troop = true; wLog("Você recrutou uma tropa no Quartel General (200 moedas)."); persist(); render(); },
+  wStore(b){ const h = state.hero, bl = wHere().bld, i = +b.dataset.i; if(!bldHas(bl, "cofre") || !h.bag[i]) return; const it = h.bag.splice(i,1)[0]; bldChest(bl).push(it); persist(); render(); },
+  wTake(b){ const h = state.hero, bl = wHere().bld, i = +b.dataset.i; if(!bldHas(bl, "cofre") || h.bag.length >= bagMax()) return; const ch = bldChest(bl); if(!ch[i]) return; h.bag.push(ch.splice(i,1)[0]); persist(); render(); },
+  wCarro(b){
+    const w = WD(), here = w.hex[w.pos], k = b.dataset.k, hx = w.hex[k];
+    if(w.ev || !bldHas(here.bld, "carro") || !hx || !hx.bld || k === w.pos) return;
+    w.pos = k; w.sel = null; w.days++; w.trips++; w.boat = false; wcenterOn = true; worldReveal(k);
+    wLog(`A carruagem leva você até ${hexDesc(k).toLowerCase()}, sem gastar provisões.`);
+    persist(); render();
   },
   wPick(b){ const hx = wHere(), i = +b.dataset.i, it = hx.ground && hx.ground[i], h = state.hero; if(!it || h.bag.length >= bagMax()) return; h.bag.push(it); hx.ground.splice(i,1); persist(); render(); },
   wBuyProv(b){
@@ -8165,13 +8616,14 @@ function pcHexPopHTML(){
   const sel = w.sel && w.hex[w.sel] && w.sel !== w.pos ? w.sel : null;
   if(sel){
     const ct = canTravel(sel);
-    return `<div class="hexpop" id="hexpop" data-k="${sel}"><span class="lbl">${esc(hexDesc(sel))}</span>${ct.ok ? `<button class="pbtn" data-act="wTravel" data-k="${sel}">Viajar para cá</button>` : `<span class="why">${esc(ct.why)}</span>`}</div>`;
+    return `<div class="hexpop" id="hexpop" data-k="${sel}"><span class="lbl">${esc(hexDesc(sel))}</span>${ct.ok ? `<button class="pbtn" data-act="wTravel" data-k="${sel}">Viajar para cá</button>` : `<span class="why">${esc(ct.why)}</span>${ct.charon ? `<button class="pbtn" data-act="wCharon" data-k="${sel}">Sim</button><button class="pbtn alt" data-act="wCharonNo">Não</button>` : ""}${ct.fog && (state.hero.provisions||0) >= 1 ? `<button class="pbtn" data-act="wFog" data-k="${sel}">Esperar (1 provisão)</button>` : ""}`}</div>`;
   }
   if(state.ui.wHere && state.ui.wHere === w.pos){
     const here = w.hex[w.pos], acts = [], r = here.dg && dgRec(here.dg);
     if(worldCityHere()) acts.push(`<button class="pbtn" data-act="go" data-to="city">Entrar na ${esc(locLabel(here.loc))}</button>`);
     if(here.dg && !(r && r.complete)) acts.push(`<button class="pbtn" data-act="wEnterDg">${dgEnterLabel(here.dg, r)}</button>`);
     if(!here.dg && here.loc){ const t = here.loc.k === "fort" ? 12 : here.loc.k === "volcano" ? 15 : here.loc.k === "corals" && here.cave ? 16 : 0; if(t) acts.push(`<button class="pbtn" data-act="wCaveIn" data-t="${t}">${t === 12 ? "Descer aos esgotos" : t === 15 ? "Entrar na Caverna Vulcânica" : "Entrar na Caverna Aquática"}</button>`); }
+    if(here.loc && here.loc.k === "portal") acts.push(`<button class="pbtn" data-act="wPortal">Atravessar o Portal</button>`);
     if(!acts.length) return "";
     return `<div class="hexpop" id="hexpop" data-k="${w.pos}" data-here="1"><span class="lbl">${esc(here.dg && !here.loc ? here.dg.name : hexDesc(w.pos).split(" · ")[0])}</span>${acts.join("")}</div>`;
   }
@@ -9098,6 +9550,7 @@ const actions = {
     if(raceT("ogro") && /^Poção|^Pergaminho/.test(it.n)) return;
     if(/^Pergaminho/.test(it.n)) H().magic++;
     if(/^Poção de Vida/.test(it.n)) h.pv = h.pvMax;
+    if(/^Poção dos Sonhos/.test(it.n)) state.ui.armsMsg = drinkDream(h);
     if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3) h.pv = h.pvMax; state.ui.armsMsg = v >= 3 ? `Poção Verdosa (dado ${v}): você recuperou todos os PV.` : `Poção Verdosa (dado ${v}): nada além de uma coceira que dura o dia inteiro.`; }
     if(/^Poção de Magia|^Poção de Mana/.test(it.n)) Object.values(h.spells).forEach(s=>s.left=s.max);
     if(/^Poção do Lugar Distante/.test(it.n)){ if(!state.world || (state.dungeon && state.dungeon.inside)) return; state.ui = {far:true}; go("world"); return; }
@@ -9178,7 +9631,11 @@ const actions = {
     w.ev = null; wLog("Você gasta 1 provisão e a Pedra das Estrelas brilha: o evento é rolado de novo.");
     await travelEvent(w.pos); wEnd();
   },
-  farCancel(){ state.ui.far = false; render(); },
+  farCancel(){
+    const o = state.ui.farOrigin; state.ui.far = false; state.ui.farKind = 0; state.ui.farTitle = ""; state.ui.farOrigin = "";
+    if(o && o !== (WD().realm || "home")) realmSwitch(o);
+    persist(); render();
+  },
   drop(b){ const h = state.hero; if(isCursed(h.bag[+b.dataset.i])) return; h.bag.splice(+b.dataset.i,1); state.ui.bagSel = null; persist(); render(); },
 
   async rollDungeon(){
