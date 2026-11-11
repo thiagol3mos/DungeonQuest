@@ -957,7 +957,10 @@ const CONTRA = [
   [/contra quem tem Veneno/, u=>has(u,"Veneno")],
   [/contra enxames/, u=>/Enxame/.test(u.name)],
   [/contra humanóides/, u=>/Orc|Goblin|Bandido|Cultista|Javaligor|Necromante|Rei|Rainha|Sacerdotisa|Anão|Humano|Elfo/.test(u.name)],
-  [/dentro de Santuários/, u=>!!(state.dungeon && state.dungeon.type === 4)]
+  [/dentro de Santuários/, u=>!!(state.dungeon && state.dungeon.type === 4)],
+  [/contra Anão ou Goblin/, u=>/Anão|Goblin/.test(u.name)],
+  [/contra Elfo ou Anão/, u=>/Elfo|Anão/.test(u.name)],
+  [/contra Morto-Vivo/, u=>has(u,"Morto-Vivo")]
 ];
 function contraBonus(u, W){
   const h = state.hero; let b = 0;
@@ -966,6 +969,7 @@ function contraBonus(u, W){
   /* itens passivos carregados: Capa do Rei Anão */
   h.bag.concat(ARMOR_SLOTS.map(s=>h.armor[s]).filter(Boolean)).forEach(it=>{ if(!it.weapon && /^Capa do Rei Anão/.test(it.n)) test(it.n); });
   if(carrying(/^Chifre de Guerra/)) b += 1;
+  if(W && /Último Suspiro/.test(W.n) && h.pv === 1) b += 4;
   if(carrying(/^Estandarte do Império Anão/) && h.armor.Peitoral) b += 1;
   if(W && /^Picareta da Aniquilação/.test(W.n) && W.last && W.last === u.name) b += 2;
   if(h.sunBless && state.dungeon && state.dungeon.inside) b += 1;
@@ -990,10 +994,11 @@ function onHeroKill(u, W){
 /* monstros que fogem de itens (Coquilha Beltrâmica) */
 function scareMon(seg){
   if(!seg || !seg.mon || seg.mon.boss) return;
-  if(!carrying(/^Coquilha Beltrâmica/)) return;
-  const groups = [seg.mon, ...(seg.mon.extra||[])], keep = groups.filter(g=>!/Escorpi/.test(g.key||g.name));
+  const rules = [[/^Coquilha Beltrâmica/, /Escorpi/, "Os escorpiões sentem a Coquilha Beltrâmica e fogem!"],[/^Flauta de Hamelin/, /Rato|Verme|Barata|Enxame|Escaravelho|Vespa|Mosca|Inseto/, "Você toca a Flauta de Hamelin: ratos, vermes e insetos fogem!"]].filter(([it])=>carrying(it));
+  if(!rules.length) return;
+  const groups = [seg.mon, ...(seg.mon.extra||[])], keep = groups.filter(g=>!rules.some(([,rx])=>rx.test(g.key||g.name)));
   if(keep.length === groups.length) return;
-  log("Os escorpiões sentem a Coquilha Beltrâmica e fogem!");
+  rules.forEach(([,rx,msg])=>{ if(groups.some(g=>rx.test(g.key||g.name))) log(msg); });
   if(!keep.length){ seg.mon = null; return; }
   const [a, ...rest] = keep; a.extra = rest; seg.mon = a;
 }
@@ -1001,6 +1006,7 @@ function scareMon(seg){
 const SLOT_BY_WORD = [[/^(Elmo|Capacete|Máscara|Coroa|Chapéu)/,"Elmo"],[/^Peitoral/,"Peitoral"],[/^Ombreiras/,"Ombreiras"],[/^Braceletes/,"Braceletes"],[/^(Botas|Sandálias)/,"Botas"],[/^Anel/,"Anel"]];
 function inferGear(it){
   if(!it || it.slot || it.weapon) return it;
+  if(/^Penico/.test(it.n)){ it.slot = "Elmo"; it.pv = 3; return it; }
   if(/^Capacete de Crocodilo \(Dano/.test(it.n)){ it.slot = "Elmo"; it.pv = 0; it.bite = (it.n.match(/Dano (\d+d6(?:[+-]\d+)?)/)||[])[1] || "1d6+2"; it.magic = true; return it; }
   const pv = it.n.match(/\((\d+) PV/), dano = it.n.match(/\(Dano (\d+d6(?:[+-]\d+)?)/);
   if(dano){ it.weapon = true; it.d = dano[1]; it.two = /Duas Mãos/.test(it.n); it.magic = true; return it; }
@@ -1013,6 +1019,7 @@ function syncGrants(h){
   h = h || state.hero; if(!h) return;
   const want = {};
   ARMOR_SLOTS.forEach(s=>{ const p = h.armor[s]; if(p && p.grant) want[p.grant] = true; });
+  [h.weapon, ...offs(h)].forEach(w=>{ if(w && w.grant) want[w.grant] = true; });
   Object.keys(h.spells).forEach(n=>{ const s = h.spells[n]; if(s.g && !want[n]){ if(s.max > 1){ s.max--; s.left = Math.min(s.left, s.max); delete s.g; } else delete h.spells[n]; } });
   Object.keys(want).forEach(n=>{ const s = h.spells[n]; if(!s) h.spells[n] = {max:1, left:1, g:true}; else if(!s.g){ s.max++; s.left++; s.g = true; } });
 }
@@ -1088,6 +1095,173 @@ function removeCurse(h){
 }
 /* aumenta o modificador de dano de uma arma ("1d6+1" vira "1d6+2") */
 function bumpDmg(d, n){ const m = d.match(/^(\d+d\d+)([+-]\d+)?$/); if(!m) return d; const v = (m[2] ? +m[2] : 0) + n; return m[1] + (v ? (v > 0 ? "+" + v : String(v)) : ""); }
+/* =========================================================
+   MASMORRAS MORTAIS, 2ª ETAPA (páginas 46 e 62)
+   Esgotos das fortalezas e as cavernas: Caverna, Mina, Caverna Vulcânica e Caverna Aquática
+   ========================================================= */
+/* túneis: a ponta do túnel é uma passagem (tun), não uma porta; comporta é uma porta sempre trancada */
+Object.assign(SHAPES, {
+  /* Esgotos */
+  TC: {n:"Túnel que acaba em uma comporta",k:"corr",w:1,d:4,doors:0,tun:"t",end:"comp",tmon:true},
+  TSC:{n:"Túnel com uma comporta",k:"corr",w:1,d:4,doors:0,tun:"t",end:"t",side:"comp",tmon:true},
+  TS: {n:"Túnel",k:"corr",w:1,d:4,doors:0,tun:"t",end:"t",tmon:true},
+  TV: {n:"Túnel em curva",k:"corr",w:1,d:3,doors:0,tun:"t",turn:"t",tmon:true},
+  TE: {n:"Túnel com escada para a superfície",k:"corr",w:1,d:3,doors:0,tun:"t",end:"t",surface:true,tmon:true},
+  SC: {n:"Sala com uma comporta",k:"room",w:4,d:4,doors:0,end:"comp"},
+  /* Cavernas */
+  CN: {n:"O túnel vai se estreitando",k:"corr",w:1,d:3,doors:0,tun:"w",end:"n",tmon:true},
+  CWN:{n:"Túnel largo com um túnel estreito na lateral",k:"corr",w:2,d:4,doors:0,tun:"w",end:"w",side:"n",tmon:true},
+  CW: {n:"Túnel largo",k:"corr",w:2,d:4,doors:0,tun:"w",end:"w",tmon:true},
+  CG: {n:"Gruta grande",k:"room",w:5,d:5,doors:0,end:"w",grotto:true},
+  NGP:{n:"Gruta pequena",k:"room",w:3,d:3,doors:0,grotto:true},
+  NGG:{n:"Gruta grande",k:"room",w:5,d:5,doors:0,grotto:true},
+  NGPN:{n:"Gruta pequena",k:"room",w:3,d:3,doors:0,end:"n",grotto:true},
+  NGGN:{n:"Gruta grande",k:"room",w:5,d:5,doors:0,end:"n",grotto:true},
+  NN: {n:"Túnel estreito",k:"corr",w:1,d:4,doors:0,tun:"n",end:"n"}
+});
+const TRAP_SLIDE = n => ["dmg","Desmoronamento!",n];
+const MEGA_MAG = ["Anel Goblin (Maldição; flatulência intensificada)","Sabre do Lorde Elfo (Dano 1d6; +2 contra Anão ou Goblin)","Gládio do General Orc (Dano 1d6; +2 contra Elfo ou Anão)","Peitoral Dracônico (10 PV; imune a Fogo)","Cajado do Deus da Morte (Dano 1d6; +3 contra Morto-Vivo)","Grande Espada do Último Herói (Dano 1d6+4; Duas Mãos)"];
+const CAVE_BASE = {
+  start:"cave", st:["CN","CWN","CWN","CG","CW","CW"], st2:["NGP","NGG","NGPN","NGGN","NN","NN"],
+  corr:["S1","M1","M1","L2","G2","E"], room:SEG_ROOM, noBoss:true, tunnels:true,
+  sec:["trap","nada","chest","chest","calab","hole"],
+  trap:[TRAP_SLIDE(10),TRAP_SLIDE(9),TRAP_SLIDE(8),["dmg","Uma estalactite te acerta.",5],["nada","Um tremor, mas nada acontece."],["nada","Um tremor, mas nada acontece."]],
+  cont:[["Está tudo inundado. Gaste 1 tocha para sair desta gruta.","w"],["Um Baú escondido atrás de algumas rochas.","x"],["Uma pequena cachoeira cai do teto e desce pelo chão em direção ao túnel adiante.","s"],
+    ["Um rio atravessa esta gruta, mas é pequeno e com pouca correnteza.",""],["Teto alto pingando muita água.",""],["Estalagmites pontudas no teto.","s"],
+    ["Um Tesouro escondido atrás de algumas rochas.","t"],["Um acampamento abandonado com um Tesouro.","t"],["Muitas rochas no caminho.",""],
+    ["Um buraco no chão parece levar para um Túnel Largo em um novo complexo abaixo.","hole"],["Um Baú estranhamente deixado sobre uma pedra.","x"]],
+  mon:[["1","Fungomestre","Fungomestres",20,2,"Espólios, Regeneração"],["5","Fungóide","Fungóides",4,2,"Espólios, Regeneração"],["3","Fungóide","Fungóides",4,2,"Espólios, Regeneração"],
+    ["1d6","Goblin","Goblins",3,1,"Explosivo"],["1d6","Morcego","Morcegos",1,1,""],null,null,["1","Urso Pardo","Ursos Pardos",13,4,""],
+    ["1","Aranha Gigante","Aranhas Gigantes",10,4,"Paralisar"],["3","Bandido","Bandidos",5,2,"Espólios"],["3","Aranha Gigante","Aranhas Gigantes",10,4,"Paralisar"]],
+  tes:["@arma",LIFE,"@scroll","Jóia perdida (vale 1d6×10 moedas na cidade)","@mar","@mag"],
+  mar:["Cogumelo Cheiroso (coma e recupere 2 PV)","Pão Mofado Especial (vale como 3 provisões)","Apito Goblin (Goblins fogem ao ouvir)",KEY_M,"Glaive Enferrujada (Dano 1d6+3; Duas Mãos)","Pó da Fuga (gaste e fuja de uma batalha)"],
+  mag:["[Armadura] da Risada (Maldição; não pode Mover em Silêncio)","[Armadura] do Azar (Maldição; rerrole os 6 nos ataques)","Marionete Mágica (segura a tocha para você)","Barco Dobrável (pode andar na água)","[Arma] do Mago sem Nome (sabe uma Magia Avançada)","[Arma] do Último Suspiro (dano +4 se estiver com 1 PV)"],
+  arma:[["Clava","1d6-1"],["Picareta","1d6"],["Cutelo","1d6"],["Rapieira","1d6+1"],["Maça","1d6+1"],["Machadão","1d6+2",1]],
+  boss:[]
+};
+Object.assign(DUNGEONS, {
+  12:{n:"Esgotos",a:"Os",
+    intro:"Você desce por um bueiro, numa escada suja de metal, e chega a um túnel numa interseção com quatro corredores de água corrente (norte, sul, leste e oeste). Todos os túneis daqui têm uma água rasa, fedida e escura correndo.",
+    start:"sewer", st:["TC","TSC","TSC","TS","TV","TE"], corr:["SP","SP","M","SC","SC","TS"], room:["SP","SP","SP","M","M","TS"], noBoss:true, tunnels:true,
+    sec:["trap","nada","nada","nada","tres","door"],
+    trap:[["arm","Um dos seus braços é decepado por uma lâmina."],["dmg","Uma explosão!",4],["dmg","Um jorro de ácido.",3],["dmg","Um dardo te acerta.",1],TRAP_NADA,TRAP_NADA],
+    cont:[["Está tudo inundado. Gaste 1 tocha para sair da sala.","w"],["Armário destruído com um Baú dentro.","x"],["Móveis destruídos.","s"],
+      ["8 caixotes empilhados.","k8"],["Pilha de lixo com um Tesouro no meio.","t"],["Sujeira por todos os cantos.","s"],
+      ["Uma cama suja e sinal de fogueira recente.","s"],["Pilha de lixo com um Tesouro no meio.","t"],["Uma escada de metal leva para a superfície.","up s"],
+      ["Um alçapão que leva para um Refúgio.","ref"],["Um Baú perdido.","x"]],
+    mon:[["1","Enxame de Ratos","Enxames de Ratos",20,2,"Regeneração"],["1","Enxame de Baratas","Enxames de Baratas",26,1,"Regeneração"],["1d6","Goblin","Goblins",3,1,"Explosivo"],
+      ["1","Verme dos Esgotos","Vermes dos Esgotos",10,3,"Veneno"],["1d6","Rato Gigante","Ratos Gigantes",2,1,""],null,null,
+      ["1","Golem de Lixo","Golens de Lixo",15,4,"Ponto Fraco"],["4","Bandido","Bandidos",5,2,"Espólios"],["1","Limo Vivo","Limos Vivos",10,1,"Espólios, Regeneração"],
+      ["1","Crocodilo Gigante","Crocodilos Gigantes",30,5,""]],
+    tes:["@torches",LIFE,"@scroll","Jóia perdida (vale 1d6×10 moedas na cidade)","@mar","@mag"],
+    mar:["Perfume (você não vai ficar fedendo depois dessa)","Penico (serve como Elmo; 3 PV)","Sino (faz um monstro abrir uma porta para você)","Apito Goblin (Goblins fogem ao ouvir)",KEY_M,"Glaive Enferrujada (Dano 1d6+3; Duas Mãos)"],
+    mag:["[Armadura] do Tétano (Maldição; -2 PV)","Anel do Azar (Maldição; rerrole os 6 nos ataques)","Flauta de Hamelin (ratos, vermes e insetos fogem)","[Armadura] dos Ratos (+1 PV, mas fede)","[Arma] das Moscas (+1 contra enxames)","[Arma] do Tétano (+3 contra humanóides)"],
+    arma:[["Cano","1d6-1"],["Espada","1d6"],["Chave de Boca","1d6"],["Espeto","1d6+1"],["Lança","1d6+1",1],["Marreta","1d6+2",1]],
+    boss:[]},
+  13:Object.assign({}, CAVE_BASE, {n:"Caverna",a:"A",
+    intro:"Entrando pela grande abertura coberta por rochas, a caverna se estende para dentro na escuridão. As paredes foram moldadas pelo tempo e por criaturas rastejantes. Estalactites e estalagmites ficam mais frequentes conforme o ar fica mais gelado e a escuridão mais assustadora. Seu único caminho é seguir o túnel largo."}),
+  14:Object.assign({}, CAVE_BASE, {n:"Mina",a:"A", mine:true,
+    intro:"A entrada da mina é sustentada por vigas de madeira velhas. Um trilho de ferro desce pelo túnel largo, e um carrinho enferrujado ainda está sobre ele. Lá dentro, o ar é pesado e cheira a terra molhada. Seu único caminho é seguir o túnel largo."}),
+  15:Object.assign({}, CAVE_BASE, {n:"Caverna Vulcânica",a:"A", magma:true,
+    intro:"Uma fenda na encosta do vulcão leva para dentro da montanha. O calor é sufocante e um brilho vermelho vem do fundo das rochas. Rios de lava escorrem devagar por rachaduras no chão. Seu único caminho é seguir o túnel largo."}),
+  16:Object.assign({}, CAVE_BASE, {n:"Caverna Aquática",a:"A", octo:true,
+    intro:"Entre os corais, uma abertura escura leva para dentro de uma caverna parcialmente alagada. As paredes brilham com algas e conchas, e a água bate nas rochas com um eco profundo. Seu único caminho é seguir o túnel largo."})
+});
+DUNGEONS[15].mag = DUNGEONS[6].mag;
+DUNGEONS[16].mag = MEGA_MAG;
+RUINS_TABLE.pl[0] = 13; RUINS_TABLE.mo[0] = 13; RUINS_TABLE.mo[3] = 14; RUINS_TABLE.fl[0] = 13; RUINS_TABLE.tu[0] = 13;
+const ENDLESS = t => !!(DUNGEONS[t] && DUNGEONS[t].noBoss);
+
+/* ---------- regras dos Esgotos e das cavernas ---------- */
+/* tabela que vale agora: a passagem para o Calabouço numa caverna muda as tabelas daquele trecho */
+let DT_FORCE = null;
+function dtNow(){
+  if(DT_FORCE) return DT_FORCE;
+  const d = state.dungeon; if(!d) return 1;
+  const lv = d.levels && d.pos ? d.levels[d.pos.level] : null, seg = lv && lv.segs[d.pos.seg];
+  return (seg && seg.dt) || (lv && lv.dt) || d.type;
+}
+/* portas das formas novas: ponta do túnel, comporta e saída lateral */
+function addShapeDoors(lv, seg, sh){
+  const f = seg.fwd, mk = (side, kind, pref) => {
+    const dd = addDoor(lv, seg, side, pref === undefined ? "mid" : pref); if(!dd) return null;
+    if(kind === "comp") dd.comp = true; else dd.tun = kind;
+    return dd;
+  };
+  if(sh.end) mk(f, sh.end);
+  if(sh.side){ const l = sideScore(lv, seg, LEFT[f]) + Math.random()*4, r = sideScore(lv, seg, RIGHT[f]) + Math.random()*4; mk(l >= r ? LEFT[f] : RIGHT[f], sh.side); }
+  if(sh.turn){ const sd = Math.random() < .5 ? LEFT[f] : RIGHT[f], len = (sd === "N" || sd === "S") ? seg.w : seg.h; mk(sd, sh.turn, (f === "N" || f === "W") ? 0 : len - 1); }
+  if(sh.surface) seg.surface = true;
+}
+function tunName(dd){ return dd.tun === "n" ? "Túnel estreito" : dd.tun === "w" ? "Túnel largo" : dd.tun ? "Túnel" : dd.comp ? "Comporta" : "Porta"; }
+/* monstros especiais das cavernas Vulcânica e Aquática */
+function caveMonster(m){
+  const dt = DT();
+  if(dt.magma && m <= 4) return {row:["1","Monstro de Magma","Monstros de Magma",30,3,"Fogo"], chests:2};
+  if(dt.octo && m >= 9) return {row:["1","Polvo Assassino","Polvos Assassinos",50,5,"Paralisar"], chests:2};
+  return null;
+}
+function rollSegMonster(seg, m, quiet){
+  const sp = caveMonster(m);
+  seg.mon = monsterGroup(sp ? sp.row : DT().mon[m-2], quiet ? "hero" : "mon");
+  if(seg.mon && sp) seg.mon.chests2 = sp.chests;
+  if(seg.mon && !quiet) seg.mon.broke = true;
+}
+/* Mina: descer o trilho no carrinho */
+async function mineCart(){
+  const seg = curSeg(), g = seg && seg.mon; if(!g || seg.cart) return;
+  startAction(); seg.cart = true;
+  log("Você sobe no carrinho e desce o trilho a toda velocidade!");
+  const groups = [g, ...(g.extra||[])];
+  let stop = false;
+  for(const gr of groups){
+    for(const u of gr.list){
+      if(stop) break;
+      if(u.pv <= 0) continue;
+      const [v] = await roll("Carrinho", 1), dmg = v + 3;
+      u.pv -= dmg;
+      if(u.pv <= 0) log(`O carrinho acerta ${gr.name.replace(/s$/,"")} com ${dmg} de dano e o derruba.`);
+      else { log(`O carrinho acerta ${gr.name.replace(/s$/,"")} com ${dmg} de dano, mas ele resiste e o carrinho para.`); stop = true; }
+    }
+    gr.list = gr.list.filter(u=>u.pv > 0); gr.qty = gr.list.length;
+    if(stop) break;
+  }
+  const left = groups.filter(gr=>gr.list.length);
+  if(!left.length){ const sp = groups.reduce((a,x)=>a+(x.chests2||0),0); seg.mon = null; if(sp) seg.chests += sp; log("O carrinho passou por cima de todos os monstros do caminho!"); }
+  else { const [a, ...rest] = left; a.extra = rest; seg.mon = a; }
+  endAction();
+}
+/* caixotes dos Esgotos: 1 dado para cada; 1 ativa armadilha, 6 acha um Tesouro */
+async function openCrates(){
+  const seg = curSeg(); if(!seg || !seg.crates) return;
+  startAction();
+  const n = seg.crates; seg.crates = 0;
+  const res = await rollPar(Array.from({length:n}, (_,i)=>[`Caixote ${i+1}`, 1]));
+  const traps = res.filter(v=>v[0] === 1).length, found = res.filter(v=>v[0] === 6).length;
+  rollNote(`${found} Tesouro${found===1?"":"s"}, ${traps} armadilha${traps===1?"":"s"}`);
+  log(`Você revira os ${n} caixotes: ${found} Tesouro${found===1?"":"s"} e ${traps} armadilha${traps===1?"":"s"}.`);
+  for(let i=0;i<traps;i++){ const ok = await trap("crate"); if(!ok || !state.hero){ endAction(); return; } }
+  if(found) seg.loot = {tres:(seg.loot && seg.loot.tres || 0) + found};
+  endAction();
+}
+/* Refúgio dos Esgotos: um esconderijo seguro para descansar uma vez */
+function useRefuge(){
+  const seg = curSeg(), h = state.hero; if(!seg || !seg.refuge || seg.refUsed) return;
+  seg.refUsed = true; h.pv = h.pvMax; Object.values(h.spells).forEach(s=>s.left = s.max);
+  party(h).forEach(p=>{ p.pv = p.max; if(p.spells) Object.values(p.spells).forEach(x=>x.left = x.max); });
+  log("Você desce pelo alçapão e encontra um Refúgio seguro. Descansa um pouco: PV e magias recuperados.");
+  persist(); render();
+}
+function dgEnterLabel(m, r){
+  if(m.type === 12) return r && r.visits ? "Voltar aos esgotos" : "Descer aos esgotos";
+  if(m.type >= 13 && m.type <= 16) return r && r.visits ? "Voltar para a caverna" : `Entrar na ${DUNGEONS[m.type].n}`;
+  return r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra";
+}
+function descLabel(seg){
+  const n = D().pos.level + 1;
+  if(seg && seg.hole) return `Descer pelo buraco <small>(nível ${n})</small>`;
+  return n >= 3 && !ENDLESS(D().type) ? "Descer para a Sala Final" : `Descer para o nível ${n}`;
+}
 
 
 /* =========================================================
@@ -1609,7 +1783,7 @@ const isShield = it => !!it && /^Escudo (de Madeira|de Ferro|Dourado)/.test(it.n
 function shieldVal(h){ h = h || state.hero; if(!h) return 0; return offs(h).filter(w=>w.shield).reduce((a,w)=>a + +((w.n.match(/em (\d)\)/)||[])[1] || 1), 0); }
 function hasShield(h){ return shieldVal(h) > 0; }
 function D(){ return state.dungeon; }
-function DT(){ return DUNGEONS[state.dungeon.type]; }
+function DT(){ return DUNGEONS[dtNow()]; }
 function DT0(){ return state.dungeon ? DUNGEONS[state.dungeon.type] : null; }
 function LV(n){ return state.dungeon.levels[n || state.dungeon.pos.level]; }
 function curSeg(){ const p = state.dungeon.pos; return LV(p.level).segs[p.seg]; }
@@ -1766,6 +1940,12 @@ function buildLevel1(){
   } else if(dt.start==="cidadela"){
     start = makeSeg(lv, "ENT", {x:-3,y:-7,w:8,h:8}, "N", {k:"room", name:"Salão da fonte seca", exit:true});
     [1,3,5].forEach(k=>{ ["W","E"].forEach(sd=>{ const dd = addDoor(lv, start, sd, k); if(dd) dd.cst = true; }); });
+  } else if(dt.start==="sewer"){
+    start = makeSeg(lv, "ENT", {x:-1,y:-3,w:3,h:3}, "N", {k:"room", name:"Interseção do bueiro", exit:true});
+    [["N","mid"],["W","mid"],["E","mid"],["S",0]].forEach(([sd,pf])=>{ const dd = addDoor(lv, start, sd, pf); if(dd) dd.tun = "t"; });
+  } else if(dt.start==="cave"){
+    start = makeSeg(lv, "ENT", {x:-2,y:-4,w:5,h:4}, "N", {k:"room", name:"Boca da caverna", exit:true});
+    const dd = addDoor(lv, start, "N", "mid"); if(dd) dd.tun = "w";
   } else if(dt.start==="zig"){
     start = makeSeg(lv, "ENT", {x:-2,y:-5,w:6,h:6}, "N", {k:"room", name:"Sala quadrada", exit:true});
     addDoor(lv, start, "N", 2); addDoor(lv, start, "W", 2); addDoor(lv, start, "E", 2); addDoor(lv, start, "S", 4);
@@ -1789,9 +1969,12 @@ function buildLevel(n, fromLevel, fromSeg){
   const d = D(), lv = newLevel(n);
   d.levels[n] = lv;
   const arr = makeSeg(lv, "ARR", {x:0,y:-1,w:1,h:2}, "N", {k:"stairs", name:"Escadaria", up:{level:fromLevel, seg:fromSeg}});
-  if(n < 3){
-    addDoor(lv, arr, "N", 0);
-    arr.desc = "Você desce a escadaria. Ao final dela há uma porta.";
+  { const fs = d.levels[fromLevel] && d.levels[fromLevel].segs[fromSeg]; if(fs && fs.dt) lv.dt = fs.dt; }
+  if(n < 3 || ENDLESS(D().type)){
+    const dd = addDoor(lv, arr, "N", 0);
+    const fs = d.levels[fromLevel] && d.levels[fromLevel].segs[fromSeg];
+    if(fs && fs.hole && DT().tunnels){ if(dd) dd.tun = "w"; arr.name = "Buraco"; arr.desc = "Você desce pelo buraco e chega a um túnel largo de um novo complexo de cavernas."; }
+    else arr.desc = "Você desce a escadaria. Ao final dela há uma porta.";
   } else {
     const fin = makeSeg(lv, "FIN", {x:-3,y:-9,w:8,h:8}, "N", {k:"room", name:"Sala Final", final:true});
     const pass = addDoor(lv, arr, "N", 0); pass.st = "open"; pass.to = fin.id; fin.from = pass.id;
@@ -1817,6 +2000,11 @@ function applyContent(seg, roll){
   if(fx==="t") seg.loot = {tres:1};
   if(fx==="tt") seg.loot = {tres:2};
   if(fx==="s2") seg.secretN = 2;
+  if(fx==="w") seg.flood = true;
+  if(fx==="k8") seg.crates = 8;
+  if(fx.startsWith("up")) seg.surface = true;
+  if(fx==="ref") seg.refuge = true;
+  if(fx==="hole"){ seg.down = true; seg.hole = true; }
   if(fx==="t1") seg.loot = {tres:rollExpr("1d6")};
   if(fx==="t2") seg.loot = {tres:rollExpr("2d6")};
   if(fx==="m") seg.loot = {magic:rollExpr("2d6")};
@@ -1837,7 +2025,7 @@ function lootText(l){
 /* itens e recompensas */
 function makeArmor(rest){
   const dt = rtDT || DT0(), [slot, pv, nm] = ((dt && dt.armorT) || ARMOR_TABLE)[d6()];
-  const bonus = (rest.match(/\(([+-]\d+) PV\)/)||[])[1];
+  const bonus = (rest.match(/([+-]\d+) PV/)||[])[1];
   const total = pv + (bonus ? +bonus : 0);
   const it = {n:`${nm || slot} ${rest}`, slot, pv:Math.max(0,total), magic:true};
   if(/Deusa Coruja/.test(rest)){ const sp = SPELL_TABLES.avancada.r[d6()+d6()]; it.grant = sp; it.n = `${nm || slot} da Deusa Coruja (sabe ${sp})`; }
@@ -1845,7 +2033,9 @@ function makeArmor(rest){
 }
 function makeWeapon(suffix, magic){
   const [n, dmg, two] = (rtDT || DT()).arma[d6()-1];
-  return {n: suffix ? `${n} ${suffix}` : n, weapon:true, d:dmg, two:!!two, magic:!!magic};
+  const it = {n: suffix ? `${n} ${suffix}` : n, weapon:true, d:dmg, two:!!two, magic:!!magic};
+  if(/Mago sem Nome/.test(suffix||"")){ const sp = SPELL_TABLES.avancada.r[d6()+d6()]; it.grant = sp; it.n = `${n} do Mago sem Nome (sabe ${sp})`; }
+  return it;
 }
 function itemFrom(text, magic){
   if(text.startsWith("[Armadura]")) return makeArmor(text.replace("[Armadura] ",""));
@@ -1870,6 +2060,7 @@ function rollTreasure(dt){
   if(e==="@mag") return itemFrom(dt.mag[d6()-1], true);
   if(e==="@arma") return makeWeapon("", false);
   if(e==="@armor") return makePlainArmor(dt);
+  if(e==="@torches"){ const n = rollExpr("1d6"); return {n:`Pacote com ${n} Tocha${n>1?"s":""} (acende quando precisar)`, torchPack:n}; }
   if(e==="@pot") return inferGear(fixWearable({n:dt.pot[d6()-1], magic:true}));
   if(e==="@scroll") return {n:`Pergaminho Mágico (${SPELLS[d6()].n})`, scroll:true, magic:true};
   return {n:e};
@@ -1920,7 +2111,7 @@ function collectLoot(seg){
    ========================================================= */
 function blocked(seg){ return seg.mon && !seg.mon.sneak; }
 function lvc(cur, max){ const p = max > 0 ? cur/max : 0; return p > .5 ? "lv-g" : p > .2 ? "lv-y" : "lv-r"; }
-function hasLamp(h){ h = h || state.hero; return !!h && (h.bag.some(it=>/^Lamparina/.test(it.n)) || (h.armor && h.armor.Elmo && /^Capacete para Tochas/.test(h.armor.Elmo.n)) || (h === state.hero && !!torchHolder(h))); }
+function hasLamp(h){ h = h || state.hero; return !!h && (h.bag.some(it=>/^Lamparina/.test(it.n)) || (h.armor && h.armor.Elmo && /^Capacete para Tochas/.test(h.armor.Elmo.n)) || h.bag.some(it=>/^Marionete Mágica/.test(it.n)) || (h === state.hero && !!torchHolder(h))); }
 function wCopy(w){ return w.shield ? {n:w.n} : {n:w.n, weapon:true, d:w.d, two:w.two, magic:w.magic}; }
 /* mãos: cada braço segura uma coisa; a tocha ocupa uma mão (a Lamparina libera); Duas Mãos ocupa duas */
 const UNARMED = () => ({n:"Mãos nuas", d:"1d6-3", unarmed:true});
@@ -2168,6 +2359,20 @@ async function doOpenDoor(id){
   const lv = LV(), door = lv.doors[id], h = state.hero;
   door.boss = isBossDoor(lv, door);
   startAction();
+  if(door.tun){
+    if(!spendTorch(1, "Seguindo o túnel")){ endAction(); return; }
+    door.st = "open"; await reveal(door, true); endAction(); return;
+  }
+  if(D().bell && door.st === "closed"){
+    D().bell = false; door.st = "open";
+    log(`O sino toca e um monstro abre ${door.comp ? "a comporta" : "a porta"} para você, sem gastar tocha e sem armadilha.`);
+    await reveal(door, true); endAction(); return;
+  }
+  if(door.comp){
+    if(!spendTorch(1, "Abrindo a comporta")){ endAction(); return; }
+    door.st = "locked"; log("A comporta está trancada, como todas daqui."); state.ui.selDoor = id;
+    endAction(); return;
+  }
   if(!spendTorch(1, "Abrindo a porta")){ endAction(); return; }
   const [v] = await roll("Porta", 1);
   rollNote(v === 1 ? "Armadilha!" : v <= 3 ? "Trancada" : "Destrancada");
@@ -2196,6 +2401,7 @@ async function doOpenDoor(id){
 }
 async function doUnlock(id, how){
   const lv = LV(), door = lv.doors[id], h = state.hero;
+  if(how === "break" && door.comp) return;
   door.boss = isBossDoor(lv, door);
   startAction();
   let quiet = true;
@@ -2228,6 +2434,10 @@ async function doUnlock(id, how){
   endAction();
 }
 async function reveal(door, quiet){
+  DT_FORCE = door.toDt || null;
+  try { await revealCore(door, quiet); } finally { DT_FORCE = null; }
+}
+async function revealCore(door, quiet){
   const d = D(), lv = LV(), from = lv.segs[door.seg], h = state.hero;
   const [dx,dy] = DIRV[door.dir];
   const tx = door.x+dx, ty = door.y+dy;
@@ -2264,12 +2474,12 @@ async function reveal(door, quiet){
       moveTo(st.id, true); return;
     }
   }
-  const col = from.k === "stairs" ? "stairs" : from.k === "corr" ? "corr" : "room";
-  const table = col === "stairs" ? (DT().st || SEG_STAIRS) : col === "corr" ? DT().corr : DT().room;
+  const col = door.tun ? (door.tun === "n" ? "narrow" : "stairs") : from.k === "stairs" ? "stairs" : from.k === "corr" ? "corr" : "room";
+  const table = col === "narrow" ? DT().st2 : col === "stairs" ? (DT().st || SEG_STAIRS) : col === "corr" ? DT().corr : DT().room;
   const [sv] = await roll("Segmento", 1);
   const code = table[sv-1], sh = SHAPES[code];
   rollNote(sh.n);
-  const wide = sh.k === "corr" && (door.dir === "N" || door.dir === "S");
+  const wide = sh.k === "corr" && sh.tun !== "n" && sh.tun !== "t" && (door.dir === "N" || door.dir === "S");
   let rect = (wide && fitRect2(lv, door.dir, tx, ty, sh.d)) || fitRect(lv, door.dir, tx, ty, sh.w, sh.d, sh.k === "room");
   let np = null;
   if(sh.k === "room" && (!rect || rect.shrunk)){ np = fitWithNeck(lv, door.dir, tx, ty, sh.w, sh.d); if(np) rect = np.rect; }
@@ -2277,20 +2487,28 @@ async function reveal(door, quiet){
   const seg = makeSeg(lv, code, rect, door.dir, {from:door.id, quiet, neck: np ? np.neck : undefined});
   door.to = seg.id;
   addNewSegDoors(lv, seg, code);
+  addShapeDoors(lv, seg, sh);
+  { const tdt = door.toDt || from.dt; if(tdt) seg.dt = tdt; }
   if(rect.shrunk) seg.name += " (estreita)";
   if(seg.k === "room"){
     const [cv, mv] = await rollPar([["Conteúdo",2],["Monstros",2]]);
     const c = cv[0]+cv[1], m = mv[0]+mv[1];
     applyContent(seg, c);
-    seg.mon = monsterGroup(DT().mon[m-2], quiet ? "hero" : "mon"); if(seg.mon && !quiet) seg.mon.broke = true;
+    rollSegMonster(seg, m, quiet);
     if(COOP.two()){ const [m2] = await rollPar([["Monstros (2º jogador)",2]]); const g2 = monsterGroup(DT().mon[m2[0]+m2[1]-2], quiet ? "hero" : "mon"); if(g2){ seg.mon = mergeMon(seg.mon, g2); if(!quiet) seg.mon.broke = true; seg.mon.first = quiet ? "hero" : "mon"; } }
     scareMon(seg);
     rollNote(DT().cont[c-2][0].replace(/\.$/,""), "Conteúdo");
     rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro", "Monstros");
     lv.last = seg.id;
   }
-  if(seg.k === "stairs"){ seg.desc = d.pos.level >= 2 ? "Uma escadaria desce para a Sala Final." : "Uma escadaria desce para o próximo nível."; }
-  log(`Você abriu a porta ${DIRNAME[door.dir]}: ${seg.name.toLowerCase()}.` + (seg.mon ? ` ${seg.mon.qty} ${seg.mon.name}!` : ""));
+  if(sh.tmon){
+    const mv = await roll("Monstros", 2), m = mv[0]+mv[1];
+    rollSegMonster(seg, m, quiet); scareMon(seg);
+    rollNote(seg.mon ? `${seg.mon.qty} ${seg.mon.name}` : "Nenhum monstro", "Monstros");
+  }
+  if(seg.k === "stairs"){ seg.desc = d.pos.level >= 2 && !ENDLESS(D().type) ? "Uma escadaria desce para a Sala Final." : "Uma escadaria desce para o próximo nível."; }
+  if(seg.surface) seg.desc = (seg.desc ? seg.desc + " " : "") + "Uma escada de metal sobe para a superfície.";
+  log((door.tun ? `Você segue pelo túnel ${DIRNAME[door.dir]}: ${seg.name.toLowerCase()}.` : `Você abriu ${door.comp ? "a comporta" : "a porta"} ${DIRNAME[door.dir]}: ${seg.name.toLowerCase()}.`) + (seg.mon ? ` ${seg.mon.qty} ${seg.mon.name}!` : ""));
   moveTo(seg.id, true);
 }
 /* Teletransporte fora do combate: magia ou pergaminho, destino escolhido no mapa */
@@ -2329,6 +2547,7 @@ async function teleTo(level, id){
 function moveTo(id, fresh){
   const d = D();
   const changed = d.pos.seg !== id;
+  { const prev = curSeg(); if(changed && prev && prev.flood && !prev.floodPaid && state.hero){ prev.floodPaid = true; log("Para sair da área inundada você gasta 1 tocha."); spendTorch(1, "Saindo da área inundada"); } }
   d.pos.seg = id;
   if(changed && COOP.on()) setTimeout(()=>COOP.checkLight(true), 0);
   state.ui.selDoor = null; state.ui.selObj = null; state.ui.bagFull = false; state.ui.pick = null;
@@ -2410,10 +2629,19 @@ async function doSecret(){
   const v = await roll(dwarf ? "Passagem (Anão)" : "Passagem", dwarf ? 2 : 1);
   const r = Math.max(...v), out = (DT().sec || SEC_BASE)[r-1];
   if(seg.secretN > 1){ seg.secretN--; seg.secretTried = false; }
-  rollNote(out === "trap" ? "Armadilha!" : out === "nada" ? "Nada" : out === "chest" ? "Baú escondido" : "Passagem secreta!");
+  rollNote(out === "trap" ? "Armadilha!" : out === "nada" ? "Nada" : out === "chest" ? (DT().tunnels ? "Baú enterrado" : "Baú escondido") : out === "tres" ? "Tesouro escondido" : out === "door" ? "Porta escondida" : out === "calab" ? "Porta para um Calabouço" : out === "hole" ? "Buraco para baixo" : "Passagem secreta!");
   if(out === "trap"){ log("Procurando a passagem, você ativou uma armadilha!"); await trap("secret"); }
   else if(out === "nada") log("Não há nada aqui.");
-  else if(out === "chest"){ seg.chests++; log("Você encontrou um Baú escondido!"); }
+  else if(out === "chest"){ seg.chests++; log(DT().tunnels ? "Você encontrou um Baú enterrado!" : "Você encontrou um Baú escondido!"); }
+  else if(out === "tres"){ seg.loot = Object.assign({}, seg.loot || {}, {tres:((seg.loot && seg.loot.tres) || 0) + 1}); log("Você encontrou um Tesouro escondido!"); }
+  else if(out === "hole"){ seg.down = true; seg.hole = true; log("Você encontrou um buraco que leva para um complexo de cavernas abaixo!"); }
+  else if(out === "door" || out === "calab"){
+    let dd = null;
+    for(const sd of [seg.fwd, LEFT[seg.fwd], RIGHT[seg.fwd]].sort(()=>Math.random()-.5)){ dd = addDoor(lv, seg, sd); if(dd) break; }
+    if(!dd) log("Você sente uma corrente de ar, mas a passagem está bloqueada.");
+    else if(out === "calab"){ dd.toDt = 6; log("Atrás das rochas há uma porta que leva para um Calabouço!"); }
+    else log("Há uma porta escondida aqui!");
+  }
   else {
     const sides = [seg.fwd, LEFT[seg.fwd], RIGHT[seg.fwd]].sort(()=>Math.random()-.5);
     let ok = false;
@@ -2452,7 +2680,7 @@ async function doSneak(){
   const res = await rollPar(specs);
   for(let i=0;i<n;i++){
     const v = i < res.length ? res[i] : (halfling ? [d6(),d6()] : [d6()]);
-    if(Math.max(...v) === 1) seen = true;
+    if(Math.max(...v) <= (seg.k === "corr" && DT().tunnels ? 2 : 1)) seen = true;
     if(i < res.length) rollNote(Math.max(...v) === 1 ? "Te viu!" : "Não viu", `Monstro ${i+1}`);
   }
   if(seen){ g.first = "mon"; g.seen = true; log("Um dos monstros te viu! Eles atacam primeiro."); }
@@ -2477,6 +2705,7 @@ async function doDefeat(){
   }
   const wasBoss = g.boss;
   seg.mon = null;
+  { const bc = groups.reduce((a,x)=>a+(x.chests2||0),0); if(bc){ seg.chests += bc; log(`Derrotado o ${g.name}, você encontra ${bc} Baús!`); } }
   if(wasBoss) H(h).bosses++;
   log(wasBoss ? `Você derrotou ${g.qty>1?"os":"o"} ${g.name}!` : `Você venceu ${g.qty} ${g.name}.`);
   if(wasBoss){
@@ -2526,7 +2755,7 @@ async function doDescend(){
   if(!seg.link){
     const arr = buildLevel(L+1, L, seg.id);
     seg.link = {level:L+1, seg:arr.id};
-    log(L+1 === 3 ? "Você desce para o terceiro nível. A Sala Final te espera." : `Você desce para o nível ${L+1}. O mapa do andar de cima fica para trás.`);
+    log(L+1 === 3 && !ENDLESS(D().type) ? "Você desce para o terceiro nível. A Sala Final te espera." : `Você desce para o nível ${L+1}. O mapa do andar de cima fica para trás.`);
   } else log(`Você desce de volta para o nível ${L+1}.`);
   d.pos = {level:seg.link.level, seg:seg.link.seg};
   if(seg.link.level === 3){
@@ -2564,7 +2793,7 @@ function doCorpse(){
 /* regra do livro: sem escada para descer, a última porta fechada do nível leva ao Chefe */
 const BOSS_MIN_ROOMS = 3; /* evita que a primeira porta da masmorra já seja a do Chefe */
 function isBossDoor(lv, door){
-  if(!door || lv.n >= 3 || D().complete) return false;
+  if(!door || lv.n >= 3 || D().complete || ENDLESS(D().type)) return false;
   if(Object.values(lv.segs).some(s=>s.final || s.down)) return false;
   if(!(door.st==="closed" || door.st==="locked")) return false;
   if(Object.values(lv.segs).filter(s=>s.k==="room" && !s.exit).length < BOSS_MIN_ROOMS) return false;
@@ -2575,7 +2804,7 @@ function isBossDoor(lv, door){
 }
 function bossDoorOf(lv){ return Object.values(lv.doors).find(dd=>isBossDoor(lv, dd)) || null; }
 function levelExhausted(lv){
-  if(lv.n >= 3) return false;
+  if(lv.n >= 3 || ENDLESS(D().type)) return false;
   if(Object.values(lv.segs).some(s=>s.final)) return false;
   if(Object.values(lv.doors).some(dd=>dd.st==="closed"||dd.st==="locked")) return false;
   if(Object.values(lv.segs).some(s=>s.down)) return false;
@@ -2608,6 +2837,8 @@ function drawDoor(ctx, dd){
   // batentes de pedra
   R(-1,0,1,6,INK); R(6,0,1,6,INK); R(-2,1,1,4,INK); R(7,1,1,4,INK);
   const st = dd.st;
+  if(dd.tun && st!=="open"){ R(0,1,6,4,INK); R(1,2,4,1,PAPER); return; }
+  if(dd.comp && st!=="open"){ for(let i=0;i<6;i+=2) R(i,0,1,6,INK); R(0,3,6,1,INK); return; }
   if(st==="closed"){
     R(0,1,6,4,INK); R(1,2,4,2,PAPER); P(3,2,INK); P(3,3,INK); P(1,2,INK);
   } else if(st==="locked"){
@@ -3406,6 +3637,53 @@ Object.assign(SPR_COMMON_BY_DUNGEON, {
   "Zigurate":["Líder de Tribo Javaligor","Soldado Javaligor","Goblin Assassino","Pantera","Morcego Gigante","Estátua do Deus Sol","Serpente Emplumada"],
   "Laboratório":["Ogro Costurado","Olho Flutuante","Zumbi Tóxico","Cadeira Viva","Bolha Assassina","Rato Mutante","Cão Tóxico"]
 });
+/* ---------- sprites dos Esgotos e das cavernas (2ª etapa) ---------- */
+Object.assign(SPR, {
+"Bandido":{pal:{s:"#e0b088",S:"#b07c58",D:"#7a5238",c:"#5a4a3a",C:"#3e3226",l:"#2e3a4a",L:"#22283a",h:"#2a2a30",r:"#c83a2a",q:"#d0d6e4",k:"#1a1410","@":"#0c0a08"},head:[9,3],
+  rows:sprPaint(20,22,o=>{ const b = sprHuman(o,{cx:9,B:21,lh:6,lw:2,lg:1,tw:8,th:7,belly:4,hr:3.6,body:["c","c","C"],leg:["l","l","L"],arm:["s","S","D"],skin:["s","S","D"],eye:"k",eyeY:0,eyeX:1,aw:2,foot:"k",belt:"C"});
+    o.rect(b.cx-4,b.hy+1,9,3,"r"); o.disc(b.cx,b.hy-2,4,2.6,(dx,dy)=> dy<.1 ? "h" : null); o.rect(b.cx-5,b.hy-1,11,1,"h");
+    o.line(16,5,16,15,"q"); o.rect(15,15,3,1,"C"); })},
+"Enxame de Ratos":{pal:{g:"#8a8078",G:"#a8a098",d:"#5a524c",p:"#e0a0b0",e:"#ff3030","@":"#0c0a08"},
+  rows:sprPaint(30,18,o=>{ [[6,12,1],[14,13,-1],[22,12,1],[10,6,-1],[19,6,1],[26,7,-1],[4,4,1]].forEach(([x,y,s],i)=>{
+    o.disc(x,y,4,2.4,o.sh("G","g","d")); o.disc(x-3*s,y-1,1.8,1.6,"g"); o.P(x-5*s,y,"p"); o.P(x-4*s,y-1,"e"); o.disc(x-2*s,y-3,1,1,"p"); o.P(x-2*s,y-4,"G");
+    for(let k=0;k<4;k++) o.P(x+(4+k)*s, y+1-(k%2), "p"); o.P(x-1,y+2,"d"); o.P(x+1,y+2,"d"); }); })},
+"Enxame de Baratas":{pal:{b:"#6a3a1a",B:"#4a2810",L:"#9a5a2a",k:"#1a0e06","@":"#0a0604"},
+  rows:sprPaint(30,18,o=>{ for(let i=0;i<14;i++){ const x = 3 + (i*7)%25, y = 3 + Math.floor(i*1.1)%13;
+    o.disc(x,y,2,1.3,o.sh("L","b","B")); o.P(x-2,y-1,"k"); o.line(x-2,y,x-4,y-2,"k"); o.P(x+1,y+1,"k"); o.P(x-1,y+1,"k"); } })},
+"Verme dos Esgotos":{pal:{p:"#c88aa0",P:"#9a5a72",L:"#e8b0c4",k:"#2a1018",w:"#f0e0d0",g:"#80c040","@":"#140608"},
+  rows:sprPaint(28,20,o=>{ for(let k=0;k<18;k++){ const x = 4+k, y = 13 - Math.round(Math.sin(k*.38)*4) + (k>12 ? (k-12)*-.6 : 0); o.disc(x,y,2.6,2.8, k%3===0 ? "P" : "p"); }
+    o.disc(23,6,4,4,o.sh("L","p","P")); o.disc(24,6,2.4,2.4,"k"); for(let a=0;a<8;a++) o.P(24+Math.cos(a)*2, 6+Math.sin(a)*2, "w"); o.P(5,16,"g"); o.P(11,9,"g"); })},
+"Golem de Lixo":{pal:{b:"#6a5a3a",B:"#4a3e28",L:"#8a7a52",w:"#c8c0b0",g:"#5a7a3a",r:"#a83a2a",m:"#8a92a6",k:"#1a1410",y:"#f0e040","@":"#0a0806"},fx:"eyes",eyes:[[10,5],[14,5]],head:[12,1],
+  rows:sprPaint(26,26,o=>{ const b = sprHuman(o,{cx:12,B:25,lh:6,lw:4,lg:2,tw:14,th:10,belly:7,hr:5,body:["L","b","B"],leg:["L","b","B"],arm:["L","b","B"],skin:["L","b","B"],eye:"y",eyeY:0,eyeX:2,aw:4,al:11,neck:2});
+    [[8,10,"w"],[14,12,"r"],[10,15,"m"],[16,8,"g"],[6,14,"g"],[13,17,"w"],[3,12,"m"],[21,13,"r"],[11,3,"g"],[15,22,"m"]].forEach(([x,y,c])=>{ o.rect(x,y,2,2,c); });
+    o.rect(b.cx-2,b.hy+2,5,1,"k"); o.line(b.cx-3,b.hy-5,b.cx-5,b.hy-8,"m"); o.P(b.cx+3,b.hy-5,"w"); })},
+"Crocodilo Gigante":{pal:{g:"#5a7a3a",G:"#3e5a28",L:"#7a9a50",y:"#e0d070",k:"#1a1a10",w:"#f0ecd8",r:"#c83a2a","@":"#080a04"},flip:true,
+  rows:sprPaint(40,18,o=>{ o.disc(20,10,13,4.6,o.sh("L","g","G")); o.trap(5,9,1.5,3,3,"g"); o.rect(0,9,8,3,(i,j)=> j===0 ? "L" : "g"); o.rect(0,12,8,1,"y");
+    for(let x=1;x<8;x+=2){ o.P(x,11,"w"); o.P(x+1,12,"w"); } o.P(8,7,"y"); o.P(9,7,"k"); o.P(1,9,"k");
+    for(let x=10;x<32;x+=3) o.P(x,6,"G"); for(let k=0;k<10;k++) o.disc(32+k, 10+k*.15, 2.6-k*.2, 1.8-k*.12, k%2?"G":"g");
+    [12,17,24,29].forEach((x,i)=>{ o.rect(x,14,3,3,i%2?"G":"g"); o.rect(x-1,17,4,1,"k"); }); o.rect(10,14,20,1,"y"); })},
+"Fungomestre":{pal:{c:"#a83a5a",C:"#7a2440",L:"#d86a88",w:"#f0e8d8",W:"#c8bca8",s:"#e8dcc0",S:"#b8a888",k:"#2a1418",y:"#f0e040","@":"#120608"},head:[12,3],fx:"spores",
+  rows:sprPaint(26,28,o=>{ o.disc(12,8,11,7,(dx,dy)=> dy>.5 ? null : dx+dy<-.6 ? "L" : dx+dy>.5 ? "C" : "c"); [[6,5],[13,3],[18,6],[9,9],[16,9]].forEach(([x,y])=>o.disc(x,y,1.4,1.2,"w"));
+    o.rect(3,11,19,1,"C"); o.trap(12,12,5,14,6,o.shx("s","s","S")); o.rect(9,15,2,2,"k"); o.rect(14,15,2,2,"k"); o.P(9,15,"y"); o.P(14,15,"y"); o.rect(10,19,6,1,"k");
+    o.rect(3,15,3,7,(i)=>i?"S":"s"); o.rect(19,15,3,7,"S"); o.rect(6,26,5,1,"S"); o.rect(14,26,5,1,"S"); })},
+"Urso Pardo":{pal:{h:"#7a5232",H:"#5a3a20",L:"#9a6c44",k:"#1a1008",w:"#f0ecd8",n:"#3a2a1e","@":"#0a0604"},flip:true,
+  rows:sprPaint(32,22,o=>{ o.disc(18,11,12,7,o.sh("L","h","H")); o.disc(6,8,5.5,5,o.sh("L","h","H")); o.disc(2,10,2.5,2,"L"); o.P(0,10,"k");
+    o.disc(4,3,1.6,1.6,"H"); o.disc(9,3,1.6,1.6,"H"); o.P(5,7,"k"); o.P(8,7,"k"); o.P(2,12,"w");
+    [9,13,22,26].forEach((x,i)=>{ o.rect(x,16,3,5,i%2?"H":"h"); o.rect(x-1,21,4,1,"n"); }); })},
+"Polvo Assassino":{pal:{p:"#a04a9a",P:"#6a2a68",L:"#d07ac8",w:"#f8f0f8",k:"#14081a",y:"#f0e040","@":"#0a040c"},head:[17,4],
+  rows:sprPaint(36,34,o=>{ for(let t=0;t<8;t++){ const x0 = 6+t*3.4; for(let k=0;k<14;k++){ const x = x0 + Math.sin(k*.5+t)*2.5 + (t-3.5)*k*.35, y = 19+k; o.disc(x,y,Math.max(.8,2.2-k*.1),1, k%3===0 ? "P" : "p"); if(k%3===1) o.P(x,y+1,"L"); } }
+    o.disc(17,10,11,10,o.sh("L","p","P")); o.disc(12,12,3,3,"w"); o.disc(22,12,3,3,"w"); o.rect(11,11,2,3,"k"); o.rect(21,11,2,3,"k"); o.P(12,11,"y"); o.P(22,11,"y");
+    [[10,4],[16,2],[23,5]].forEach(([x,y])=>o.disc(x,y,1.4,1.2,"L")); })},
+"Monstro de Magma":{pal:{k:"#2a1810",K:"#3e2418",L:"#5a3424",o:"#f87020",O:"#e04010",y:"#ffe060",r:"#c82a10","@":"#0a0604"},head:[13,4],
+  rows:sprPaint(28,30,o=>{ const b = sprHuman(o,{cx:13,B:29,lh:7,lw:4,lg:2,tw:16,th:11,belly:8,hr:6,body:["L","K","k"],leg:["L","K","k"],arm:["L","K","k"],skin:["L","K","k"],eye:"y",eyeY:0,eyeX:2,aw:4,al:12,neck:2});
+    [[9,b.ty+2,7],[15,b.ty+4,6],[11,b.ty+8,5],[6,b.ty+6,4],[19,b.ty+9,4],[b.cx-3,b.hy-3,4],[b.cx+2,b.hy+2,3]].forEach(([x,y,l],i)=>o.line(x,y,x+(i%2?2:-2),y+l,i%2?"o":"O"));
+    o.trap(b.cx,b.hy+3,3,2,2,"o"); o.P(b.cx,b.hy+4,"y"); for(let x=2;x<26;x+=3) o.P(x,b.B-Math.round(Math.sin(x)*1+1),"o"); })}
+});
+Object.assign(BOSS_EYES, {"Polvo Assassino":"y","Monstro de Magma":"y"});
+Object.assign(SPR_COMMON_BY_DUNGEON, {
+  "Esgotos":["Enxame de Ratos","Enxame de Baratas","Verme dos Esgotos","Golem de Lixo","Bandido","Crocodilo Gigante"],
+  "Cavernas":["Fungomestre","Urso Pardo","Polvo Assassino","Monstro de Magma"]
+});
 
 
 /* =========================================================
@@ -3426,8 +3704,14 @@ Object.assign(PALZ, {
   8:{S:["#5a4424","#7a5e34","#9a7a46","#b8965a","#d0b070","#e4c88a","#f4e2b0"],F:["#7a6038","#94784a","#ac905c","#c2a670","#d6bc86","#e8d29e"],acc:"#2a8a9a",acc2:"#6ac8d0",acc3:"#c8a030"},
   9:{S:["#1e2a22","#2e3e32","#425646","#5a705c","#768e76","#98ae94","#c0d2b8"],F:["#2a3226","#3a4434","#4a5642","#5c6a52","#6e7e62","#829476"],acc:"#c83a2a",acc2:"#e8c040",acc3:"#2a8a4a"},
   10:{S:["#1c1e1a","#2a2e26","#3c4234","#505844","#687258","#848e70","#aab494"],F:["#24261e","#32352a","#424636","#525844","#646a52","#787e64"],acc:"#6af040",acc2:"#c8ff90",acc3:"#2a7a1a"},
-  11:{S:["#1e1a24","#2c2634","#3e3648","#524a5e","#6a6278","#8a8296","#b4aec0"],F:["#221e26","#302a34","#3e3844","#4e4654","#5e5666","#706878"],acc:"#e8e0cc",acc2:"#a080d0",acc3:"#5a3a7a"}
+  11:{S:["#1e1a24","#2c2634","#3e3648","#524a5e","#6a6278","#8a8296","#b4aec0"],F:["#221e26","#302a34","#3e3844","#4e4654","#5e5666","#706878"],acc:"#e8e0cc",acc2:"#a080d0",acc3:"#5a3a7a"},
+  12:{S:["#1e221c","#2c3228","#3e4638","#525c4a","#6a7460","#8a947e","#b4bca6"],F:["#1c2018","#282e22","#343c2c","#424a38","#525a46","#646c56"],acc:"#4a6a3a",acc2:"#8aa060",acc3:"#2a3a20"},
+  13:{S:["#1e1a18","#2e2824","#433a34","#5a4e46","#74665c","#968676","#bcae9e"],F:["#24201c","#322c26","#403830","#4e463c","#5e5448","#706456"],acc:"#6a8aa0",acc2:"#a8c8d8",acc3:"#3a4a5a"},
+  14:{S:["#24180e","#36261a","#4c3826","#644c34","#7e6446","#a0845e","#c8ae86"],F:["#2a1e14","#3a2a1c","#4a3826","#5a4630","#6c563c","#80684a"],acc:"#8c5628",acc2:"#c8a040",acc3:"#4a2a12"},
+  15:{S:["#140e0e","#221816","#342420","#48322a","#604438","#80604e","#a88870"],F:["#1a1210","#261a16","#32221c","#3e2a22","#4c342a","#5c4034"],acc:"#f87020",acc2:"#ffe060",acc3:"#c82a10"},
+  16:{S:["#101e24","#1a2e36","#284450","#385c6a","#4e7886","#7098a4","#a0c4cc"],F:["#14242a","#1c323a","#26404a","#30505a","#3c606a","#4a727c"],acc:"#e07a9a",acc2:"#62d6c6",acc3:"#225a90"}
 });
+const isCaveT = t => t >= 13 && t <= 16;
 const WATER = ["#0f2840","#17406a","#225a90","#3478b0","#62a6d6","#b6e2f6","#eefaff"];
 const WOOD = ["#2a170a","#4a2a12","#6a3e1c","#8c5628","#ae7036"];
 const IRON = ["#22252e","#3c4150","#61687a","#9aa2b6"];
@@ -3443,14 +3727,97 @@ function drawSpriteC(ctx, rows, x, y, cmap){
 }
 /* texturas pré-desenhadas por tipo de masmorra */
 const TEX = {};
+/* cavernas: chão de rocha sem rejunte e paredes de pedra bruta */
+function caveTex(type, mk, P){
+  const F = P.F, S = P.S;
+  const floors = [0,1,2,3].map(v => mk(32,32,(x,y)=>{
+    const h = zh(x+v*41, y+v*17), b = zh(Math.floor((x+v*5)/6), Math.floor((y+v*3)/5)+v*9);
+    if(type===15 && v===3){ const cy = 14 + Math.round(Math.sin(x*.35)*4); if(x>3 && x<29 && Math.abs(y-cy)<1) return P.acc; if(x>3 && x<29 && Math.abs(y-cy)<2) return P.acc3; }
+    if(type===16 && v===2 && h>.985) return P.acc2;
+    if(type===14 && v===1 && h>.97) return P.acc2;
+    if(h>.94) return F[5];
+    if(h<.06) return F[0];
+    return b < .3 ? F[1] : b > .72 ? F[3] : F[2];
+  }));
+  const face = mk(512,40,(x,y)=>{
+    const sx = x + Math.floor(zh(Math.floor(y/7), 3)*9), cw = 9, ch = 7;
+    const bx = sx % cw, by = y % ch, blk = zh(Math.floor(sx/cw), Math.floor(y/ch)+11), h = zh(x,y);
+    let c = blk < .3 ? S[1] : blk > .7 ? S[3] : S[2];
+    if(by===0 && blk>.35) c = S[4];
+    if(bx===0 && zh(Math.floor(sx/cw), Math.floor(y/ch)) > .45) c = S[0];
+    if(h>.95) c = S[5]; else if(h<.04) c = S[0];
+    if(y>=37) c = y===39 ? S[0] : S[1];
+    if(type===15 && Math.abs(((x*.6 + Math.sin(y*.5)*3) % 61) - 30) < .7 && zh(Math.floor(x/61), 7) > .4) c = y%3 ? P.acc : P.acc2;
+    if(type===16 && y>30 && zh(x,y+9) > .55) c = y>34 ? P.acc2 : MOSS[1];
+    if(type===13 && y>32 && zh(x,y+3) > .8) c = MOSS[1];
+    if(type===14){ const bm = x % 96; if(bm<4){ c = bm===0 ? WOOD[0] : bm===3 ? WOOD[1] : WOOD[3]; } if(y<4){ c = y===0 ? WOOD[4] : y===3 ? WOOD[0] : WOOD[2]; } }
+    return c;
+  });
+  const rock = (h,a) => h>.9 ? S[5] : h<.15 ? S[3] : a ? S[4] : S[3];
+  const capH = mk(512,CAP,(x,y)=>{ const h = zh(x,y+50), a = zh(Math.floor(x/5), y+3) > .4; if(y===0) return h>.5 ? S[5] : S[4]; if(y===CAP-1) return S[2]; return rock(h,a); });
+  const capV = mk(CAP,512,(x,y)=>{ const h = zh(x+50,y), a = zh(x+3, Math.floor(y/5)) > .4; if(x===0) return h>.5 ? S[5] : S[4]; if(x===CAP-1) return S[2]; return rock(h,a); });
+  return {floors, face, capH, capV};
+}
+/* detalhes dos Esgotos e das cavernas: água, trilhos, buracos, escadas e alçapões */
+function drawSegExtraZ(ctx, s, type, P, fy0, fy1, ix0, ix1){
+  const X = s.x*T, Wd = s.w*T, R = (a,b,c,d,col) => { ctx.fillStyle = col; ctx.fillRect(a,b,c,d); };
+  const vertical = s.h > s.w || ((s.fwd==="N"||s.fwd==="S") && s.h === s.w);
+  const cxm = Math.round(X + Wd/2), cym = Math.round((fy0+fy1)/2);
+  if(type===12 && s.k==="corr"){
+    const MW = ["#141c10","#1e2a16","#28381e","#344826","#4e663a"];
+    const [x0,y0,w,h] = vertical ? [cxm-6, fy0, 12, fy1-fy0] : [ix0, cym-4, ix1-ix0, 8];
+    for(let yy=y0; yy<y0+h; yy++) for(let xx=x0; xx<x0+w; xx++){
+      const edge = vertical ? (xx===x0 || xx===x0+w-1) : (yy===y0 || yy===y0+h-1);
+      const hh = zh(xx,yy); let c = edge ? MW[0] : MW[2];
+      if(!edge && ((vertical ? (yy*2 + xx) : (xx*2 + yy)) % 11 === 0)) c = MW[3];
+      if(!edge && hh > .97) c = MW[4]; else if(!edge && hh < .05) c = MW[1];
+      R(xx, yy, 1, 1, c);
+    }
+  }
+  if(type===14 && s.k==="corr"){
+    const [x0,y0,w,h] = vertical ? [cxm-6, fy0, 12, fy1-fy0] : [ix0, cym-5, ix1-ix0, 10];
+    if(vertical){ for(let yy=y0+2; yy<y0+h; yy+=5) R(x0-1, yy, w+2, 2, WOOD[1]); R(x0+1, y0, 2, h, IRON[2]); R(x0+w-3, y0, 2, h, IRON[2]); R(x0+1, y0, 1, h, IRON[3]); R(x0+w-3, y0, 1, h, IRON[3]); }
+    else { for(let xx=x0+2; xx<x0+w; xx+=5) R(xx, y0-1, 2, h+2, WOOD[1]); R(x0, y0+1, w, 2, IRON[2]); R(x0, y0+h-3, w, 2, IRON[2]); R(x0, y0+1, w, 1, IRON[3]); R(x0, y0+h-3, w, 1, IRON[3]); }
+  }
+  if((type===15 || type===16) && s.k==="room" && s.w>=3 && zh(s.x, s.y) > .35){
+    const px = ix1 - 22, py = fy1 - 14, C = type===15 ? [P.acc3, P.acc, P.acc2] : [WATER[1], WATER[2], WATER[4]];
+    for(let yy=-6; yy<=6; yy++) for(let xx=-14; xx<=14; xx++){ const e = (xx*xx)/196 + (yy*yy)/36; if(e>1) continue; R(px+xx, py+yy, 1, 1, e>.7 ? C[0] : zh(px+xx, py+yy) > .9 ? C[2] : C[1]); }
+  }
+  if(s.hole){
+    const rx = Math.min(14, Math.floor((ix1-ix0)/2) - 4), ry = Math.max(5, Math.round(rx*.6)), hx = cxm, hy = cym + 2;
+    for(let yy=-ry-2; yy<=ry+2; yy++) for(let xx=-rx-2; xx<=rx+2; xx++){
+      const e = (xx*xx)/(rx*rx) + (yy*yy)/(ry*ry);
+      if(e <= 1) R(hx+xx, hy+yy, 1, 1, yy < -ry*.4 ? "#05040a" : e > .75 ? "#120e14" : "#05040a");
+      else if(e <= 1.45 && zh(hx+xx, hy+yy) > .35) R(hx+xx, hy+yy, 1, 1, yy < 0 ? P.S[1] : P.S[4]);
+    }
+  }
+  if(s.surface){
+    const lx = cxm - 5, top = s.y*T + CAP, bot = fy0 + 10;
+    R(lx-2, top, 14, 3, "rgba(255,240,200,.18)");
+    R(lx, top, 2, bot-top, IRON[1]); R(lx+8, top, 2, bot-top, IRON[1]); R(lx, top, 1, bot-top, IRON[3]); R(lx+8, top, 1, bot-top, IRON[3]);
+    for(let yy=top+3; yy<bot; yy+=4){ R(lx+2, yy, 6, 1, IRON[2]); R(lx+2, yy+1, 6, 1, IRON[0]); }
+  }
+  if(s.refuge){
+    const tx = ix0 + 6, ty = fy1 - 18;
+    R(tx-1, ty-1, 16, 14, WOOD[0]);
+    for(let i=0;i<14;i++) R(tx+i, ty, 1, 12, i%4===0 ? WOOD[1] : WOOD[3]);
+    R(tx, ty+3, 14, 1, IRON[2]); R(tx, ty+8, 14, 1, IRON[2]); R(tx+11, ty+5, 2, 2, GOLD[2]);
+  }
+  if(s.crates > 0){
+    const n = Math.min(4, Math.ceil(s.crates/2)), bx0 = ix1 - 14*n - 4, by = fy0 + 4;
+    for(let i=0;i<n;i++){ const x = bx0 + i*14, y = by + (i%2)*3; R(x, y, 13, 11, WOOD[0]); R(x+1, y+1, 11, 9, WOOD[3]); R(x+1, y+1, 11, 1, WOOD[4]); R(x+1, y+5, 11, 1, WOOD[1]); R(x+6, y+1, 1, 9, WOOD[1]); }
+  }
+}
 function texFor(type){
   if(TEX[type]) return TEX[type];
   const P = PALZ[type], F = P.F, S = P.S;
   const mk = (w,h,fn) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); const id = g.createImageData(w,h);
     for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const col = fn(x,y); if(!col) continue; const n = parseInt(col.slice(1),16), i = (y*w+x)*4; id.data[i]=n>>16; id.data[i+1]=(n>>8)&255; id.data[i+2]=n&255; id.data[i+3]=255; }
     g.putImageData(id,0,0); return c; };
+  if(isCaveT(type)) return (TEX[type] = caveTex(type, mk, P));
   const floors = [0,1,2,3].map(v => mk(32,32,(x,y)=>{
     const h = zh(x+v*41, y+v*17), tint = v%2;
+    if(type===12 && x>1 && y>1 && x<31 && y<31 && h>.965) return v%2 ? P.acc : P.acc3;
     if(x===0||y===0) return F[0];
     if(x===1||y===1) return F[4];
     if(x===31||y===31) return F[1];
@@ -3503,6 +3870,7 @@ function buildStaticZ(lv){
       if(type===3 && s.w>=3){ [[ix0+4, fy1-18],[ix1-18, fy1-18]].forEach(([ux,uy])=>{ ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(ux+1, uy+15, 13, 3); drawSpriteC(ctx, ["...kkkkkk...","..kAaaaaAk..","...kaaaak...","..kaaaaaak..",".kaaBaaaaak.","kaaBaaaaaaak","kaaBaaaaaaak","kaaaaaaaaaak","kaaaaaaaaaAk",".kaaaaaaaAk.","..kaaaaaAk..","...kkkkkk..."], ux, uy+2, {k:"#1a1418", a:P.acc, A:P.acc3, B:P.acc2}); }); }
       if(type===4 && s.w>=3){ extras.candles.push([ix0+6, fy0+6],[ix1-8, fy0+6]); }
     }
+    if(s.k!=="stairs" && (type >= 12 || s.hole || s.surface || s.refuge || s.crates)) drawSegExtraZ(ctx, s, type, P, fy0, fy1, ix0, ix1);
     if(s.k==="stairs") drawStairsZ(ctx, s, S);
     if(s.final){
       const cx = X+Wd/2, cy = fy0+(fy1-fy0)/2, R = Math.min(Wd, fy1-fy0)/2 - 22;
@@ -3705,6 +4073,21 @@ function drawDoorZ(ctx, dd, lv, P){
     if(hz){ R(x, y, 1, h, F[4]); R(x+w-3, y, 3, h, "rgba(0,0,0,.3)"); } else { R(x, y, w, 1, F[4]); R(x, y+h-3, w, 3, "rgba(0,0,0,.3)"); }
     if(st==="secret"){ [[2,3],[w-5,h-6],[5,h-3]].forEach(([a,b])=>{ R(x+a, y+b, 3, 2, S[2]); R(x+a, y+b, 3, 1, S[4]); }); }
     if(st==="broken"){ R(x, y+2, 4, 2, WOOD[2]); R(x+w-5, y+h-4, 4, 2, WOOD[3]); R(x+6, y+h-2, 2, 1, WOOD[1]); R(x+2, y+7, 1, 4, WOOD[3]); }
+    return;
+  }
+  if(dd.tun){
+    R(x, y, w, h, "#07060a");
+    if(hz){ R(x, y, w, 2, S[1]); for(let i=0;i<h;i+=4) if(zh(x, y+i) > .4){ R(x, y+i, 2, 3, S[2]); R(x+w-2, y+i+2, 2, 3, S[2]); } }
+    else { R(x, y, 2, h, S[1]); for(let i=0;i<w;i+=4) if(zh(x+i, y) > .4){ R(x+i, y, 3, 2, S[2]); R(x+i+2, y+h-2, 3, 2, S[2]); } }
+    if(dd.tun === "n"){ if(hz){ R(x, y, 5, h, S[0]); R(x+w-5, y, 5, h, S[0]); } else { R(x, y, w, 6, S[0]); R(x, y+h-6, w, 6, S[0]); } }
+    return;
+  }
+  if(dd.comp){
+    R(x, y, w, h, "#10140e");
+    if(hz){ for(let xx=x+1; xx<x+w; xx+=3){ R(xx, y, 1, h, IRON[2]); R(xx+1, y, 1, h, IRON[0]); } [y+3, y+h-5].forEach(by=>{ R(x, by, w, 2, IRON[1]); R(x, by, w, 1, IRON[3]); }); }
+    else { for(let yy=y+1; yy<y+h; yy+=3){ R(x, yy, w, 1, IRON[2]); R(x, yy+1, w, 1, IRON[0]); } R(x+2, y, 2, h, IRON[1]); R(x+w-4, y, 2, h, IRON[1]); }
+    const vx = x + Math.floor(w/2) - 3, vy = y + Math.floor(h/2) - 3;
+    R(vx, vy, 7, 7, IRON[3]); R(vx+1, vy+1, 5, 5, "#10140e"); R(vx+3, vy, 1, 7, IRON[3]); R(vx, vy+3, 7, 1, IRON[3]);
     return;
   }
   if(st==="rubble"){
@@ -4501,7 +4884,7 @@ function itemActs(it, i){
   const combatOnly = /^Poção da Fúria/.test(it.n) || (sp && !/^(Cura|Luz)$/.test(sp) && !(sp === "Teletransporte" && inDg));
   if(/^Vela dos Protetores/.test(it.n)) acts.push(`<button class="use" data-act="useItem" data-i="${i}">Acender</button>`);
   const farBad = /^Poção do Lugar Distante/.test(it.n) && (!state.world || inDg);
-  if(/^Poção|^Pergaminho|^Safira|^Barril de Cerveja|^Fruta Estranha|^Bebida Doce|^Rubi/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="useItem" data-i="${i}" ${(noPot && /^Poção|^Pergaminho/.test(it.n)) || farBad || (/^Rubi da Durabilidade/.test(it.n) && !ARMOR_SLOTS.some(sl=>h0.armor[sl])) || (/^Rubi de Encantamento/.test(it.n) && h0.weapon.unarmed) ?"disabled":""}>${/^Rubi/.test(it.n) ? "Colar" : /^Barril|^Bebida/.test(it.n) ? "Beber" : /^Fruta/.test(it.n) ? "Comer" : "Usar"}</button>`);
+  if(/^Poção|^Pergaminho|^Safira|^Barril de Cerveja|^Fruta Estranha|^Bebida Doce|^Rubi|^Cogumelo Cheiroso|^Pão Mofado|^Pacote com|^Sino|^Perfume/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="useItem" data-i="${i}" ${(noPot && /^Poção|^Pergaminho/.test(it.n)) || farBad || (/^Rubi da Durabilidade/.test(it.n) && !ARMOR_SLOTS.some(sl=>h0.armor[sl])) || (/^Rubi de Encantamento/.test(it.n) && h0.weapon.unarmed) ?"disabled":""}>${/^Rubi/.test(it.n) ? "Colar" : /^Barril|^Bebida/.test(it.n) ? "Beber" : /^Fruta/.test(it.n) ? "Comer" : "Usar"}</button>`);
   if(/^Apito Goblin/.test(it.n) && !combatOnly) acts.push(`<button class="use" data-act="whistle" data-i="${i}">Apitar</button>`);
   if(COOP.on() && COOP.partner() && !combatOnly){ const pt = COOP.partner(), full = pt.lite && pt.lite.bagN >= pt.lite.bagMax;
     acts.push(`<button class="use" data-act="giveItem" data-i="${i}" ${!COOP.online(pt) || full || pt.dead || it.locked ? "disabled" : ""}>Enviar para ${esc(pt.name)}</button>`); }
@@ -4699,7 +5082,12 @@ function viewDungeon(){
   : `<button class="btn" data-act="rollDungeon">Rolar 3d6</button>`}
   ${coopPanel()}`;
 }
+/* jogo em dupla desligado por enquanto (o código continua aqui para quando quisermos religar);
+   a simulação dos testes ainda consegue usar */
+const COOP_ENABLED = false;
+function coopEnabled(){ return COOP_ENABLED || !!(state.settings && state.settings.coopSim); }
 function coopPanel(){
+  if(!coopEnabled() && !COOP.on()) return "";
   const msg = state.ui.coopMsg ? `<p class="toast">${esc(state.ui.coopMsg)}</p>` : "";
   if(COOP.on()){
     const p = COOP.partner();
@@ -4747,7 +5135,7 @@ function viewExplore(){
 </div>`;
     if(isBlocked){
       if(raceT("coutim") && !g.boss && [g, ...(g.extra||[])].every(x=>/Espólios/.test(x.tr||""))) acts.push(`<button class="btn ghost" data-act="coutim">Ignorar o combate e pegar os espólios</button>`);
-      if(g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") && !hasAlly("Cachorro")) acts.push(`<button class="btn ghost" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>`);
+      if(g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !cursedOn(/da Risada/) && !raceT("noSneak") && !hasAlly("Cachorro")) acts.push(`<button class="btn ghost" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>`);
       acts.unshift(`<button class="btn" data-act="fight">Lutar!</button>`);
       acts.push(`<button class="btn ghost" data-act="go" data-to="sheet">Abrir ficha</button>`);
     } else acts.push(`<button class="btn ghost" data-act="fight" data-surprise="1">Atacar de surpresa</button>`);
@@ -4760,25 +5148,25 @@ function viewExplore(){
   let doorsHTML = "";
   if(!isBlocked && closed.length){
     const count = {};
-    doorsHTML = `<span class="label">Portas fechadas</span><div class="dlist">${closed.map(dd=>{
+    doorsHTML = `<span class="label">${DT().tunnels ? "Caminhos" : "Portas fechadas"}</span><div class="dlist">${closed.map(dd=>{
       count[dd.dir] = (count[dd.dir]||0)+1;
       const same = closed.filter(o=>o.dir===dd.dir).length;
-      const lab = `Porta ${DIRNAME[dd.dir]}${same>1?" "+count[dd.dir]:""}${dd.st==="locked"?" (trancada)":""}${isBossDoor(lv, dd)?" · Chefe":""}`;
+      const lab = `${tunName(dd)} ${DIRNAME[dd.dir]}${same>1?" "+count[dd.dir]:""}${dd.st==="locked"?" (trancada)":""}${isBossDoor(lv, dd)?" · Chefe":""}`;
       return `<button class="dbtn ${selDoor&&selDoor.id===dd.id?"sel":""}" data-act="selDoor" data-id="${dd.id}">${lab}</button>`;
     }).join("")}</div>`;
     if(selDoor && selDoor.seg===seg.id){
       const chav0 = freeLock();
       popHTML = selDoor.st==="closed"
-        ? `<button class="pbtn" data-act="openDoor" data-id="${selDoor.id}">Abrir porta <small>(1 tocha)</small></button>`
+        ? `<button class="pbtn" data-act="openDoor" data-id="${selDoor.id}">${selDoor.tun ? "Seguir pelo túnel" : selDoor.comp ? "Abrir comporta" : "Abrir porta"} <small>(1 tocha)</small></button>`
         : `<button class="pbtn" data-act="unlock" data-how="pick" data-id="${selDoor.id}">Destrancar <small>(${chav0?"sem tocha":"+1 tocha"})</small></button>
-           <button class="pbtn alt" data-act="unlock" data-how="break" data-id="${selDoor.id}">Quebrar</button>
+           ${selDoor.comp ? "" : `<button class="pbtn alt" data-act="unlock" data-how="break" data-id="${selDoor.id}">Quebrar</button>`}
            ${keyIdx() >= 0 ? `<button class="pbtn alt" data-act="unlock" data-how="key" data-id="${selDoor.id}">Chave</button>` : ""}`;
       if(isBossDoor(lv, selDoor)){ popHTML = `<span class="pwarn">O Chefe está atrás desta porta</span>` + popHTML; acts.push(`<p class="note">Esta é a última porta do nível e não há escada para descer. Ao abri-la, você entra na Sala Final e enfrenta o Chefe da Masmorra.</p>`); }
-      if(selDoor.st==="closed") acts.push(`<button class="btn" data-act="openDoor" data-id="${selDoor.id}">Abrir porta <small>(1 tocha)</small></button>`);
+      if(selDoor.st==="closed") acts.push(`<button class="btn" data-act="openDoor" data-id="${selDoor.id}">${selDoor.tun ? "Seguir pelo túnel" : selDoor.comp ? "Abrir comporta" : "Abrir porta"} <small>(1 tocha)</small></button>`);
       else {
         const chav = freeLock();
         acts.push(`<button class="btn" data-act="unlock" data-how="pick" data-id="${selDoor.id}">Destrancar <small>(${chav?"sem tocha extra":"+1 tocha"})</small></button>`);
-        acts.push(`<button class="btn ghost" data-act="unlock" data-how="break" data-id="${selDoor.id}">Quebrar porta <small>(faz barulho)</small></button>`);
+        if(!selDoor.comp) acts.push(`<button class="btn ghost" data-act="unlock" data-how="break" data-id="${selDoor.id}">Quebrar porta <small>(faz barulho)</small></button>`);
         if(keyIdx() >= 0) acts.push(`<button class="btn ghost" data-act="unlock" data-how="key" data-id="${selDoor.id}">Usar chave</button>`);
       }
     }
@@ -4787,7 +5175,7 @@ function viewExplore(){
   if(selObj === "mon" && seg.mon){
     const g = seg.mon;
     popHTML = isBlocked
-      ? `<button class="pbtn" data-act="fight">Lutar!</button>${g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !raceT("noSneak") && !hasAlly("Cachorro") ? `<button class="pbtn alt" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>` : ""}`
+      ? `<button class="pbtn" data-act="fight">Lutar!</button>${g.first==="hero" && !g.sneakTried && !g.boss && !seg.final && !wearing(/^Chapéu do Bobo/) && !cursedOn(/da Risada/) && !raceT("noSneak") && !hasAlly("Cachorro") ? `<button class="pbtn alt" data-act="sneak">Mover em Silêncio <small>(1 tocha)</small></button>` : ""}`
       : `<button class="pbtn" data-act="fight" data-surprise="1">Atacar de surpresa</button>`;
     popHTML = `<span class="pwarn">${g.qty} ${esc(g.name)}</span>` + popHTML;
   } else if(selObj === "chest" && seg.chests>0 && !isBlocked){
@@ -4798,13 +5186,17 @@ function viewExplore(){
       : er.ok ? `<button class="pbtn" data-act="leave">Sair da masmorra</button>`
       : `<span class="pwarn">Monstros em ${esc(er.by.map(n=>n.toLowerCase()).join(" ou "))} bloqueiam o caminho</span>`;
   } else if(selObj === "stairs" && !isBlocked && (seg.down || seg.up)){
-    popHTML = (seg.down ? `<button class="pbtn" data-act="descend">${d.pos.level+1>=3 ? "Descer para a Sala Final" : `Descer para o nível ${d.pos.level+1}`}</button>` : "")
+    popHTML = (seg.down ? `<button class="pbtn" data-act="descend">${descLabel(seg)}</button>` : "")
       + (seg.up ? `<button class="pbtn alt" data-act="climb">Subir para o nível ${seg.up.level}</button>` : "");
   } else if(selObj){ state.ui.selObj = null; }
+  if(isBlocked && DT().mine && /^(CW|CWN)$/.test(seg.code) && !seg.cart) acts.push(`<button class="btn" data-act="cart">Descer o trilho no carrinho <small>(1d6+3 em cada monstro no caminho)</small></button>`);
   if(!isBlocked){
     if(seg.loot) acts.push(`<button class="btn" data-act="loot">Pegar: ${lootText(seg.loot)}</button>`);
     if(seg.stash && seg.stash.length && !state.ui.bagFull) acts.push(`<button class="btn" data-act="takeStash">Itens deixados aqui (${seg.stash.length})</button>`);
     if(seg.chests>0) acts.push(`<button class="btn" data-act="chest">Abrir baú</button>`);
+    if(seg.crates) acts.push(`<button class="btn ghost" data-act="crates">Investigar os ${seg.crates} caixotes <small>(1 dado para cada)</small></button>`);
+    if(seg.refuge && !seg.refUsed) acts.push(`<button class="btn" data-act="refuge">Descer ao Refúgio <small>(descanso seguro, uma vez)</small></button>`);
+    if(seg.surface) acts.push(`<button class="btn ghost" data-act="leave">Subir para a superfície</button>`);
     if(seg.fx === "k" && !seg.drank) acts.push(`<button class="btn ghost" data-act="cauldron">Beber do caldeirão <small>(role na tabela de Poção)</small></button>`);
     if(seg.secret && !seg.secretTried) acts.push(`<button class="btn ghost" data-act="secret">Procurar passagem secreta <small>(1 tocha)</small></button>`);
     if(seg.k==="room" && !seg.disarmed && !seg.final) acts.push(seg.trapSeen
@@ -4812,7 +5204,7 @@ function viewExplore(){
       : `<button class="btn ghost" disabled>Desarmar armadilhas <small>(nenhuma armadilha à vista)</small></button>`);
     if(d.corpses.some(c=>c.level===d.pos.level && c.seg===seg.id)) acts.push(`<button class="btn" data-act="corpse">Revistar cadáver</button>`);
     if(seg.gosma && raceT("gosma")) acts.push(`<button class="btn" data-act="engulf">Engolfar um corpo <small>(recupera todos os PV)</small></button>`);
-    if(seg.down) acts.push(`<button class="btn" data-act="descend">${d.pos.level+1>=3 ? "Descer para a Sala Final" : `Descer para o nível ${d.pos.level+1}`}</button>`);
+    if(seg.down) acts.push(`<button class="btn" data-act="descend">${descLabel(seg)}</button>`);
     if(seg.up) acts.push(`<button class="btn ghost" data-act="climb">Subir para o nível ${seg.up.level}</button>`);
   }
   let banner = "";
@@ -4899,6 +5291,7 @@ function sellValue(it){
   let v;
   if(/2d6×10/.test(it.n)) v = rollExpr("2d6")*10;
   else if(/vale 3d6 moedas/.test(it.n)) v = rollExpr("3d6");
+  else if(/1d6×10 moedas/.test(it.n)) v = rollExpr("1d6")*10;
   else { const m = it.n.match(/vale (\d+) moedas/); v = m ? +m[1] : it.magic ? Math.max(0, d6()-1) : 1; }
   if(raceT("catSell") && (it.weapon || it.slot)) v *= 2;
   if(hasClass("Colecionador") && it.slot) v = Math.max(v, 5);
@@ -5103,7 +5496,8 @@ async function heroAttack(kind, wn){
   const bite = kind === "bite" && h.armor.Elmo && h.armor.Elmo.bite ? h.armor.Elmo.bite : null;
   if(kind === "bite"){ kind = "horn"; if(bite) W = {n:"Capacete de Crocodilo", d:bite}; }
   const expr = bite || (kind === "horn" ? "1d6" : W.d);
-  const [die] = await roll(bite ? "Mordida" : kind === "horn" ? "Chifre" : "Ataque", 1);
+  let [die] = await roll(bite ? "Mordida" : kind === "horn" ? "Chifre" : "Ataque", 1);
+  if(die === 6 && cursedOn(/do Azar|^Anel do Azar/)){ cLog("A maldição do Azar faz você rerrolar o 6."); [die] = await roll("Ataque (Azar)", 1); }
   const mod = +((expr.match(/([+-]\d+)$/)||[])[1] || 0);
   const firstHit = !c.hits; c.hits = (c.hits||0) + 1;
   let base = die + mod + heroDamageBonus(u, W);
@@ -5193,11 +5587,12 @@ async function heroItem(idx){
   const c = C(), h = state.hero, it = h.bag[idx];
   if(!it || raceT("ogro")) return;
   if(/^Pergaminho/.test(it.n)) H().magic++;
+  if(/^Pó da Fuga/.test(it.n)){ h.bag.splice(idx,1); cLog("Você joga o Pó da Fuga e foge da batalha!"); fleeCombat(); return; }
   busy = true; lockButtons();
   if(/^Poção de Vida/.test(it.n)){ h.pv = h.pvMax; cLog("Você bebe a Poção de Vida e recupera todos os PV."); }
   else if(/^Poção Verdosa/.test(it.n)){ const v = d6(); if(v >= 3){ h.pv = h.pvMax; cLog(`Poção Verdosa (${v}): você recupera todos os PV.`); } else cLog(`Poção Verdosa (${v}): só te deu coceira.`); }
   else if(/^Poção da Fúria/.test(it.n)){ c.fury = 2; cLog("Você bebe a Poção da Fúria: +2 de dano até o fim do combate."); }
-  else if(/^Poção de Magia/.test(it.n)){ Object.values(h.spells).forEach(s=>s.left=s.max); cLog("Você bebe a Poção de Magia e recupera todas as magias."); }
+  else if(/^Poção de Magia|^Poção de Mana/.test(it.n)){ Object.values(h.spells).forEach(s=>s.left=s.max); cLog("Você bebe a poção e recupera todas as magias."); }
   else if(/^Pergaminho Mágico \((.+)\)/.test(it.n)){
     const sp = it.n.match(/\((.+)\)/)[1]; h.bag.splice(idx,1);
     const had = !!h.spells[sp], prevMax = had ? h.spells[sp].max : 0;
@@ -5225,7 +5620,7 @@ async function runMonsterTurn(){
       if(ARMOR_SLOTS.some(s=>h.armor[s] && /dos Deuses/.test(h.armor[s].n))){ cLog("A armadura dos Deuses te protege da Morte Súbita."); u.doom = false; }
       else { finishDeath(`Morte Súbita de ${u.name}`); return; } }
     let dmg = Math.max(0, u.dano - monDmgCut(u));
-    if(u.fireNext){ u.fireNext = false; if(raceT("fireproof")) cLog(`${u.name} ataca envolto em fogo, mas você é imune.`); else { dmg += 10; cLog(`${u.name} ataca envolto em fogo: +10 de dano!`); } }
+    if(u.fireNext){ u.fireNext = false; if(raceT("fireproof") || wearing(/^Peitoral Dracônico/)) cLog(`${u.name} ataca envolto em fogo, mas você é imune.`); else { dmg += 10; cLog(`${u.name} ataca envolto em fogo: +10 de dano!`); } }
     if(u.magicNext){ dmg += u.magicNext; cLog(`A magia de ${u.name} soma ${u.magicNext} ao dano.`); u.magicNext = 0; }
     if(u.paralNext){ const [p] = await roll("Paralisia", 1); c.heroPar = p; u.paralNext = false; cLog(`${u.name} te paralisa por ${p} turno${p>1?"s":""}!`); }
     const abil = ABILITIES.filter(a=>has(u,a));
@@ -5510,7 +5905,7 @@ function viewCombat(){
   } else if(c.phase === "hero"){
     const sel = c.units[c.sel];
     const spells = Object.entries(h.spells).filter(([n,s])=>s.left>0 && canCast(n, true));
-    const items = raceT("ogro") ? [] : h.bag.map((it,i)=>({it,i})).filter(({it})=>/^Poção de Vida|^Poção da Fúria|^Poção de Magia|^Pergaminho Mágico/.test(it.n));
+    const items = raceT("ogro") ? [] : h.bag.map((it,i)=>({it,i})).filter(({it})=>/^Poção de Vida|^Poção da Fúria|^Poção de Magia|^Poção de Mana|^Pergaminho Mágico|^Pó da Fuga/.test(it.n));
     if(c.stonePick) panel = `<div class="stack"><p class="small">Armadura de Pedra: escolha a peça que a magia vai criar (5 PV).</p>
       <div class="dlist">${freeSlots().map(sl=>`<button class="dbtn" data-act="stonePick" data-s="${sl}">${sl}</button>`).join("")}</div>
       <button class="btn ghost" data-act="stoneCancel">Cancelar</button></div>`;
@@ -5704,7 +6099,7 @@ const DG_TYPE = {
   pa:["Cripta","Tumba","Santuário","Templo","Calabouço","Necrópole"],
   de:["Calabouço","Palácio","Santuário","Templo","Pirâmide","Pirâmide"]
 };
-const DG_ID = {"Palácio":1,"Cripta":2,"Tumba":3,"Santuário":4,"Templo":5,"Calabouço":6,"Cidadela":7,"Pirâmide":8,"Zigurate":9,"Laboratório":10,"Necrópole":11};
+const DG_ID = {"Palácio":1,"Cripta":2,"Tumba":3,"Santuário":4,"Templo":5,"Calabouço":6,"Cidadela":7,"Pirâmide":8,"Zigurate":9,"Laboratório":10,"Necrópole":11,"Caverna":13,"Mina":14};
 /* nomes elaborados: 3d6 em cada coluna (página 29) */
 const WN2 = {3:["Sagrado","Sagrada"],4:["Opaco","Opaca"],5:["Traiçoeiro","Traiçoeira"],6:["Sangrento","Sangrenta"],7:["Sinistro","Sinistra"],8:["Nebuloso","Nebulosa"],9:["Secreto","Secreta"],10:["Perdido","Perdida"],11:["Amaldiçoado","Amaldiçoada"],12:["Maligno","Maligna"],13:["Abandonado","Abandonada"],14:["Sujo","Suja"],15:["Rachado","Rachada"],16:["Torto","Torta"],17:["Fedorento","Fedorenta"],18:["Demoníaco","Demoníaca"]};
 const WN3 = {3:["do Anjo","m"],4:["da Estátua","f"],5:["da Serpente","f"],6:["da Estrada","f"],7:["do Vale","m"],8:["do Monte","m"],9:["do Segredo","m"],10:["do Rei","m"],11:["da Rainha","f"],12:["do Horror","m"],13:["do Caminho","m"],14:["da Morte","f"],15:["da Feiticeira","f"],16:["do Guerreiro","m"],17:["do Cão","m"],18:["do Inferno","m"]};
@@ -5762,7 +6157,7 @@ function dirOf(a, b){
 function distTxt(d){ return d <= 1 ? "logo ao lado" : `a ${d} hexágonos`; }
 function nearDgs(pos, rad){
   const w = WD(); rad = rad || 3;
-  return Object.keys(w.hex).filter(k=>k !== pos && w.hex[k].dg && hexDist(pos, k) <= rad).map(k=>{ const m = w.hex[k].dg, r = dgRec(m); return {k, m, d:hexDist(pos,k), dir:dirOf(pos,k), done:!!(r && r.complete)}; }).sort((a,b)=>a.d-b.d);
+  return Object.keys(w.hex).filter(k=>k !== pos && w.hex[k].dg && !ENDLESS(w.hex[k].dg.type) && hexDist(pos, k) <= rad).map(k=>{ const m = w.hex[k].dg, r = dgRec(m); return {k, m, d:hexDist(pos,k), dir:dirOf(pos,k), done:!!(r && r.complete)}; }).sort((a,b)=>a.d-b.d);
 }
 function hexPx(k){ const [q,r] = hq(k); return {x:q*HEXW + r*HEXW/2, y:r*HEXH}; }
 function pxHex(x, y){
@@ -5857,7 +6252,7 @@ function canTravel(k){
   if(w.ev) return {ok:false, why:"Resolva o encontro antes de seguir viagem."};
   if(!hexNb(w.pos).includes(k)) return {ok:false, why:`Fica a ${hexDist(w.pos,k)} hexágonos daqui. Viaje um hexágono por vez.`};
   if(hx.loc && hx.loc.k === "rocks") return {ok:false, why:"Rochas: não é possível passar por aqui."};
-  if(hx.t === "ag" && !w.boat && !canSwim()) return {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
+  if(hx.t === "ag" && !w.boat && !canSwim() && hasItem(/^Barco Dobrável/) < 0) return {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
   return {ok:true};
 }
 function dgRec(m){ const w = WD(), d = state.dungeon; return d && d.uid === m.uid ? d : (w.recs[m.uid] || null); }
@@ -6354,6 +6749,21 @@ function locSprite(key, f){
     [[5,B-1],[11,B],[34,B-1],[40,B]].forEach(([x,y])=>{ rect(x, y-5, 4, 5, (i)=> i===0 ? "#a8a2b0" : "#7a7484"); P(x+1, y-6, "#a8a2b0"); P(x+2, y-6, "#7a7484"); P(x+1, y-3, "#4a4454"); P(x+2, y-3, "#4a4454"); });
     for(let x=1;x<45;x+=3){ rect(x, B-4, 1, 5, "#2a2a34"); P(x, B-5, "#61687a"); }
     rect(1, B-3, 44, 1, "#2a2a34"); }, false);
+  if(/^dg1[2-6]$/.test(key)) cv = pixCanvas(42, 30, ({P,rect,disc,n,B})=>{   /* Caverna e Mina: morro de pedra com uma boca escura */
+    const R = ["#9a8a7a","#74665c","#4e443c","#332c26"];
+    disc(21, B+2, 19, 20, (x,y,e,dx,dy)=>{ const r = n(x,y); P(x, y, dx+dy < -10 ? R[0] : dx > 8 ? (r < .3 ? R[3] : R[2]) : (r < .15 ? R[2] : r > .9 ? R[0] : R[1])); });
+    for(let i=0;i<6;i++){ const x = 6 + n(i,4)*30, y = B-14 + n(4,i)*12; P(x, y, R[0]); P(x+1, y, R[2]); }
+    disc(21, B+1, 7, 10, (x,y,e)=>P(x, y, e > .7 ? "#120e0c" : "#060508"));
+    if(key === "dg14"){
+      rect(13, B-10, 3, 11, (i)=> i===0 ? "#ae7036" : i===1 ? "#8c5628" : "#4a2a12"); rect(27, B-10, 3, 11, (i)=> i===0 ? "#ae7036" : i===1 ? "#8c5628" : "#4a2a12");
+      rect(12, B-12, 19, 3, (i,j)=> j===0 ? "#ae7036" : j===1 ? "#8c5628" : "#4a2a12");
+      for(let y=B-3; y<=B+2; y+=2) rect(17, y, 9, 1, "#6a3e1c"); rect(18, B-4, 1, 7, "#9aa2b6"); rect(24, B-4, 1, 7, "#9aa2b6");
+      rect(32, B-3, 6, 4, (i,j)=> j===0 ? "#9aa2b6" : "#61687a"); P(33, B+1, "#22252e"); P(36, B+1, "#22252e"); rect(33, B-4, 4, 1, "#c8a040");
+    } else {
+      for(let i=0;i<5;i++) P(17 + i*2, B-9 + (i%2), "#bcae9e");
+      rect(30, B-1, 5, 3, R[1]); rect(31, B-2, 3, 1, R[0]); rect(6, B, 4, 2, R[2]);
+    }
+  });
   /* ruínas */
   if(key === "ruins") cv = pixCanvas(40, 30, ({P,rect,walls,n,B})=>{
     [[6,14],[14,8],[25,17],[33,6]].forEach(([x,h])=>{ walls(x, B-h, 4, h, STONE_L); for(let k=0;k<3;k++) P(x+n(x,k)*3, B-h-1, STONE_L[1]); rect(x-1, B, 6, 1, STONE_L[2]); });
@@ -6424,7 +6834,7 @@ function drawLoc(ctx, hx, cx, cy){
   if(hx.dg){
     const r = dgRec(hx.dg), done = r && r.complete;
     drawGround(ctx, hx.t, cx, by, 17, 6);
-    if(!(loc && loc.k === "ruins")) put(locSprite("dg" + hx.dg.type), done ? .5 : undefined);
+    if(!loc) put(locSprite("dg" + hx.dg.type), done ? .5 : undefined);
     if(done){ const fx = cx+13, fy = by-16;
       ctx.fillStyle = "#1a1410"; ctx.fillRect(fx-1, fy-1, 8, 6); ctx.fillRect(fx-1, fy, 3, 15);
       ctx.fillStyle = "#6a4424"; ctx.fillRect(fx, fy, 1, 14);
@@ -6513,9 +6923,10 @@ function hexExtrasHTML(k, here){
     else if(!canEnterCity(loc)) out.push(`<p class="small">Gente da sua raça não é bem-vinda aqui (Afinidade entre Raças).</p>`);
   }
   if(loc && loc.k === "ruins" && !hx.dg) out.push(`<p class="small">Ruínas que podem ser exploradas como masmorra.</p>`);
-  if(loc && loc.k === "volcano") out.push(soonNote("Há uma Caverna Vulcânica aqui."));
+  if(loc && loc.k === "volcano" && !hx.dg) out.push(`<p class="small">Há uma Caverna Vulcânica aqui.</p>`);
+  if(loc && loc.k === "fort" && !hx.dg) out.push(`<p class="small">Toda fortaleza tem esgotos embaixo.</p>`);
   if(loc && loc.k === "portal") out.push(soonNote("Um portal para lugares desconhecidos."));
-  if(loc && loc.k === "corals" && hx.cave) out.push(soonNote("Há uma Caverna Subaquática entre os corais."));
+  if(loc && loc.k === "corals" && hx.cave && !hx.dg) out.push(`<p class="small">Há uma Caverna Aquática entre os corais.</p>`);
   if(loc && loc.k === "oasis" && hx.oasis) out.push(`<p class="small">Um oásis de verdade: entrar aqui recupera todos os PV.</p>`);
   if(here && (hx.corpses||[]).length) hx.corpses.forEach((c,i)=>out.push(`<div class="spell"><div class="txt"><b>Corpo de ${esc(c.name)}</b><span class="small">${c.coins} moedas e ${c.bag.length} itens.</span></div><button class="use" data-act="wCorpse" data-i="${i}">Revistar</button></div>`));
   else if((hx.corpses||[]).length) out.push(`<p class="small">O corpo de ${esc(hx.corpses.map(c=>c.name).join(", "))} está aqui.</p>`);
@@ -6557,8 +6968,11 @@ function viewWorld(){
   const r = here.dg && dgRec(here.dg);
   const acts = [];
   if(town) acts.push(`<button class="btn" data-act="go" data-to="city">Entrar na ${esc(locLabel(hereLoc))}</button>`);
-  if(here.dg && !(r && r.complete)) acts.push(`<button class="btn" data-act="wEnterDg" ${w.ev?"disabled":""}>${r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra"}</button>`);
+  if(here.dg && !(r && r.complete)) acts.push(`<button class="btn" data-act="wEnterDg" ${w.ev?"disabled":""}>${dgEnterLabel(here.dg, r)}</button>`);
   if(hereLoc && hereLoc.k === "ruins" && !here.dg) acts.push(`<button class="btn" data-act="wRuins" ${w.ev?"disabled":""}>Explorar as ruínas</button>`);
+  if(hereLoc && hereLoc.k === "fort" && !here.dg) acts.push(`<button class="btn ghost" data-act="wCaveIn" data-t="12" ${w.ev?"disabled":""}>Descer aos esgotos da fortaleza</button>`);
+  if(hereLoc && hereLoc.k === "volcano" && !here.dg) acts.push(`<button class="btn" data-act="wCaveIn" data-t="15" ${w.ev?"disabled":""}>Entrar na Caverna Vulcânica</button>`);
+  if(hereLoc && hereLoc.k === "corals" && here.cave && !here.dg) acts.push(`<button class="btn" data-act="wCaveIn" data-t="16" ${w.ev?"disabled":""}>Entrar na Caverna Aquática</button>`);
   if(here.dg && here.dg.type === 9) acts.push(`<button class="btn ghost" data-act="wGods" ${w.ev || (h.provisions||0) < 1 ? "disabled" : ""}>Oferenda aos Deuses Esquecidos <small>(1 provisão)</small></button>`);
   const retire = mustRetire(h) ? `<div class="banner"><b>Fim da jornada de ${esc(h.name)}</b><p class="small">Os ferimentos são irreparáveis. Encontre uma cidade para passar o legado adiante, ou registre o fim na ficha.</p></div>` : "";
   const far = state.ui.far ? `<div class="banner"><b>Poção do Lugar Distante</b><p class="small">${pcMode() ? "Clique" : "Toque"} no mapa no hexágono já descoberto para onde você quer ir.</p><button class="btn ghost" data-act="farCancel">Cancelar</button></div>` : "";
@@ -6642,6 +7056,13 @@ const actionsWorld = {
     s.left--; H().magic++; wLog(`Camuflagem: você passa despercebido (${w.ev.k === "mon" ? (w.ev.qty>1 ? w.ev.pl : w.ev.n) : w.ev.n}).`); w.ev = null; persist(); render();
   },
   async wClimate(){ const w = WD(), e = w.ev; if(!e || e.k !== "clima") return; w.ev = null; wBegin(); await applyClimate(e); if(state.hero) wEnd(); else { busy = false; persist(); render(); } },
+  wCaveIn(b){
+    const w = WD(), hx = wHere(), t = +b.dataset.t; if(!hx || hx.dg || w.ev || ![12,15,16].includes(t)) return;
+    const nm = t === 12 ? `Os Esgotos d${/^Cidade/.test(locLabel(hx.loc)) ? "a" : "a"} ${locLabel(hx.loc)}` : worldDungeonName(t, 3+d6()+d6(), 3+d6()+d6(), 3+d6()+d6());
+    hx.dg = {uid:Date.now().toString(36)+Math.floor(Math.random()*1e4), type:t, name:nm, dice:[0,0,0]};
+    wLog(t === 12 ? "Você abre o bueiro e desce para os esgotos." : `Você encontra a entrada d${nm.startsWith("A ")?"a":"o"} ${nm.slice(2)}.`);
+    actions.wEnterDg();
+  },
   wEnterDg(){
     const w = WD(), hx = wHere(), m = hx && hx.dg; if(!m || w.ev) return;
     let d = state.dungeon;
@@ -7749,7 +8170,8 @@ function pcHexPopHTML(){
   if(state.ui.wHere && state.ui.wHere === w.pos){
     const here = w.hex[w.pos], acts = [], r = here.dg && dgRec(here.dg);
     if(worldCityHere()) acts.push(`<button class="pbtn" data-act="go" data-to="city">Entrar na ${esc(locLabel(here.loc))}</button>`);
-    if(here.dg && !(r && r.complete)) acts.push(`<button class="pbtn" data-act="wEnterDg">${r && r.visits ? "Voltar para a masmorra" : "Entrar na masmorra"}</button>`);
+    if(here.dg && !(r && r.complete)) acts.push(`<button class="pbtn" data-act="wEnterDg">${dgEnterLabel(here.dg, r)}</button>`);
+    if(!here.dg && here.loc){ const t = here.loc.k === "fort" ? 12 : here.loc.k === "volcano" ? 15 : here.loc.k === "corals" && here.cave ? 16 : 0; if(t) acts.push(`<button class="pbtn" data-act="wCaveIn" data-t="${t}">${t === 12 ? "Descer aos esgotos" : t === 15 ? "Entrar na Caverna Vulcânica" : "Entrar na Caverna Aquática"}</button>`); }
     if(!acts.length) return "";
     return `<div class="hexpop" id="hexpop" data-k="${w.pos}" data-here="1"><span class="lbl">${esc(here.dg && !here.loc ? here.dg.name : hexDesc(w.pos).split(" · ")[0])}</span>${acts.join("")}</div>`;
   }
@@ -8489,8 +8911,8 @@ const actions = {
     persist(); render();
   },
   coopRecv(){ if(COOPC.on() && C().phase === "alloc") applyCoopDamage(); },
-  async coopCreate(){ state.ui.coopMsg = "Criando a sala..."; render(); try{ const e = await COOP.create(); state.ui.coopMsg = e || "Sala criada! Passe o código para o seu parceiro."; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } render(); },
-  async coopJoin(){ const c = ($("#coopCode")||{}).value; state.ui.coopMsg = "Entrando..."; render(); try{ const e = await COOP.join(c); state.ui.coopMsg = e || "Você entrou na dupla!"; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } mapVersion++; render(); },
+  async coopCreate(){ if(!coopEnabled()) return; state.ui.coopMsg = "Criando a sala..."; render(); try{ const e = await COOP.create(); state.ui.coopMsg = e || "Sala criada! Passe o código para o seu parceiro."; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } render(); },
+  async coopJoin(){ if(!coopEnabled()) return; const c = ($("#coopCode")||{}).value; state.ui.coopMsg = "Entrando..."; render(); try{ const e = await COOP.join(c); state.ui.coopMsg = e || "Você entrou na dupla!"; }catch(err){ state.ui.coopMsg = "Não foi possível falar com o servidor."; } mapVersion++; render(); },
   async coopLeave(){ if(state.dungeon && state.dungeon.inside) return; await COOP.leave(); state.ui.coopMsg = "Você saiu da dupla."; mapVersion++; render(); },
   takeTorch(){ COOP.takeTorch(); },
   giveItem(b){
@@ -8681,6 +9103,11 @@ const actions = {
     if(/^Poção do Lugar Distante/.test(it.n)){ if(!state.world || (state.dungeon && state.dungeon.inside)) return; state.ui = {far:true}; go("world"); return; }
     if(/^Rubi/.test(it.n)){ state.ui.ruby = i; render(); return; }
     let extra = "";
+    if(/^Cogumelo Cheiroso/.test(it.n)){ const b0 = h.pv; h.pv = Math.min(h.pvMax, h.pv+2); extra = `O cogumelo cheiroso te devolve ${h.pv-b0} PV.`; }
+    if(/^Pão Mofado/.test(it.n)){ const b0 = h.provisions||0; h.provisions = Math.min(provMax(), b0+3); extra = `O pão mofado especial rende ${h.provisions-b0} provisões.`; }
+    if(/^Pacote com/.test(it.n)){ const b0 = h.torches; h.torches = Math.min(10, h.torches + (it.torchPack||1)); extra = `Você guarda ${h.torches-b0} tocha${h.torches-b0===1?"":"s"}.`; }
+    if(/^Perfume/.test(it.n)){ extra = "Você passa o perfume. Pelo menos agora ninguém vai reclamar do cheiro."; }
+    if(/^Sino/.test(it.n)){ if(!(state.dungeon && state.dungeon.inside)) return; D().bell = true; extra = "Você toca o sino. A próxima porta ou comporta que você abrir, um monstro abre por você: sem tocha e sem armadilha."; }
     if(/^Barril de Cerveja Anã/.test(it.n)){ const b0 = h.pv; h.pv = Math.min(h.pvMax, h.pv+5); extra = `Você bebeu a cerveja anã e recuperou ${h.pv-b0} PV.`; }
     if(/^Bebida Doce Viciante/.test(it.n)){ const b0 = h.pv; h.pv = Math.min(h.pvMax, h.pv+1); extra = `A bebida doce te devolve ${h.pv-b0} PV. Dá vontade de tomar outra.`; }
     if(/^Fruta Estranha/.test(it.n)){ const sp = Object.entries(h.spells).find(([,x])=>x.left < x.max); if(sp){ sp[1].left++; extra = `A fruta estranha devolve 1 uso de ${sp[0]}.`; } else extra = "Você comeu a fruta estranha, mas nenhuma magia estava gasta."; }
@@ -8847,6 +9274,9 @@ const actions = {
   },
   playDead(){ if(!raceT("zumbi")) return; cLog("Você se faz de morto... e escapa quando os monstros se distraem."); fleeCombat(); },
   horn(){ heroAttack("horn"); },
+  crates(){ if(!busy) openCrates(); },
+  refuge(){ useRefuge(); },
+  cart(){ if(!busy) mineCart(); },
   bite(){ const e = state.hero.armor.Elmo; if(e && e.bite) heroAttack("bite"); },
   cspell(b){ heroSpell(b.dataset.n); },
   citem(b){ heroItem(+b.dataset.i); },
