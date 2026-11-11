@@ -1054,7 +1054,7 @@ async function labMutation(why){
   (h.mut = h.mut || []).push(k);
   if(k === "pedra"){ h.pvMax += 4; h.pv += 4; }
   if(k === "fraco"){ h.pvMax = Math.max(1, h.pvMax - 6); h.pv = Math.min(h.pv, h.pvMax); }
-  if(k === "braco") h.arms = (h.arms||2) + 1;
+  if(k === "braco") armsGain(h);
   if(k === "bolhas"){ ARMOR_SLOTS.forEach(s=>{ if(h.armor[s]){ h.bag.push(h.armor[s]); delete h.armor[s]; } }); }
   if(k === "dedo" && h.armor.Botas){ h.bag.push(h.armor.Botas); delete h.armor.Botas; }
   if(!["poodle","olho"].includes(k)) (h.marks = h.marks || []).push(txt.split(":")[0]);
@@ -4866,6 +4866,9 @@ function buildSpells(dr){
   dr.spells.forEach(e=>{ const x = draftSpell(e); add(spellRollName(x.t, x.v),1); });
   return map;
 }
+/* máximo de braços: o da raça ou o maior já alcançado (Mão na Roda, mutação); a Poção da Salamandra recupera até ele */
+function armsMax(h){ h = h || state.hero; return Math.max(raceStart(h).arms, h.armsMax || 0, h.arms || 2); }
+function armsGain(h){ h.arms = (h.arms||2) + 1; h.armsMax = Math.max(h.armsMax || 0, raceStart(h).arms, h.arms); }
 function raceStart(dr){
   const rs = [R(dr.race), R(dr.race2)].filter(Boolean);
   return {coins: rs.reduce((a,r)=>a+(r.coins||0),0), gun: rs.some(r=>r.gun), arms: Math.max(2, ...rs.map(r=>r.arms||2))};
@@ -4985,7 +4988,7 @@ function viewSheet(){
       <button class="mini" data-act="pv" data-d="1" aria-label="Recuperar 1 PV">+</button>
     </div>
     <div class="hp" aria-hidden="true"><i style="width:${pct}%"></i></div>
-    ${(h.arms||2) < raceStart(h).arms && handsFree(h) < 2 ? `<p class="note">Você perdeu um braço. ${handsFree(h) ? "Só dá para usar uma arma de uma mão." : "Sem a Lamparina, a única mão segura a tocha e você não consegue atacar com armas. Saia vivo da masmorra."}</p>` : ""}
+    ${(h.arms||2) < armsMax(h) && handsFree(h) < 2 ? `<p class="note">Você perdeu um braço. ${handsFree(h) ? "Só dá para usar uma arma de uma mão." : "Sem a Lamparina, a única mão segura a tocha e você não consegue atacar com armas. Saia vivo da masmorra."}</p>` : ""}
   </div>
   <div class="sheet">
     <h3>Tochas</h3>
@@ -5010,7 +5013,7 @@ function viewSheet(){
     </div>
     <div class="sheet">
       <h3>Mãos <span class="n" style="font-size:12px">${handsUsed(h)}/${handsFree(h)}</span></h3>
-      <p class="muted small" style="margin:0 0 6px">${h.arms||2} braço${(h.arms||2)===1?"":"s"}${hasLamp() || raceT("tongue") || !COOP.holdsTorch(h) ? "" : ", um com a tocha"}</p>
+      <p class="muted small" style="margin:0 0 6px">${h.arms||2}/${armsMax(h)} braço${armsMax(h)===1?"":"s"}${hasLamp() || raceT("tongue") || !COOP.holdsTorch(h) ? "" : ", um com a tocha"}</p>
       ${COOP.on() && !hasLamp() && !raceT("tongue") ? (COOP.holder() === COOP.me() ? `<button class="btn ghost" disabled>Você está segurando a tocha</button>` : `<button class="btn ghost" data-act="takeTorch">Segurar a tocha</button><p class="muted small">${esc(COOP.partner() ? COOP.partner().name : "Seu parceiro")} está com a tocha${COOP.sameRoom() ? "" : ", mas não está na mesma sala que você"}.${state.coop.own ? " Você acendeu uma tocha própria." : ""}</p>`) : ""}
       ${state.ui.armsMsg ? `<p class="toast" style="text-align:left">${esc(state.ui.armsMsg)}</p>` : ""}
       <button class="slot full eqbtn ${eq==="weapon"?"sel":""}" data-act="eqSel" data-s="weapon"><b>${esc(h.weapon.n.split(" (")[0])}</b><span class="small">Dano ${h.weapon.d}${h.weapon.two?" · Duas Mãos":""}</span>${descHTML(h.weapon, false)}</button>
@@ -9570,8 +9573,8 @@ const actions = {
     if(/^Poção do Goblin/.test(it.n)){ (h.marks = h.marks || []).push("Tem a aparência de um goblin."); extra = "Sua pele fica verde e suas orelhas crescem: agora você parece um goblin."; }
     if(/^Poção da Mutação/.test(it.n)){ h.bag.splice(i,1); state.ui.bagSel = null; persist(); render(); labMutation("Poção da Mutação"); return; }
     if(/^Poção da Luminescência/.test(it.n)) h.torches = Math.min(10, h.torches+2);
-    if(/^Poção da Salamandra/.test(it.n)) h.arms = Math.max(h.arms||2, raceStart(h).arms);
-    if(/^Poção Mão na Roda/.test(it.n)){ h.arms = (h.arms||2) + 1; state.ui.armsMsg = `Um braço novo brota! Agora você tem ${h.arms} braços.`; }
+    if(/^Poção da Salamandra/.test(it.n)) h.arms = Math.max(h.arms||2, armsMax(h));
+    if(/^Poção Mão na Roda/.test(it.n)){ armsGain(h); state.ui.armsMsg = `Um braço novo brota! Agora você tem ${h.arms} braços.`; }
     if(/^Poção da Salamandra/.test(it.n)) state.ui.armsMsg = `Seu corpo se regenera: você tem ${h.arms} braços.`;
     const sp = (it.n.match(/^Pergaminho Mágico \((.+)\)/)||[])[1];
     let msg = `Você usou ${it.n.split(" (")[0]}.`;
@@ -9608,7 +9611,7 @@ const actions = {
       if(/Goblin/.test(nm)) (h.marks = h.marks || []).push("Tem a aparência de um goblin.");
       if(/Zumbi/.test(nm)) h.zpot = true;
       if(/Luminescência/.test(nm)) h.torches = Math.min(10, h.torches+2);
-      if(/Mão na Roda/.test(nm)){ h.arms = (h.arms||2) + 1; log(`Um braço novo brota! Agora você tem ${h.arms} braços.`); }
+      if(/Mão na Roda/.test(nm)){ armsGain(h); log(`Um braço novo brota! Agora você tem ${h.arms} braços.`); }
       if(/Louco/.test(nm)){ const got = []; for(let k=0;k<3;k++){ const n = SPELLS[d6()].n; got.push(n); h.spells[n] = h.spells[n] ? {max:h.spells[n].max+1, left:h.spells[n].left+1} : {max:1,left:1}; } log(`Você aprende: ${got.join(", ")}.`); }
       endAction();
     })();
