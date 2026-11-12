@@ -7127,8 +7127,8 @@ const FENCE_V = [[0,-22],[26,-7],[26,7],[0,22],[-26,7],[-26,-7]];
 const fenceCache = {};
 function fenceSprite(lv){
   if(fenceCache[lv]) return fenceCache[lv];
-  const cv = pixCanvas(TW, TH + 4, ({P,rect,disc})=>{
-    const ox = TCX, oy = TCY + 2;
+  const cv = pixCanvas(TW + 8, TH + 4, ({P,rect,disc})=>{
+    const ox = TCX + 4, oy = TCY + 2;
     const cols = {
       0:(i,x,y)=>{ const h = 3 + (i%3===0 ? 1 : 0); for(let k=0;k<h;k++) P(x, y-k, k===h-1 ? "#f0d878" : k===1 ? "#7a5a24" : i%3===1 ? "#c8a444" : "#e0bc58"); },
       1:(i,x,y)=>{ const h = 5; for(let k=0;k<h;k++) P(x, y-k, k===h-1 ? "#d8b080" : (i%4<2 ? "#8a5a2c" : "#6a4424")); },
@@ -7143,8 +7143,24 @@ function fenceSprite(lv){
       for(let t=0;t<len;t++){
         const x = Math.round(ox + x0 + (x1-x0)*t/len), y = Math.round(oy + y0 + (y1-y0)*t/len);
         if(Math.abs(x - ox) < 5 && y - oy > 14) { n++; continue; }   /* entrada na frente */
+        if(lv >= 4 && x0 === x1){ n++; continue; }   /* as laterais retas são desenhadas à parte, mais grossas */
         cols(n++, x, y);
       }
+    }
+    /* portãozinho na entrada da frente, de acordo com o tipo de cerca */
+    { const gx = ox, gy = oy + 21;
+      if(lv === 0){ rect(gx-5, gy-5, 1, 6, "#6a4424"); rect(gx+4, gy-5, 1, 6, "#6a4424"); rect(gx-4, gy-3, 8, 4, (i)=> i%2 ? "#e0bc58" : "#c8a444"); rect(gx-4, gy-2, 8, 1, "#7a5a24"); P(gx-5, gy-6, "#f0d878"); P(gx+4, gy-6, "#f0d878"); }
+      else if(lv === 1){ rect(gx-5, gy-7, 2, 8, (i)=> i ? "#6a4424" : "#8a5a2c"); rect(gx+3, gy-7, 2, 8, (i)=> i ? "#6a4424" : "#8a5a2c"); P(gx-5, gy-8, "#d8b080"); P(gx-4, gy-8, "#d8b080"); P(gx+3, gy-8, "#d8b080"); P(gx+4, gy-8, "#d8b080"); rect(gx-3, gy-5, 6, 6, (i,j)=> j%2 ? "#6a4424" : "#8a5a2c"); }
+      else if(lv === 2){ rect(gx-5, gy-6, 2, 7, (i)=> i ? "#dcd0b4" : "#f4ecd8"); rect(gx+3, gy-6, 2, 7, (i)=> i ? "#dcd0b4" : "#f4ecd8"); P(gx-5, gy-7, "#e8c040"); P(gx+4, gy-7, "#e8c040"); rect(gx-3, gy-5, 6, 6, "#6a2a3a"); rect(gx-3, gy-6, 6, 1, "#f4ecd8"); P(gx+1, gy-2, "#e8c040"); rect(gx, gy-5, 1, 6, "#4a1a28"); }
+      else if(lv === 3){ rect(gx-5, gy-7, 2, 8, (i)=> i ? "#8a867e" : "#b8b4ac"); rect(gx+3, gy-7, 2, 8, (i)=> i ? "#66625c" : "#8a867e"); rect(gx-5, gy-8, 10, 2, "#a8a49c"); P(gx-5, gy-9, "#c8c4bc"); P(gx-1, gy-9, "#c8c4bc"); P(gx+3, gy-9, "#c8c4bc"); rect(gx-3, gy-6, 6, 7, "#1a1218"); for(let i=-2;i<3;i+=2) rect(gx+i, gy-6, 1, 7, "#5a5a62"); }
+      else if(lv === 4){ rect(gx-5, gy-7, 2, 8, (i)=> i ? "#9a968e" : "#c8c4bc"); rect(gx+3, gy-7, 2, 8, (i)=> i ? "#76726c" : "#9a968e"); rect(gx-5, gy-11, 3, 4, "#3a52b0"); rect(gx+2, gy-11, 3, 4, "#3a52b0"); P(gx-5, gy-11, "#4a6ad8"); P(gx+2, gy-11, "#4a6ad8"); rect(gx-3, gy-8, 6, 2, "#9a968e"); rect(gx-3, gy-6, 6, 7, "#5a3a20"); rect(gx-3, gy-4, 6, 1, "#3a3a42"); rect(gx, gy-6, 1, 7, "#3a2412"); }
+      else { rect(gx-6, gy-11, 3, 12, (i)=> i===0 ? "#b8b4ac" : i===2 ? "#4e4a46" : "#76726c"); rect(gx+3, gy-11, 3, 12, (i)=> i===0 ? "#b8b4ac" : i===2 ? "#4e4a46" : "#76726c"); P(gx-6, gy-12, "#b8b4ac"); P(gx-4, gy-12, "#b8b4ac"); P(gx+3, gy-12, "#b8b4ac"); P(gx+5, gy-12, "#b8b4ac");
+        rect(gx-3, gy-9, 6, 2, "#8e8a82"); rect(gx-3, gy-7, 6, 8, "#1a1218"); for(let i=-2;i<3;i+=2) rect(gx+i, gy-7, 1, 8, "#5a5a62"); rect(gx-3, gy-4, 6, 1, "#5a5a62"); rect(gx-6, gy-16, 1, 4, "#2a2420"); rect(gx-5, gy-16, 3, 2, "#d82e2e"); } }
+    if(lv >= 4){   /* laterais retas: muro grosso ligando as torres */
+      const h = lv === 5 ? 7 : 5;
+      [-1,1].forEach(sg=>{ const x0 = Math.round(ox + sg*26) - 1, yt = Math.round(oy - 7), yb = Math.round(oy + 7);
+        rect(x0, yt - h, 3, yb - yt + h, (i,j)=> i === (sg < 0 ? 0 : 2) ? "#c8c4bc" : i === (sg < 0 ? 2 : 0) ? "#66625c" : (j % 4 === 3 ? "#76726c" : "#8e8a82"));
+        for(let y=yt-h-1;y<yb;y+=3){ P(x0, y, "#b8b4ac"); P(x0+2, y, "#b8b4ac"); } });
     }
     if(lv >= 4){   /* torrinhas nos vértices */
       FENCE_V.forEach(([vx,vy],k)=>{ if(k === 3) return; const x = Math.round(ox + vx), y = Math.round(oy + vy), w = lv === 5 ? 6 : 4, h = lv === 5 ? 11 : 8;
@@ -7160,7 +7176,7 @@ function drawBld(ctx, hx, cx, cy){
   const lv = hx.bld.lv;
   const by = cy + 3, sp = bldSprite(lv), ah = sp.anchorH || sp.height;
   drawGround(ctx, hx.t, cx, by, 22, 11);
-  ctx.drawImage(fenceSprite(lv), Math.round(cx - TCX), Math.round(cy - TCY - 2));
+  ctx.drawImage(fenceSprite(lv), Math.round(cx - TCX - 4), Math.round(cy - TCY - 2));
   ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - ah));
 }
 function drawLoc(ctx, hx, cx, cy){
