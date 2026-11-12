@@ -343,7 +343,9 @@ html.pc #app.pcv{max-width:none;height:100vh;box-sizing:border-box;display:grid;
 #app.pcv .pcL > p{margin:0}
 #app.pcv .pcR{grid-column:2;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;overflow-y:auto;padding-right:4px}
 #app.pcv .pcR > *{flex-shrink:0}
-#app.pcv-world .pcR{overflow:hidden;padding-right:0}
+#app.pcv-world .pcR, #app.pcv-explore .pcR{overflow:hidden;padding-right:0}
+html.pc #app.pcv.pcv-explore{grid-template-columns:minmax(0,1fr) 520px}
+#app.pcv-explore .pctabs button[data-t=mapa]{flex:2.4}
 #app.pcv .pcL .arena{width:min(100%, calc((100vh - 330px) * 1.5));align-self:center}
 #app.pcv .pcL .tgts{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pcside{display:flex;flex-direction:column;gap:8px}
@@ -5996,11 +5998,7 @@ function viewSettings(){
     <div class="ticks">${["10 itens","20 itens","Sem limite"].map((t,i)=>`<span class="${[10,20,0][i]===st.bagCap?"on":""}">${t}</span>`).join("")}</div>
     <p class="muted small">${st.bagCap===10 ? "Regra do livro." : st.bagCap===20 ? "O dobro da regra do livro." : "Carregue quantos itens quiser."}</p>
   </div>
-  <div class="sheet"><h3>Mapa</h3>
-    ${opt(true,"noop","","Automático","O jogo rola, desenha e encaixa cada segmento")}
-    ${opt(false,"noop","","Manual","Em breve: escolha 1 de 3 desenhos e arraste para encaixar no mapa",true)}
-  </div>
-  <div class="sheet"><h3>Som e vibração</h3><p class="muted small">Em breve.</p></div>`;
+  `;
 }
 
 /* cemitério */
@@ -7255,7 +7253,7 @@ const BLD = [
   {n:"Cidade", cost:1000, def:6, slots:5, req:"Lorde"}, {n:"Fortaleza", cost:3000, def:12, slots:6, req:"Rei"}];
 /* as melhorias só podem ser feitas nesta ordem */
 const BIMP = [
-  {id:"fonte", n:"Fonte", cost:100, txt:"Recupera todos os PV, de graça."},
+  {id:"fonte", n:"Fonte", cost:100, txt:"Recupera todos os PV e as magias, de graça."},
   {id:"forja", n:"Ferreiro", cost:200, txt:"Conserta todas as armaduras, de graça."},
   {id:"cofre", n:"Sala Cofre", cost:500, txt:"Guarda os espólios (só desta construção)."},
   {id:"rota", n:"Rota de Comércio", cost:1000, txt:"Liga as Salas Cofre: o mesmo cofre em todas as construções com Rota."},
@@ -7281,7 +7279,7 @@ function bldHTML(){
   out.push(`<span class="label" style="margin-top:6px">${b ? "Melhorar a construção" : "Construir aqui"}</span>`);
   if(bldMult(hx.t) > 1) out.push(`<p class="small">Fora da Planície o custo é o dobro.</p>`);
   BLD.forEach((d,i)=>{
-    if(i <= cur) return;
+    if(i !== cur + 1) return;
     const price = bldPrice(i, hx), ok = !d.req || hasClass(d.req);
     out.push(row(d.n, `${N(price)} moedas · Defesa ${d.def} · ${d.slots} melhoria${d.slots>1?"s":""}${d.req ? ` · precisa ser ${d.req}` : ""}`, `<button class="use" data-act="wBuild" data-i="${i}" ${h.coins < price || !ok ? "disabled" : ""}>${b ? "Melhorar" : "Construir"}</button>`));
   });
@@ -7294,7 +7292,7 @@ function bldHTML(){
       out.push(row(m.n, `${m.txt} · ${N(m.cost)} moedas${why}`, have ? `<span class="chip solid">Pronta</span>` : `<button class="use" data-act="wImp" ${next && h.coins >= m.cost ? "" : "disabled"}>Construir</button>`));
     });
     const sv = [];
-    if(bldHas(b, "fonte")) sv.push(`<button class="btn ghost" data-act="wFonte" ${h.pv >= h.pvMax ? "disabled" : ""}>Beber da Fonte <small>(todos os PV, de graça)</small></button>`);
+    if(bldHas(b, "fonte")) sv.push(`<button class="btn ghost" data-act="wFonte" ${needRest(h) ? "" : "disabled"}>Beber da Fonte <small>(todos os PV e magias, de graça)</small></button>`);
     if(bldHas(b, "forja")){ const br = ARMOR_SLOTS.some(sl=>h.armor[sl] && armorCur(h.armor[sl]) < h.armor[sl].pv); sv.push(`<button class="btn ghost" data-act="wForja" ${br ? "" : "disabled"}>Ferreiro <small>(conserta todas as armaduras, de graça)</small></button>`); }
     if(bldHas(b, "quartel")) sv.push(b.troop ? `<p class="small">Uma tropa está pronta para a guerra.</p>` : `<button class="btn ghost" data-act="wTroop" ${h.coins < 200 ? "disabled" : ""}>Recrutar tropa <small>(200 moedas)</small></button>`);
     if(sv.length) out.push(`<span class="label" style="margin-top:6px">Serviços</span><div class="stack">${sv.join("")}</div>`);
@@ -7524,7 +7522,7 @@ const actionsWorld = {
     wLog(`Melhoria pronta: ${m.n} (${m.cost} moedas).`);
     persist(); render();
   },
-  wFonte(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "fonte") || h.pv >= h.pvMax) return; h.pv = h.pvMax; party(h).forEach(p=>{ p.pv = p.max; }); wLog("Você bebe da Fonte e recupera todos os PV."); persist(); render(); },
+  wFonte(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "fonte") || !needRest(h)) return; h.pv = h.pvMax; Object.values(h.spells||{}).forEach(s=>{ s.left = s.max; }); party(h).forEach(p=>{ p.pv = p.max; if(p.spells) Object.values(p.spells).forEach(x=>{ x.left = x.max; }); }); wLog("Você bebe da Fonte e recupera todos os PV e magias."); persist(); render(); },
   wForja(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "forja")) return; let n = 0; ARMOR_SLOTS.forEach(sl=>{ const p = h.armor[sl]; if(p && armorCur(p) < p.pv){ p.cur = p.pv; n++; } }); if(n){ wLog(`O Ferreiro conserta ${n} peça${n>1?"s":""} de armadura, de graça.`); persist(); render(); } },
   wTroop(){ const h = state.hero, b = wHere().bld; if(!bldHas(b, "quartel") || b.troop || h.coins < 200) return; h.coins -= 200; b.troop = true; wLog("Você recrutou uma tropa no Quartel General (200 moedas)."); persist(); render(); },
   wStore(b){ const h = state.hero, bl = wHere().bld, i = +b.dataset.i; if(!bldHas(bl, "cofre") || !h.bag[i]) return; const it = h.bag.splice(i,1)[0]; bldChest(bl).push(it); persist(); render(); },
@@ -8578,13 +8576,13 @@ function pcSideTabs(){
 const PC_TABN = {mapa:"Mapa", ficha:"Ficha", mochila:"Mochila", magias:"Magias", grupo:"Grupo"};
 function pcSide(sc, mapEls){
   const tabs = pcSideTabs(); if(!tabs) return null;
-  const world = sc === "world";
+  const explore = sc === "explore", world = sc === "world" || explore;
   if(world) tabs.mapa = mapEls;
-  const keys = (world ? ["mapa","mochila","magias","grupo"] : ["ficha","mochila","magias","grupo"]).filter(k=>tabs[k].length || k === "mapa");
+  const keys = (sc === "world" ? ["mapa","mochila","magias","grupo"] : explore ? ["mapa","ficha","mochila","magias","grupo"] : ["ficha","mochila","magias","grupo"]).filter(k=>tabs[k].length || k === "mapa");
   if(!keys.includes(pcTab)) pcTab = keys[0];
   const open = world || pcTabOpen;
   const box = document.createElement("div"); box.className = "pcside" + (world ? " fill" : "");
-  box.innerHTML = `<div class="pctabs" role="tablist">${keys.map(k=>`<button role="tab" class="${k===pcTab && open ? "on" : ""}" aria-selected="${k===pcTab && open}" data-act="pcTab" data-t="${k}">${PC_TABN[k]}</button>`).join("")}</div>`;
+  box.innerHTML = `<div class="pctabs" role="tablist">${keys.map(k=>`<button role="tab" class="${k===pcTab && open ? "on" : ""}" aria-selected="${k===pcTab && open}" data-act="pcTab" data-t="${k}">${k === "mapa" && explore ? "Opções do Mapa" : PC_TABN[k]}</button>`).join("")}</div>`;
   if(open){
     const body = document.createElement("div"); body.className = "pcbody";
     tabs[pcTab].forEach(el=>body.appendChild(el));
@@ -8678,6 +8676,14 @@ function pcLayout(sc, saved){
       [...R.children].forEach(el=>{ (el.classList.contains("banner") || el.querySelector("[data-act=wFight],[data-act=wClimate]") ? urgent : mapEls).push(el); });
       const side = pcSide(sc, mapEls);
       R.innerHTML = ""; urgent.forEach(el=>R.appendChild(el)); if(side) R.appendChild(side);
+    } else if(sc === "explore"){
+      /* dentro da masmorra: as opções do mapa e o diário ficam na aba "Opções do Mapa", antes da Ficha */
+      if(!saved || saved.sc !== "explore") pcTab = "mapa";
+      const urgent = [], mapEls = [];
+      [...R.children].forEach(el=>{ (el.classList.contains("banner") || el.classList.contains("toast") ? urgent : mapEls).push(el); });
+      if(mapEls.some(el=>el.querySelector && el.querySelector("[data-act=confirmPick]"))) pcTab = "mapa";
+      const side = pcSide(sc, mapEls);
+      R.innerHTML = ""; urgent.forEach(el=>R.appendChild(el)); if(side) R.appendChild(side);
     } else {
       const side = pcSide(sc, []);
       if(side){ if(sc === "combat") R.appendChild(side); else R.prepend(side); }
@@ -8730,7 +8736,7 @@ window.addEventListener("resize", ()=>{
 const actionsPC = {
   pcTab(b){
     const t = b.dataset.t;
-    if(t === pcTab && pcTabOpen && state.screen !== "world") pcTabOpen = false;
+    if(t === pcTab && pcTabOpen && state.screen !== "world" && state.screen !== "explore") pcTabOpen = false;
     else { pcTab = t; pcTabOpen = true; }
     pcTabReset = true; render();
   }

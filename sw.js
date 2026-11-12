@@ -1,5 +1,5 @@
 // Dungeon Quest: cache para jogar offline. Troque a versão a cada atualização do jogo.
-const CACHE = 'dungeonquest-v29';
+const CACHE = 'dungeonquest-v30';
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon.png'];
 
