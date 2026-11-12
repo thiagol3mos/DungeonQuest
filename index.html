@@ -6308,7 +6308,7 @@ function canTravel(k){
   const w = WD(), hx = w.hex[k];
   if(!hx) return {ok:false, why:"Ainda não se sabe o que há lá."};
   if(w.ev) return {ok:false, why:"Resolva o encontro antes de seguir viagem."};
-  if(!hexNb(w.pos).includes(k)) return {ok:false, why:`Fica a ${hexDist(w.pos,k)} hexágonos daqui. Viaje um hexágono por vez.`};
+  if(!hexNb(w.pos).includes(k)) return {ok:false, why:`Fica a ${hexDist(w.pos,k)} hexágonos de você. Viaje um hexágono de cada vez.`};
   if(hx.loc && hx.loc.k === "rocks") return {ok:false, why:"Rochas: não é possível passar por aqui."};
   if(hx.loc && hx.loc.k === "fog") return {ok:false, fog:true, why:"Neblina densa: não dá para atravessar. Gaste 1 provisão para esperar ela dissipar."};
   if(hx.t === "ag" && !w.boat && !canSwim() && hasItem(/^Barco Dobrável/) < 0) return w.realm === "mortos" ? {ok:false, charon:true, why:"Deseja chamar o Barqueiro?"} : {ok:false, why:"Para andar na água você precisa de um barco. Contrate um numa cidade da costa."};
@@ -6858,6 +6858,10 @@ const TOWN_STYLE = {
   "Chocolate":{wall:["#8a5a3a","#6e4428","#4e2e1a"], roof:["#f0a0c0","#d07898","#a05474"], stone:["#c89a6a","#a87c50","#805a36"], flag:"#f8e040", wood:"#4a2a18"},
   "Mandolate":{wall:["#5a3a28","#402818","#2a1a10"], roof:["#e8c840","#c0a028","#8a7014"], stone:["#7a5a44","#5e4430","#40291c"], flag:"#e03050", wood:"#34200f"}
 };
+/* brasão do jogador: escudo vermelho e branco (6x7) */
+const SHIELD_ROWS = ["######","#WWRR#","#WWRR#","#RRWW#","#RRWW#",".#RW#.","..##.."];
+const SHIELD_C = {"#":"#1a1410", W:"#f8f4e8", R:"#d82e2e"};
+function shield(P, x, y){ SHIELD_ROWS.forEach((r,j)=>{ for(let i=0;i<r.length;i++){ const c = SHIELD_C[r[i]]; if(c) P(x+i, y+j, c); } }); }
 const townCache = {};
 function townSprite(kind, race){
   const key = kind + race; if(townCache[key]) return townCache[key];
@@ -6884,7 +6888,8 @@ function townSprite(kind, race){
 
   const B = H - 3;
   if(kind === "city"){
-    if(race === "Humana"){ tower(21, B-4, 6, 13, S.stone, S.roof, null); house(5, B-1, 11, 7, 6, {chimney:true}); house(26, B, 10, 6, 5); house(15, B+1, 8, 5, 4, {dx:1}); rect(3, B+1, 36, 1, S.wood); for(let i=3;i<39;i+=3) rect(i, B-1, 1, 3, S.wood); }
+    if(race === "Jogador"){ house(4, B-1, 11, 7, 6, {chimney:true}); house(27, B, 10, 6, 5); tower(21, B-4, 8, 14, S.stone, S.roof, S.flag); rect(17, B-4-14+3, 8, 5, S.stone[1]); shield(P, 18, B-4-14+3); rect(3, B+1, 36, 1, S.wood); for(let i=3;i<39;i+=3) rect(i, B-1, 1, 3, S.wood); }
+    else if(race === "Humana"){ tower(21, B-4, 6, 13, S.stone, S.roof, null); house(5, B-1, 11, 7, 6, {chimney:true}); house(26, B, 10, 6, 5); house(15, B+1, 8, 5, 4, {dx:1}); rect(3, B+1, 36, 1, S.wood); for(let i=3;i<39;i+=3) rect(i, B-1, 1, 3, S.wood); }
     else if(race === "Anã"){ /* salão na rocha */ for(let j=0;j<16;j++){ const half = Math.round(18*(j+4)/20); for(let i=-half;i<half;i++) P(21+i, B-16+j, i < -half/2 ? S.stone[0] : i < half/3 ? S.stone[1] : S.stone[2]); }
       rect(17, B-8, 8, 8, "#1a1418"); for(let i=0;i<8;i++){ P(17+i, B-9, S.stone[0]); } P(16, B-8, S.stone[0]); P(25, B-8, S.stone[2]); rect(20, B-12, 2, 2, "#d8a030"); house(3, B, 9, 5, 4, {roof:S.roof}); house(31, B, 9, 5, 4, {roof:S.roof}); }
     else if(race === "Élfica"){ tree(21, B-2, 9, ["#8ad870","#4aa050","#2a7038"]); house(4, B, 10, 6, 5); house(29, B, 9, 6, 5); P(21, B-8, "#f8e870"); P(17, B-12, "#f8e870"); P(25, B-14, "#f8e870"); }
@@ -6896,17 +6901,18 @@ function townSprite(kind, race){
     /* torre de menagem ao fundo */
     { const kw = 16, kh = 13, kx = 25 - kw/2, ky = B-10-kh, flat = race === "Orc" || wood;
       walls(kx, ky, kw, kh, C);
-      [[4,3],[10,3],[4,8],[10,8]].forEach(([dx,dy])=>win(kx+dx, ky+dy, "#1e1820"));
+      (race === "Jogador" ? [[4,8],[10,8]] : [[4,3],[10,3],[4,8],[10,8]]).forEach(([dx,dy])=>win(kx+dx, ky+dy, "#1e1820"));
+      if(race === "Jogador") shield(P, 22, ky+2);
       if(flat){ crenel(kx, ky, kw, C); rect(25, ky-8, 1, 6, "#2a2420"); rect(26, ky-8, 3, 2, S.flag); P(29, ky-7, S.flag); }
       else { cone(25, ky, kw/2+2, 9, S.roof); rect(25, ky-14, 1, 5, "#2a2420"); rect(26, ky-14, 3, 2, S.flag); P(29, ky-13, S.flag); } }
     /* muralha da frente */
     if(wood){ for(let i=4;i<46;i++){ const h = 12 + (i%2); rect(i, B-h, 1, h, i%2 ? "#86643a" : "#a07a4a"); P(i, B-h-1, "#c8b088"); } }
-    else { walls(4, B-11, 42, 11, C); crenel(4, B-11, 42, C); for(let i=6;i<44;i+=6) P(i, B-6, C[2]); }
+    else { const J = race === "Jogador", wx = J ? 8 : 4, ww = J ? 34 : 42; walls(wx, B-11, ww, 11, C); crenel(wx, B-11, ww, C); for(let i=wx+2;i<wx+ww-2;i+=6) P(i, B-6, C[2]); }
     /* portão */
     rect(21, B-8, 8, 8, "#1a1214"); for(let i=0;i<8;i++) P(21+i, B-9, C[0]); for(let i=22;i<29;i+=2) rect(i, B-8, 1, 8, "#5a5a62");
     /* torres dos lados */
-    tower(5, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
-    tower(45, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
+    tower(race === "Jogador" ? 10 : 5, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
+    tower(race === "Jogador" ? 40 : 45, B, 8, 17, C, race === "Orc" ? null : S.roof, S.flag);
     if(race === "Orc"){ spikes(10, B-11, 8, "#3a2418"); spikes(32, B-11, 8, "#3a2418"); }
     if(race === "Élfica"){ tree(14, B-11, 4, ["#8ad870","#4aa050","#2a7038"]); tree(37, B-11, 4, ["#8ad870","#4aa050","#2a7038"]); }
   }
@@ -7056,19 +7062,19 @@ function locSprite(key, f){
   /* portal: arco de pedra com redemoinho (3 quadros) */
   if(key === "b0") cv = pixCanvas(30, 28, ({P,rect,walls,tri,B})=>{   /* Casa */
     walls(5, B-12, 20, 12, ["#f0e4c8","#d8c8a4","#b8a47c"]); rect(20, B-21, 3, 6, "#9a968e"); tri(15, B-20, 13, 8, ["#e0684a","#c04a34","#8a2e22"]);
-    rect(7, B-9, 4, 4, "#6ab0e8"); rect(19, B-9, 4, 4, "#6ab0e8"); rect(13, B-8, 5, 8, "#6a4424"); P(16, B-4, "#e8c050"); rect(4, B, 22, 1, "#6a9a3a"); });
+    rect(7, B-9, 4, 4, "#6ab0e8"); rect(19, B-9, 4, 4, "#6ab0e8"); rect(13, B-8, 5, 8, "#6a4424"); P(16, B-4, "#e8c050"); rect(4, B, 22, 1, "#6a9a3a"); shield(P, 12, B-19); });
   if(key === "b1") cv = pixCanvas(24, 50, ({P,rect,walls,B})=>{   /* Torre */
     walls(6, B-30, 12, 30, STONE_G); rect(4, B-34, 16, 4, STONE_G[1]); for(let x=4;x<20;x+=4) rect(x, B-37, 3, 3, STONE_G[0]);
-    rect(10, B-8, 4, 8, DOOR); rect(10, B-24, 4, 5, "#1a1218"); rect(10, B-15, 4, 4, "#1a1218"); rect(12, B-46, 1, 9, "#6a4424"); rect(13, B-46, 6, 3, "#3a6ad8"); });
+    rect(10, B-8, 4, 8, DOOR); rect(10, B-15, 4, 4, "#1a1218"); shield(P, 9, B-27); rect(12, B-46, 1, 9, "#6a4424"); rect(13, B-46, 6, 3, "#3a6ad8"); });
   if(key === "b2") cv = pixCanvas(44, 38, ({P,rect,walls,disc,B})=>{   /* Palácio */
-    walls(4, B-16, 36, 16, ["#f8f0dc","#e0d4b4","#b8a884"]); walls(15, B-24, 14, 10, ["#fffaf0","#e8dcc0","#c0b090"]);
-    disc(22, B-28, 7, 6, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(8, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(36, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040"));
-    [8,13,29,34].forEach(x=>rect(x, B-14, 2, 12, "#fffaf0")); rect(19, B-11, 6, 11, "#6a2a3a"); rect(19, B-12, 6, 1, "#c8a040"); rect(3, B, 38, 2, "#e0d4b4"); });
+    walls(6, B-16, 32, 16, ["#f8f0dc","#e0d4b4","#b8a884"]); walls(15, B-24, 14, 10, ["#fffaf0","#e8dcc0","#c0b090"]);
+    disc(22, B-28, 7, 6, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(10, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040")); disc(34, B-18, 4, 3, (x,y,e)=>P(x, y, e > .7 ? "#c8901c" : "#f0c040"));
+    [9,13,29,33].forEach(x=>rect(x, B-14, 2, 12, "#fffaf0")); rect(19, B-11, 6, 11, "#6a2a3a"); rect(19, B-12, 6, 1, "#c8a040"); rect(5, B, 34, 2, "#e0d4b4"); shield(P, 19, B-23); });
   if(key === "b3") cv = pixCanvas(46, 44, ({P,rect,walls,tri,B})=>{   /* Castelo */
-    walls(8, B-18, 30, 18, STONE_G); walls(2, B-26, 10, 26, STONE_G); walls(34, B-26, 10, 26, STONE_G); walls(17, B-30, 12, 30, STONE_G);
-    tri(7, B-33, 7, 7, ["#4a6ad8","#3a52b0","#2a3a80"]); tri(39, B-33, 7, 7, ["#4a6ad8","#3a52b0","#2a3a80"]);
+    walls(10, B-18, 26, 18, STONE_G); walls(4, B-26, 9, 26, STONE_G); walls(33, B-26, 9, 26, STONE_G); walls(17, B-30, 12, 30, STONE_G);
+    tri(8, B-33, 6, 7, ["#4a6ad8","#3a52b0","#2a3a80"]); tri(38, B-33, 6, 7, ["#4a6ad8","#3a52b0","#2a3a80"]);
     for(let i=0;i<12;i+=4) rect(17+i, B-33, 3, 3, STONE_G[0]); rect(23, B-39, 1, 6, "#6a4424"); rect(24, B-39, 5, 3, "#d8302a");
-    rect(19, B-10, 8, 10, DOOR); rect(19, B-11, 8, 1, STONE_G[2]); rect(5, B-18, 2, 4, "#1a1218"); rect(39, B-18, 2, 4, "#1a1218"); rect(22, B-22, 2, 4, "#1a1218"); });
+    rect(19, B-10, 8, 10, DOOR); rect(19, B-11, 8, 1, STONE_G[2]); rect(7, B-18, 2, 4, "#1a1218"); rect(37, B-18, 2, 4, "#1a1218"); shield(P, 20, B-27); });
   if(key === "house") cv = pixCanvas(30, 28, ({P,rect,walls,tri,line,B})=>{   /* Casa Abandonada: torta, com janelas quebradas e porta tapada */
     walls(5, B-12, 20, 12, ["#a8946c","#86744e","#5e4e34"]); rect(20, B-21, 3, 6, "#5e5a54"); tri(15, B-20, 13, 8, ["#6a4a3a","#4e3428","#34221a"]);
     rect(7, B-9, 4, 4, "#1a1218"); rect(19, B-9, 4, 4, "#1a1218"); line(7, B-9, 10, B-6, "#a8946c"); line(22, B-9, 19, B-6, "#86744e");
@@ -7111,11 +7117,51 @@ function drawGround(ctx, t, cx, cy, rx, ry){
   const C = CLEARING[t] || CLEARING.pl;
   for(let y=-ry;y<=ry;y++) for(let x=-rx;x<=rx;x++){ const e = (x/rx)**2 + (y/ry)**2; if(e <= 1){ ctx.fillStyle = e > .75 ? C[1] : C[0]; if(zh(x+cx,y+cy) < .18) ctx.fillStyle = C[1]; ctx.fillRect(cx+x, cy+y, 1, 1); } }
 }
+/* sprite da construção do jogador (as melhorias não têm desenho próprio) */
+function bldSprite(lv){
+  const sp = lv >= 4 ? townSprite(lv === 5 ? "fort" : "city", "Jogador") : locSprite("b" + lv);
+  sp.anchorH = sp.height; return sp;
+}
+/* cerquinha baixa em volta do hexágono (acompanha a borda): palha, toras, pedras claras, muro, muro com torres, muralha */
+const FENCE_V = [[0,-22],[26,-7],[26,7],[0,22],[-26,7],[-26,-7]];
+const fenceCache = {};
+function fenceSprite(lv){
+  if(fenceCache[lv]) return fenceCache[lv];
+  const cv = pixCanvas(TW, TH + 4, ({P,rect,disc})=>{
+    const ox = TCX, oy = TCY + 2;
+    const cols = {
+      0:(i,x,y)=>{ const h = 3 + (i%3===0 ? 1 : 0); for(let k=0;k<h;k++) P(x, y-k, k===h-1 ? "#f0d878" : k===1 ? "#7a5a24" : i%3===1 ? "#c8a444" : "#e0bc58"); },
+      1:(i,x,y)=>{ const h = 5; for(let k=0;k<h;k++) P(x, y-k, k===h-1 ? "#d8b080" : (i%4<2 ? "#8a5a2c" : "#6a4424")); },
+      2:(i,x,y)=>{ const h = 4; for(let k=0;k<h;k++) P(x, y-k, k===h-1 ? "#fffaf0" : (i%6===0 || (k%2===0 && i%6===3)) ? "#a89c80" : k%2 ? "#f0e8d4" : "#dcd0b4"); },
+      3:(i,x,y)=>{ if(i%5 >= 3){ for(let k=0;k<4;k++) P(x, y-k, k===3 ? null : "#8a867e"); return; } for(let k=0;k<5;k++) P(x, y-k, k===4 ? "#c8c4bc" : (i%5===0 && k%2===0) ? "#66625c" : k%2 ? "#a8a49c" : "#8a867e"); },
+      4:(i,x,y)=>{ if(i%5 >= 3){ for(let k=0;k<4;k++) P(x, y-k, k===3 ? null : "#9a968e"); return; } for(let k=0;k<5;k++) P(x, y-k, k===4 ? "#d0ccc4" : (i%5===0 && k%2===0) ? "#76726c" : k%2 ? "#b8b4ac" : "#9a968e"); },
+      5:(i,x,y)=>{ if(i%6 >= 4){ for(let k=0;k<5;k++) P(x, y-k, k===4 ? null : "#6e6a62"); return; } for(let k=0;k<7;k++) P(x, y-k, k===6 ? "#b8b4ac" : (i%6===0 && k%2===0) ? "#4e4a46" : k%2 ? "#8e8a82" : "#76726c"); }
+    }[lv];
+    let n = 0;
+    for(let e=0;e<6;e++){
+      const [x0,y0] = FENCE_V[e], [x1,y1] = FENCE_V[(e+1)%6], len = Math.max(Math.abs(x1-x0), Math.abs(y1-y0));
+      for(let t=0;t<len;t++){
+        const x = Math.round(ox + x0 + (x1-x0)*t/len), y = Math.round(oy + y0 + (y1-y0)*t/len);
+        if(Math.abs(x - ox) < 5 && y - oy > 14) { n++; continue; }   /* entrada na frente */
+        cols(n++, x, y);
+      }
+    }
+    if(lv >= 4){   /* torrinhas nos vértices */
+      FENCE_V.forEach(([vx,vy],k)=>{ if(k === 3) return; const x = Math.round(ox + vx), y = Math.round(oy + vy), w = lv === 5 ? 6 : 4, h = lv === 5 ? 11 : 8;
+        rect(x - w/2, y - h, w, h, (i,j)=> i===0 ? "#b8b4ac" : i===w-1 ? "#66625c" : j%3===2 ? "#8e8a82" : "#9a968e");
+        for(let i=0;i<w;i+=2) P(x - w/2 + i, y - h - 1, "#b8b4ac");
+        if(lv === 4){ rect(x - w/2, y - h - 3, w, 3, "#3a52b0"); P(x - w/2 + 1, y - h - 3, "#4a6ad8"); }
+        else { rect(x, y - h - 5, 1, 4, "#2a2420"); rect(x + 1, y - h - 5, 3, 2, "#d82e2e"); } });
+    }
+  });
+  return fenceCache[lv] = cv;
+}
 function drawBld(ctx, hx, cx, cy){
   const lv = hx.bld.lv;
-  if(lv >= 4) return drawTown(ctx, {k:lv === 5 ? "fort" : "city", race:"Jogador"}, hx.t, cx, cy);
-  const by = cy + 3, sp = locSprite("b" + lv);
-  drawGround(ctx, hx.t, cx, by, 15, 5); ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - sp.height));
+  const by = cy + 3, sp = bldSprite(lv), ah = sp.anchorH || sp.height;
+  drawGround(ctx, hx.t, cx, by, 22, 11);
+  ctx.drawImage(fenceSprite(lv), Math.round(cx - TCX), Math.round(cy - TCY - 2));
+  ctx.drawImage(sp, Math.round(cx - sp.width/2), Math.round(by + 4 - ah));
 }
 function drawLoc(ctx, hx, cx, cy){
   const loc = hx.loc, by = cy + 3;
