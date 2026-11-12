@@ -1275,6 +1275,7 @@ let state = null;
 let busy = false;
 let toastMsg = "";
 let rollLog = [];
+const APP_VER = "v33";   /* o build_site.py atualiza este número */
 let mapVersion = 1, mapHero = null;
 
 function freshState(){ return {v:1, screen:"title", hero:null, draft:null, cemetery:[], dungeon:null, ui:{}, settings:defaultSettings()}; }
@@ -4777,6 +4778,7 @@ function viewTitle(){
       <button class="btn ghost" data-act="go" data-to="save">Backup</button>
     </div>
   </div>
+  <p class="credit">Versão: ${APP_VER}</p>
   <p class="credit">Versão para uso pessoal.</p>`;
 }
 
